@@ -117,24 +117,56 @@ class BackendQueryTypeLessThanOrEqual(BackendQueryType):
 class BackendQueryTypePartial(BackendQueryType):
     query_type = QueryTypePartial
 
+    # Characters that indicate the user explicitly wants a wildcard pattern.
+    # If the value contains any of these, the wildcard query is preserved.
+    WILDCARD_CHARS = ('*', '?')
+
+    def _value_has_explicit_wildcard(self):
+        return any(c in self.value for c in self.WILDCARD_CHARS)
+
     def do_resolve(self):
-        if self.value is not None:
-            if self.get_search_backend_field_type() != field.Date:
-                if self.is_quoted_value:
-                    return Q(
-                        name_or_query='match_phrase', _expand__to_dot=False,
-                        **{
-                            self.search_field.field_name: '{}'.format(self.value)
-                        }
-                    )
-                else:
-                    if self.get_search_backend_field_type() != field.Integer:
-                        return Q(
-                            name_or_query='wildcard', _expand__to_dot=False,
-                            **{
-                                self.search_field.field_name: '*{}*'.format(self.value)
-                            }
-                        )
+        if self.value is None:
+            return None
+
+        backend_field_type = self.get_search_backend_field_type()
+
+        if backend_field_type == field.Date:
+            # Date fields are not handled by partial search.
+            return None
+
+        if self.is_quoted_value:
+            # Quoted value — preserve original match_phrase behaviour.
+            return Q(
+                name_or_query='match_phrase', _expand__to_dot=False,
+                **{self.search_field.field_name: self.value}
+            )
+
+        if backend_field_type == field.Integer:
+            # Integers do not support wildcard or full-text match.
+            return None
+
+        if self._value_has_explicit_wildcard():
+            # The user explicitly typed a wildcard pattern (e.g. "factu*").
+            # Preserve the wildcard query so the intent is respected.
+            return Q(
+                name_or_query='wildcard', _expand__to_dot=False,
+                **{self.search_field.field_name: self.value}
+            )
+
+        # Default path — plain token with no explicit wildcard.
+        #
+        # Original behaviour: wildcard *value* — performs a full index scan
+        # because the leading * prevents ES from using the inverted index.
+        #
+        # Optimized behaviour: match query — ES tokenizes the value through
+        # the same analyser used at index time (accent fold, hyphen replace,
+        # casefold) and resolves against the inverted index. Orders of
+        # magnitude faster on large indices, and consistent with how the
+        # data was stored.
+        return Q(
+            name_or_query='match', _expand__to_dot=False,
+            **{self.search_field.field_name: self.value}
+        )
 
 
 class BackendQueryTypeRange(BackendQueryType):

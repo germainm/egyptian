@@ -30,7 +30,6 @@ class RedisLock(LockingBackend):
         else:
             redis_url = setting_backend_arguments.value.get('redis_url', None)
             server = redis.from_url(url=redis_url)
-            # Force to initialize the connection.
             server.client()
         return server
 
@@ -67,7 +66,7 @@ class RedisLock(LockingBackend):
             name='{}{}'.format(REDIS_LOCK_NAME_PREFIX, name),
             timeout=timeout
         )
-        if _redis_lock_instance.acquire(blocking=False):
+        if _redis_lock_instance.acquire(blocking=True, blocking_timeout=30):
             self._redis_lock_instance = _redis_lock_instance
         else:
             raise LockError

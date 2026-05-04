@@ -1,9 +1,10 @@
 from collections import deque
+from contextlib import contextmanager
 import functools
 
 import elasticsearch
 from elasticsearch import Elasticsearch, helpers
-from elasticsearch.dsl import Search
+from elasticsearch.dsl import Q, Search
 
 from mayan.literals import DEFAULT_ELASTICSEARCH_PASSWORD
 
@@ -13,6 +14,7 @@ from ...exceptions import (
 from ...search_backends import SearchBackend
 from ...search_fields import SearchFieldVirtualAllFields
 from ...search_models import SearchModel
+from ...settings import setting_results_limit
 
 from .literals import (
     DEFAULT_ELASTICSEARCH_HOSTS, DEFAULT_ELASTICSEARCH_INDICES_NAMESPACE,
@@ -40,7 +42,11 @@ class ElasticsearchSearchBackend(SearchBackend):
 
         self.indices_namespace = indices_namespace
         self.point_in_time_keep_alive = point_in_time_keep_alive
-        self.search_page_size = search_page_size
+        # Cap the page size to the results limit so ES never allocates a
+        # top-N heap larger than the number of results we will actually use.
+        self.search_page_size = min(
+            search_page_size, setting_results_limit.value
+        )
 
         self.client_kwargs = client_kwargs or {
             'basic_auth': ('elastic', DEFAULT_ELASTICSEARCH_PASSWORD),
@@ -53,16 +59,67 @@ class ElasticsearchSearchBackend(SearchBackend):
 
         self._client = Elasticsearch(**self.client_kwargs)
 
+        # Shared PIT id active during a top-level search() call.
+        # None means no shared PIT is active; each do_search_execute call
+        # will open and close its own PIT independently.
+        self._active_pit_id = None
+
+    @contextmanager
+    def _pit_context(self, index_name):
+        """
+        Open a Point-in-Time for index_name, expose its id via
+        self._active_pit_id for the duration of the block, then close it.
+
+        This context manager is entered once at the top of search() so that
+        every do_search_execute() call within the same request reuses the
+        same PIT instead of opening and closing one per scope.
+        """
+        pit = self._client.open_point_in_time(
+            index=index_name, keep_alive=self.point_in_time_keep_alive
+        )
+        self._active_pit_id = pit['id']
+        try:
+            yield self._active_pit_id
+        finally:
+            try:
+                self._client.close_point_in_time(id=self._active_pit_id)
+            except elasticsearch.exceptions.NotFoundError:
+                """PIT already expired — safe to ignore."""
+            finally:
+                self._active_pit_id = None
+
     def do_search_execute(self, index_name, search):
+        """
+        Execute a paginated Elasticsearch search using search_after + PIT,
+        sorted by relevance score descending.
+
+        Sort strategy:
+          primary   — _score descending: most relevant results come first.
+                      With SEARCH_QUERY_RESULTS_LIMIT set to a small value
+                      (e.g. 200), the user always sees the best matches
+                      rather than the oldest documents.
+          secondary — _shard_doc ascending: deterministic tiebreak required
+                      by ES for correct search_after pagination. Without it,
+                      two documents with the same score could swap positions
+                      between pages, causing duplicates or gaps.
+
+        If self._active_pit_id is set (i.e. we are inside a _pit_context
+        block), the existing PIT is reused and its lifecycle is NOT managed
+        here. Otherwise a new PIT is opened and closed within this method.
+        """
         model = self._get_model_for_index(index_name=index_name)
-        self._client.indices.refresh(index=index_name)
+        #self._client.indices.refresh(index=index_name)
 
         pk_field = model._meta.pk
 
-        point_in_time = self._client.open_point_in_time(
-            index=index_name, keep_alive=self.point_in_time_keep_alive
-        )
-        pit_id = point_in_time['id']
+        owned_pit = self._active_pit_id is None
+        if owned_pit:
+            pit = self._client.open_point_in_time(
+                index=index_name, keep_alive=self.point_in_time_keep_alive
+            )
+            pit_id = pit['id']
+        else:
+            pit_id = self._active_pit_id
 
         base = (
             Search(using=self._client)
@@ -73,7 +130,10 @@ class ElasticsearchSearchBackend(SearchBackend):
                 size=self.search_page_size,
                 track_total_hits=False
             )
-            .sort('_shard_doc')
+            .sort(
+                {'_score': {'order': 'desc'}},
+                {'_shard_doc': {'order': 'asc'}}
+            )
             .source(False)
         )
 
@@ -109,7 +169,8 @@ class ElasticsearchSearchBackend(SearchBackend):
                 'it already existed.'
             ) from exception
         finally:
-            self._client.close_point_in_time(id=pit_id)
+            if owned_pit:
+                self._client.close_point_in_time(id=pit_id)
 
     def _get_index_name(self, search_model):
         return '{}{}{}'.format(
@@ -172,6 +233,70 @@ class ElasticsearchSearchBackend(SearchBackend):
     def _initialize(self):
         self._update_mappings()
 
+    def search(
+        self, query, search_model, user, store_resultset=False, queryset=None
+    ):
+        """
+        Override the base search() to open a single shared PIT for the
+        entire request before delegating to the parent implementation.
+
+        All do_search_execute() calls triggered while resolving scopes will
+        detect self._active_pit_id and reuse the same PIT instead of each
+        opening and closing their own.
+        """
+        index_name = self._get_index_name(search_model=search_model)
+        with self._pit_context(index_name=index_name):
+            return super().search(
+                query=query, search_model=search_model, user=user,
+                store_resultset=store_resultset, queryset=queryset
+            )
+
+    def _search_all_fields(
+        self, search_field, query_type, value, is_quoted_value=False,
+        is_raw_value=False
+    ):
+        """
+        Optimized path for SearchFieldVirtualAllFields.
+
+        Instead of executing one Elasticsearch query per concrete field
+        (N round-trips, N PIT open/close cycles), this method builds a
+        single bool/should query that covers all compatible fields and
+        executes it in one request.
+
+        Fields whose value cannot be transformed for the given query type
+        (DynamicSearchValueTransformationError) are silently skipped,
+        matching the behaviour of the original sequential loop.
+        """
+        index_name = self._get_index_name(
+            search_model=search_field.search_model
+        )
+
+        should_clauses = []
+
+        for concrete_field in search_field.field_composition:
+            try:
+                field_query = query_type.resolve_for_backend(
+                    is_quoted_value=is_quoted_value,
+                    is_raw_value=is_raw_value,
+                    search_backend=self,
+                    search_field=concrete_field,
+                    value=value
+                )
+            except DynamicSearchValueTransformationError:
+                # This field type is incompatible with the value; skip it.
+                continue
+
+            if field_query is not None:
+                should_clauses.append(field_query)
+
+        if not should_clauses:
+            return
+
+        combined_query = Q('bool', should=should_clauses, minimum_should_match=1)
+        search = Search(index=index_name, using=self._client).filter(combined_query)
+
+        yield from self.do_search_execute(index_name=index_name, search=search)
+
     def _search(
         self, search_field, query_type, value, is_quoted_value=False,
         is_raw_value=False
@@ -185,35 +310,13 @@ class ElasticsearchSearchBackend(SearchBackend):
         )
 
         if isinstance(search_field, SearchFieldVirtualAllFields):
-            seen = set()
-
-            for search_field in search_field.field_composition:
-                try:
-                    search_field_query = query_type.resolve_for_backend(
-                        is_quoted_value=is_quoted_value,
-                        is_raw_value=is_raw_value, search_backend=self,
-                        search_field=search_field, value=value
-                    )
-                except DynamicSearchValueTransformationError:
-                    """Skip the search field."""
-                else:
-                    if search_field_query is not None:
-                        index_name = self._get_index_name(
-                            search_model=search_field.search_model
-                        )
-
-                        search = Search(index=index_name, using=self._client)
-                        search = search.filter(search_field_query)
-
-                        result = self.do_search_execute(
-                            index_name=index_name, search=search
-                        )
-                        for item in result:
-                            if item not in seen:
-                                seen.add(item)
-                                yield item
-            else:
-                return
+            yield from self._search_all_fields(
+                search_field=search_field,
+                query_type=query_type,
+                value=value,
+                is_quoted_value=is_quoted_value,
+                is_raw_value=is_raw_value
+            )
         else:
             search = Search(index=index_name, using=self._client)
 

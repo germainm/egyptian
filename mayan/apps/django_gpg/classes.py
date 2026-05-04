@@ -77,7 +77,9 @@ class SignatureVerification:
             self.expires = None
 
         self.fingerprint = raw['fingerprint']
-        self.signature_id = raw['signature_id']
+        self.signature_id = raw['signature_id'] or next(
+            iter(raw.get('sig_info', {})), None
+        )
         self.stderr = raw['stderr']
         self.trust_level = raw['trust_level']
         self.trust_text = raw['trust_text']

@@ -1,9 +1,12 @@
 import hashlib
+from io import BytesIO
 from itertools import islice
 import logging
 import shutil
+import time
 
 from django.apps import apps
+from django.db import IntegrityError
 from django.template.defaultfilters import filesizeformat
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
@@ -36,6 +39,17 @@ from ..signals import signal_post_document_file_upload
 logger = logging.getLogger(name=__name__)
 
 
+def _read_cache_file(cache_file):
+    """
+    Lit le contenu d'un CachePartitionFile en mémoire et retourne un BytesIO.
+    Ceci évite la race condition entre storage.exists() et open() — le fichier
+    physique est lu immédiatement pendant que le lock est tenu, avant que le
+    pruning ne puisse le supprimer.
+    """
+    with cache_file.open() as f:
+        return BytesIO(f.read())
+
+
 class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
     @staticmethod
     def hash_function():
@@ -43,10 +57,6 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
 
     @classmethod
     def execute_pre_create_hooks(cls, kwargs=None):
-        """
-        Helper method to allow checking if it is possible to create
-        a new document file.
-        """
         cls._execute_hooks(
             hook_list=cls._hooks_pre_create, instance=None, kwargs=kwargs
         )
@@ -160,10 +170,6 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
             self.upload_complete()
 
     def _open(self, raw=False, **kwargs):
-        """
-        Return a file descriptor to a document file's file irrespective of
-        the storage backend.
-        """
         DocumentFile = apps.get_model(
             app_label='documents', model_name='DocumentFile'
         )
@@ -233,20 +239,12 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
         return partition
 
     def checksum_update(self, save=True):
-        """
-        Open a document file's file and update the checksum field using
-        the user provided checksum function.
-        """
         DocumentFile = apps.get_model(
             app_label='documents', model_name='DocumentFile'
         )
 
         block_size = setting_hash_block_size.value
         if block_size == 0:
-            # If the setting value is 0 that means disable read limit.
-            # To disable the read limit passing None won't work, we pass
-            # -1 instead as per the Python documentation.
-            # https://docs.python.org/2/tutorial/inputoutput.html#methods-of-file-objects
             block_size = -1
 
         if self.exists():
@@ -267,11 +265,6 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
             return self.checksum
 
     def execute_pre_save_hooks(self):
-        """
-        Helper method to allow checking if new files are possible from
-        outside the model. Currently used by the document file upload link
-        condition.
-        """
         DocumentFile = apps.get_model(
             app_label='documents', model_name='DocumentFile'
         )
@@ -321,44 +314,114 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
     def get_intermediate_file(self):
         cache_filename = 'intermediate_file'
 
+        # Étape 1 — chercher le fichier dans le cache DB.
         try:
             cache_file = self.cache_partition.get_file(
                 filename=cache_filename
             )
         except CachePartitionFile.DoesNotExist:
-            logger.debug(msg='Intermediate file not found.')
+            logger.debug(msg='Intermediate file not found in cache.')
+        else:
+            logger.debug(msg='Intermediate file found in cache DB.')
+            storage_instance = self.cache_partition.cache.storage
+            if not storage_instance.exists(name=cache_file.full_filename):
+                # Cas A : worker gagnant en train d'écrire (transitoire)
+                # → attendre jusqu'à 10s qu'il apparaisse.
+                # Cas B : fichier purgé par pruning (orphelin permanent)
+                # → après 10s, supprimer l'entrée DB et régénérer.
+                logger.warning(
+                    'Intermediate file DB entry exists but physical file '
+                    'is missing for partition %s — waiting up to 10s.',
+                    self.cache_partition.pk
+                )
+                for _attempt in range(20):
+                    time.sleep(0.5)
+                    if storage_instance.exists(
+                        name=cache_file.full_filename
+                    ):
+                        logger.debug(
+                            'Intermediate file appeared after %d attempts '
+                            'for partition %s.',
+                            _attempt + 1, self.cache_partition.pk
+                        )
+                        # Lire en mémoire immédiatement pour éviter
+                        # une nouvelle race condition avec le pruning.
+                        return _read_cache_file(cache_file)
+                # Après 10s toujours absent → orphelin confirmé
+                logger.warning(
+                    'Intermediate file still missing after 10s for '
+                    'partition %s — deleting orphan DB entry and '
+                    'regenerating.',
+                    self.cache_partition.pk
+                )
+                cache_file.delete()
+            else:
+                # Lire en mémoire immédiatement — évite la race condition
+                # entre exists() et l'ouverture réelle dans get_image().
+                return _read_cache_file(cache_file)
 
-            try:
-                with self.open() as file_object:
-                    converter = ConverterBase.get_converter_class()(
-                        file_object=file_object
-                    )
-                    with converter.to_pdf() as pdf_file_object:
-                        with self.cache_partition.create_file(filename=cache_filename) as file_object:
+        # Étape 2 — générer l'intermediate_file.
+        try:
+            with self.open() as file_object:
+                converter = ConverterBase.get_converter_class()(
+                    file_object=file_object
+                )
+                with converter.to_pdf() as pdf_file_object:
+                    try:
+                        with self.cache_partition.create_file(
+                            filename=cache_filename
+                        ) as file_object:
                             shutil.copyfileobj(
                                 fsrc=pdf_file_object, fdst=file_object
                             )
+                    except IntegrityError:
+                        # Race condition : autre worker a créé le fichier
+                        # entre notre DoesNotExist et notre create_file.
+                        # Avec blocking=True le lock devrait prévenir ça,
+                        # mais on garde ce filet de sécurité.
+                        logger.debug(
+                            'Race condition on intermediate_file for '
+                            'partition %s — waiting for winning worker.',
+                            self.cache_partition.pk
+                        )
+                        for _attempt in range(10):
+                            try:
+                                return _read_cache_file(
+                                    self.cache_partition.get_file(
+                                        filename=cache_filename
+                                    )
+                                )
+                            except CachePartitionFile.DoesNotExist:
+                                time.sleep(0.5)
+                        return _read_cache_file(
+                            self.cache_partition.get_file(
+                                filename=cache_filename
+                            )
+                        )
 
-                        return self.cache_partition.get_file(filename=cache_filename).open()
-            except InvalidOfficeFormat:
-                return self.open()
-            except Exception as exception:
-                logger.error(
-                    'Error creating intermediate file "%s"; %s.',
-                    cache_filename, exception, exc_info=True
-                )
-                try:
-                    cache_file = self.cache_partition.get_file(
-                        filename=cache_filename
+                    return _read_cache_file(
+                        self.cache_partition.get_file(
+                            filename=cache_filename
+                        )
                     )
-                except CachePartitionFile.DoesNotExist:
-                    """Non fatal, ignore."""
-                else:
-                    cache_file.delete()
-                raise exception
-        else:
-            logger.debug(msg='Intermediate file found.')
-            return cache_file.open()
+
+        except InvalidOfficeFormat:
+            return self.open()
+        except Exception as exception:
+            from mayan.apps.lock_manager.exceptions import LockError
+            if isinstance(exception, LockError):
+                raise
+            logger.error(
+                'Error creating intermediate file "%s"; %s.',
+                cache_filename, exception, exc_info=True
+            )
+            try:
+                self.cache_partition.get_file(
+                    filename=cache_filename
+                ).delete()
+            except CachePartitionFile.DoesNotExist:
+                pass
+            raise exception
 
     def get_label(self):
         return self.filename
@@ -384,10 +447,6 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
         return self.document.is_in_trash
 
     def mimetype_update(self, save=True):
-        """
-        Read a document version's file and determine the mime type by using
-        the MIME type backend.
-        """
         if self.exists():
             try:
                 with self.open() as file_object:
@@ -413,7 +472,6 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
                 )
                 detected_pages = converter.get_page_count()
         except PageCountError as exception:
-            """Converter backend doesn't understand the format."""
             error_log_text = _(
                 message='Error updating page count; %(exception)s'
             ) % {'exception': exception}
@@ -421,6 +479,7 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
             self.error_log.create(
                 domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
             )
+            raise
         else:
             DocumentFilePage = apps.get_model(
                 app_label='documents', model_name='DocumentFilePage'
@@ -474,18 +533,10 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
         return self.pages.first()
 
     def save_to_file(self, file_object):
-        """
-        Save a copy of the document from the document storage backend
-        to the local filesystem.
-        """
         with self.open() as input_file_object:
             shutil.copyfileobj(fsrc=input_file_object, fdst=file_object)
 
     def size_update(self, save=True):
-        """
-        Get a document file's disk file size from the storage layer and store
-        it into the model.
-        """
         if self.exists():
             name = self.file.name
             self.file.close()
@@ -507,7 +558,6 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
 
     @property
     def uuid(self):
-        # Make cache UUID a mix of document UUID, file ID.
         return '{}-{}'.format(self.document.uuid, self.pk)
 
     def versions_new(self, action_name, comment=None, user=None):

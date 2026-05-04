@@ -81,7 +81,7 @@ class CacheBusinessLogicMixin:
 
     def get_queryset_files_for_eviction(self):
         queryset_cache_partition_files_sorted = self.get_files().order_by(
-            'hits', 'datetime'
+            'hits', '-datetime'
         )
 
         return queryset_cache_partition_files_sorted

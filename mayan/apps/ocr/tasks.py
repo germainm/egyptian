@@ -80,7 +80,7 @@ def task_document_version_page_ocr_process(
         raise self.retry(exc=exception)
     except LockError as exception:
         raise self.retry(exc=exception)
-    except OperationalError as exception:
+    except (OperationalError, FileNotFoundError) as exception:
         raise self.retry(exc=exception)
 
 
@@ -113,9 +113,10 @@ def task_document_version_ocr_finished(
             document_version=document_version,
             user=user
         )
-    except OperationalError as exception:
+    except (OperationalError, FileNotFoundError) as exception:
         logger.warning(
             'Operational error in OCR finish for document version: %d; %s. '
             'Retrying.', document_version, exception
         )
         raise self.retry(exc=exception)
+

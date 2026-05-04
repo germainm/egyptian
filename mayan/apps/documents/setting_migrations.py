@@ -1,7 +1,7 @@
 from mayan.apps.smart_settings.namespace_migrations import (
     SettingNamespaceMigration
 )
-from mayan.apps.smart_settings.setting_clusters import setting_cluster
+from mayan.apps.smart_settings.settings import setting_cluster
 from mayan.apps.smart_settings.utils import smart_yaml_load
 
 from .literals import (
@@ -65,6 +65,10 @@ class DocumentsSettingMigration(SettingNamespaceMigration):
             return value
 
     def documents_file_storage_backend_0003(self, value):
+        # Si la valeur courante est deja definie (non None), la conserver.
+        # Cela evite d'ecraser une valeur configuree dans config.yml.
+        if value is not None:
+            return value
         # Load the value from the setting's old global name.
         try:
             value, domain_dict = setting_cluster.get_domains_value(
@@ -76,6 +80,9 @@ class DocumentsSettingMigration(SettingNamespaceMigration):
             return value
 
     def documents_file_storage_backend_arguments_0003(self, value):
+        # Si la valeur courante est deja definie (non None), la conserver.
+        if value is not None:
+            return value
         # Load the value from the setting's old global name.
         try:
             value, domain_dict = setting_cluster.get_domains_value(

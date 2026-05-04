@@ -28,7 +28,13 @@ logger = logging.getLogger(name=__name__)
 )
 def task_deindex_instance(self, app_label, model_name, object_id):
     Model = apps.get_model(app_label=app_label, model_name=model_name)
-    instance = Model._meta.default_manager.get(pk=object_id)
+
+
+    try:
+        instance = Model._meta.default_manager.get(pk=object_id)
+    except ObjectDoesNotExist:
+        """Object was deleted before it could be deindexed."""
+        return
 
     try:
         search_backend = SearchBackend.get_instance()
@@ -58,8 +64,9 @@ def task_index_instance(
 
     try:
         instance = Model._meta.default_manager.get(pk=object_id)
-    except Model.DoesNotExist as exception:
-        raise self.retry(exc=exception)
+    except Model.DoesNotExist:
+        """Object was deleted before it could be indexed."""
+        return
 
     try:
         search_backend = SearchBackend.get_instance()
