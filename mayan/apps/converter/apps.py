@@ -39,6 +39,12 @@ class ConverterApp(MayanAppConfig):
     def ready(self):
         super().ready()
 
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except ImportError:
+            pass
+
         Asset = self.get_model(model_name='Asset')
         LayerTransformation = self.get_model(
             model_name='LayerTransformation'

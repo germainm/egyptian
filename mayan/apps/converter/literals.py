@@ -3,6 +3,70 @@ import platform
 
 from django.conf import settings
 
+CONVERTER_SVG_MIME_TYPE = 'image/svg+xml'
+
+CONVERTER_VIDEO_MIME_TYPES = (
+    'video/mp4',
+    'video/x-matroska',
+    'video/x-msvideo',
+    'video/quicktime',
+    'video/webm',
+    'video/ogg',
+    'video/3gpp',
+)
+
+CONVERTER_RAW_PHOTO_MIME_TYPES = (
+    'image/x-canon-cr2',
+    'image/x-canon-crw',
+    'image/x-nikon-nef',
+    'image/x-sony-arw',
+    'image/x-adobe-dng',
+    'image/x-olympus-orf',
+    'image/x-fuji-raf',
+    'image/x-panasonic-rw2',
+    'image/x-sigma-x3f',
+    'image/x-pentax-pef',
+)
+
+CONVERTER_DJVU_MIME_TYPES = (
+    'image/vnd.djvu',
+    'image/x-djvu',
+)
+
+CONVERTER_EML_MIME_TYPE = 'message/rfc822'
+
+CONVERTER_MARKDOWN_MIME_TYPES = (
+    'text/markdown',
+    'text/x-markdown',
+)
+
+CONVERTER_DXF_MIME_TYPES = (
+    'image/vnd.dxf',
+    'application/dxf',
+    'application/x-autocad',
+    'application/x-dxf',
+)
+
+CONVERTER_STL_MIME_TYPES = (
+    'model/stl',
+    'model/x.stl-ascii',
+    'model/x.stl-binary',
+    'application/sla',
+)
+
+CONVERTER_EPUB_MIME_TYPE = 'application/epub+zip'
+
+CONVERTER_DICOM_MIME_TYPES = (
+    'application/dicom',
+    'application/x-dicom',
+)
+
+DEFAULT_DJVU_PATH = '/usr/bin/ddjvu'
+DEFAULT_DJVUSED_PATH = '/usr/bin/djvused'
+DEFAULT_EBOOK_CONVERT_PATH = '/usr/bin/ebook-convert'
+DEFAULT_FFMPEG_PATH = '/usr/bin/ffmpeg'
+DEFAULT_FFPROBE_PATH = '/usr/bin/ffprobe'
+
 CONVERTER_OFFICE_FILE_MIMETYPES = (
     'application/msword',
     'application/mswrite',

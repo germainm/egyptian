@@ -1,3 +1,4 @@
+import mimetypes
 import hashlib
 from io import BytesIO
 from itertools import islice
@@ -26,6 +27,23 @@ from mayan.apps.storage.hashing import chunk_hash_file_object
 from mayan.apps.storage.model_mixins import ModelMixinFileFieldOpen
 
 from ..classes import DocumentFileAction
+
+# MIME types that mimetypes.guess_type() may return for text/plain files and
+# that the converter has a dedicated rendering path for.  Only these are
+# promoted when libmagic falls back to text/plain.
+_MIME_TYPE_EXTENSION_OVERRIDES = frozenset((
+    'text/markdown',
+    'text/x-markdown',
+    'image/vnd.dxf',
+    'application/dxf',
+    'application/x-autocad',
+    'application/x-dxf',
+    'model/stl',
+    'model/x.stl-ascii',
+    'model/x.stl-binary',
+    'application/sla',
+))
+
 from ..events import event_document_file_created, event_document_file_edited
 from ..literals import (
     DOCUMENT_FILE_PAGE_CREATE_BATCH_SIZE, ERROR_LOG_DOMAIN_NAME,
@@ -454,6 +472,16 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
                     self.mimetype, self.encoding = mimetype_backend.get_mime_type(
                         file_object=file_object
                     )
+                # When libmagic returns the generic text/plain, refine using
+                # the original filename extension for formats that have a
+                # dedicated converter path (e.g. .md to text/markdown so it
+                # goes through the markdown renderer instead of LibreOffice).
+                # Only override to MIME types the converter explicitly handles
+                # to avoid breaking unknown formats.
+                if self.mimetype == 'text/plain' and self.filename:
+                    guessed, _ = mimetypes.guess_type(self.filename)
+                    if guessed and guessed in _MIME_TYPE_EXTENSION_OVERRIDES:
+                        self.mimetype = guessed
             except Exception:
                 self.encoding = ''
                 self.mimetype = ''

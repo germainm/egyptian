@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.converter.classes import ConverterBase
 from mayan.apps.converter.exceptions import AppImageError
+from mayan.apps.converter.literals import CONVERTER_OFFICE_FILE_MIMETYPES
 from mayan.apps.converter.models import LayerTransformation
 from mayan.apps.converter.settings import setting_image_generation_timeout
 from mayan.apps.converter.transformations import BaseTransformation
@@ -184,8 +185,19 @@ class DocumentFilePageBusinessLogicMixin:
             try:
                 with self.document_file.get_intermediate_file() as file_object:
                     converter_class = ConverterBase.get_converter_class()
+                    # Office formats are converted to PDF by get_intermediate_file
+                    # via LibreOffice; let the converter auto-detect that PDF.
+                    # All other formats return the original file, so pass the
+                    # stored MIME type to avoid falling back to text/plain.
+                    doc_mime = self.document_file.mimetype
+                    mime_type = (
+                        None
+                        if doc_mime in CONVERTER_OFFICE_FILE_MIMETYPES
+                        else doc_mime
+                    )
                     converter_instance = converter_class(
-                        file_object=file_object
+                        file_object=file_object,
+                        mime_type=mime_type
                     )
                     converter_instance.seek_page(
                         page_number=self.page_number - 1
