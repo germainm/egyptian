@@ -106,6 +106,7 @@ class SharedUploadedFile(DatabaseFileModelMixin, models.Model):
         return self.filename
 
     def save(self, *args, **kwargs):
-        self.filename = self.filename or Path(path=self.file.name).name
+        path = self.file.name or ''
+        self.filename = self.filename or Path(path).name
         super().save(*args, **kwargs)
         self.file.close()
