@@ -29,7 +29,33 @@ Se reconnecter avec l'utilisateur `germain`.
 sudo apt update && sudo apt install openssh-server -y
 ```
 
-### 3. Cloner le code source et lancer le script d'installation
+### 3. Installer l'agent VM (optionnel)
+
+#### Proxmox / KVM (QEMU Guest Agent)
+
+Permet à Proxmox de communiquer avec la VM : arrêt propre, snapshots cohérents, affichage de l'IP dans l'interface, etc.
+
+```bash
+sudo apt install qemu-guest-agent -y
+sudo systemctl enable qemu-guest-agent
+sudo systemctl start qemu-guest-agent
+```
+
+> Activer l'agent dans Proxmox : Options de la VM → QEMU Guest Agent → cocher *Enabled*.
+
+#### VMware (open-vm-tools)
+
+Permet les snapshots cohérents, le redimensionnement automatique, le copier-coller et la synchronisation de l'heure avec l'hôte.
+
+```bash
+sudo apt install open-vm-tools -y
+sudo systemctl enable open-vm-tools
+sudo systemctl start open-vm-tools
+```
+
+> Pour une VM avec interface graphique, remplacer par `open-vm-tools-desktop`.
+
+### 4. Cloner le code source et lancer le script d'installation
 
 ```bash
 git clone --filter=blob:none --sparse --depth=1 git@github.com:germainm/egyptian.git /tmp/egyptian-install
