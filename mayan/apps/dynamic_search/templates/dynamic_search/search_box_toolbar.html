@@ -31,4 +31,9 @@
     {% endif %}
 
     <a alt="{% trans 'Advanced search' %}" class="btn btn-primary search-anchor-search-advanced" href="{% url 'search:search_advanced' %}?{% search_get_search_model_name_query_variable %}={{ default_search_model.full_name }}" id="search-button-search-advanced">{{ icon_search_advanced }} {% if setting_disable_simple_search == False %}{% trans 'Advanced' %}{% else %}{% trans 'Advanced search' %}{% endif %}</a>
+
+    {% url 'document_embedding:search_semantic' as semantic_search_url %}
+    {% if semantic_search_url %}
+        <a alt="{% trans 'Semantic search' %}" class="btn btn-default" href="{{ semantic_search_url }}{% if request.GET.q %}?q={{ request.GET.q }}{% endif %}"><span class="fa fa-magic"></span> {% trans 'Sémantique' %}</a>
+    {% endif %}
 </form>
