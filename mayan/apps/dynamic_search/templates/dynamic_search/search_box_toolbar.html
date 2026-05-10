@@ -34,6 +34,6 @@
 
     {% url 'document_embedding:search_semantic' as semantic_search_url %}
     {% if semantic_search_url %}
-        <a alt="{% trans 'Semantic search' %}" class="btn btn-primary" href="{{ semantic_search_url }}{% if request.GET.q %}?q={{ request.GET.q }}{% endif %}"><span class="fa fa-magic"></span> {% trans 'Sémantique' %}</a>
+        <a alt="{% trans 'Semantic search' %}" class="btn btn-primary" href="{{ semantic_search_url }}{% if request.GET.q %}?q={{ request.GET.q }}{% endif %}"><span class="fa fa-magic"></span> {% trans 'Semantic' %}</a>
     {% endif %}
 </form>
