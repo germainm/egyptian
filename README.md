@@ -1,83 +1,94 @@
-[![Support][support-badge]][support-url]
-[![DOI][doi-badge-imgshield]][doi-url]
-[![License][license-badge]][license-url]
-[![Docker image tag][docker-image-tag-badge]][docker-image-url]
-[![Docker pulls][docker-image-pull-badge]][docker-image-url]
-[![Docker Stars][docker-image-stars-badge]][docker-image-url]
-[![GitLab][gitlab-tag-badge]][gitlab-url]
+# Egyptian — Mayan EDMS 4.x Fork
 
+**Egyptian** is a production fork of [Mayan EDMS](https://gitlab.com/mayan-edms/mayan-edms) 4.x,
+maintained by [mypalace.ca](https://mayan.mypalace.ca).
+It ships bug fixes that have not yet been merged upstream, and serves as the base for a set of
+commercial extensions built and used in production.
 
-[doi-badge-zenodo]: https://zenodo.org/badge/DOI/10.5281/zenodo.16760961.svg
-[doi-badge-imgshield]: https://img.shields.io/badge/DOI-10.5281%20%2F%20zenodo.16760961-blue.svg?style=for-the-badge&logo=doi
-[doi-url]: https://doi.org/10.5281/zenodo.16760961
+---
 
-[docker-image-tag-badge]: https://img.shields.io/docker/v/mayanedms/mayanedms?style=for-the-badge&sort=semver&logo=docker
+## Free bug fixes included in this fork
 
-[docker-image-url]: https://hub.docker.com/r/mayanedms/mayanedms
+All fixes below are available to anyone who runs this fork, at no cost.
 
-[docker-image-pull-badge]: https://img.shields.io/docker/pulls/mayanedms/mayanedms.svg?style=for-the-badge&logo=docker
+### Security
 
-[docker-image-stars-badge]: https://img.shields.io/docker/stars/mayanedms/mayanedms.svg?style=for-the-badge&logo=docker
+- **OIDC — JavaScript injection** fixed in the logout view
+- **OIDC** — cross-origin SSO logout support added
+- **OIDC** — missing parameters restored (token expiry, logout endpoint, id token storage)
+- **OIDC** — HTTP timeout added on discovery requests to prevent hanging on unreachable providers
+- **OIDC** — `ModelBackend` fallback added for scenarios where the OIDC provider is unavailable
+- **Encrypted storage** — migrated from AES-256-CBC to AES-256-GCM (authenticated encryption)
+- **Encrypted storage** — replaced fixed salt with a per-file random salt (32 bytes)
+- **Encrypted storage** — added per-file random nonce (12 bytes)
+- **Encrypted storage** — PBKDF2 iterations raised from 100 000 to 600 000 (OWASP 2024 recommendation)
+- **Encrypted storage** — switched from `pycryptodome` to `cryptography` (PyCA)
 
-[gitlab-pipelines-url]: https://gitlab.com/mayan-edms/mayan-edms/pipelines
-[gitlab-tag-badge]:https://img.shields.io/gitlab/v/tag/mayan-edms%2Fmayan-edms?style=for-the-badge&sort=semver&logo=gitlab&label=GitLab
-[gitlab-url]: https://gitlab.com/mayan-edms/mayan-edms
+### Interface
 
-[pypi-badge]: https://img.shields.io/pypi/v/mayan-edms?style=for-the-badge&logo=python&label=PyPI
-[pypi-url]: https://pypi.org/project/mayan-edms/
+- Duplicate page title removed in the **Similar Documents** view
+- Duplicate page title removed in the **Version Diff** view
+- Oversized form and layout issues fixed in the **Semantic Search** view
+- ACL filtering corrected in **Semantic Search** and **Similar Documents** (users no longer see
+  documents they do not have access to)
+- Search toolbar button alignment corrected (`Semantic` button now matches `Search` and `Advanced`)
+- i18n strings corrected in the search toolbar (French locale)
+- Top-bar menu no longer reloads on every page refresh
 
-[license-badge]: https://img.shields.io/pypi/l/mayan-edms.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white&color=008800
-[license-url]: https://gitlab.com/mayan-edms/mayan-edms/blob/master/LICENSE
+### Core
 
-[support-badge]: https://img.shields.io/badge/Get_support-brightgreen?style=for-the-badge
-[support-url]: https://www.mayan-edms.com/support/
+- Template tag `math_substract` typo fixed (was breaking arithmetic in templates)
+- Smart setting view imports corrected
+- Literal type mismatch fixed in tag handling
 
+### Docker
 
-<a href="http://www.mayan-edms.com">
-    <img align="center" height="200" width="200" src="https://gitlab.com/mayan-edms/mayan-edms/raw/master/docs/_static/mayan_logo_bw.png">
-</a>
+- Multi-package `APT` and `PIP` installs fixed in the Dockerfile
+- Docker Compose mirroring services corrected
 
-<p>
-    The most advanced, scalable, and mature open source document management system.
-<p>
+---
 
-<img align="center" src="https://gitlab.com/mayan-edms/mayan-edms/raw/master/docs/_static/overview.gif" width="400">
+## Paid extensions
 
-# Getting started
+The following applications extend Mayan EDMS with AI, workflow, and productivity features.
+Access is granted per GitHub account via private repository.
+All prices are in USD.
 
-It is very easy to get started with Mayan EDMS, just deploy the official
-Docker Compose file.
+| Application | What it does | Price |
+|---|---|---|
+| [Approvals](https://mayan.mypalace.ca/apps/approvals/) | Document approval workflows with SLA tracking and notifications | from $999 / yr |
+| [Workflow UI](https://mayan.mypalace.ca/apps/workflow-ui/) | Visual drag-and-drop workflow editor — no code required | $499 one-time |
+| [Document Q&A](https://mayan.mypalace.ca/apps/document-qa/) | Ask your documents in natural language — answers with citations | $299 one-time |
+| [Document Embedding](https://mayan.mypalace.ca/apps/document-embedding/) | Semantic search — find documents even when you don't know the exact words | $299 one-time |
+| [Document NER](https://mayan.mypalace.ca/apps/document-ner/) | Automatically extract persons, organizations, and dates from your documents | $249 one-time |
+| [Autotag](https://mayan.mypalace.ca/apps/autotag/) | Zero-shot automatic tagging using your existing Mayan tags | $199 one-time |
+| [Activity Report](https://mayan.mypalace.ca/apps/activity-report/) | Exportable audit reports — who did what, when, on which document | $149 one-time |
+| [Barcode Extract](https://mayan.mypalace.ca/apps/barcode-extract/) | Automatically detect and index all barcodes found in your documents | $149 one-time |
+| [Document Health](https://mayan.mypalace.ca/apps/document-health/) | Quality dashboard — identify and fix problematic documents | $149 one-time |
+| [Version Diff](https://mayan.mypalace.ca/apps/version-diff/) | Compare two document versions with highlighted differences in one click | $149 one-time |
+| [OCR Viewer](https://mayan.mypalace.ca/apps/ocr-viewer/) | Select and copy text directly from scanned document pages | $99 one-time |
 
-    curl https://gitlab.com/mayan-edms/mayan-edms/-/raw/master/docker/docker-compose.yml -O
-    curl https://gitlab.com/mayan-edms/mayan-edms/-/raw/master/docker/.env -O
-    docker compose up --detach
+Browse all apps and purchase access: **[mayan.mypalace.ca](https://mayan.mypalace.ca)**
 
-The complete documentation is available at: https://docs.mayan-edms.com/parts/installation.html
+---
 
-# Get the books
+## Community forum
 
-<a href="https://a.co/d/cqda9uu">
-    <img align="center" src="https://m.media-amazon.com/images/I/61PAvrh303L._SL1293_.jpg" width="150">
-</a>
-<a href="https://a.co/d/9RMXyfn">
-    <img align="center" src="https://m.media-amazon.com/images/I/61g21N5oQCL._SL1491_.jpg" width="150">
-</a>
+Questions, feedback, and discussion about Egyptian and its extensions:
 
-# Tutorials
+**[mayan.mypalace.ca/forum/](https://mayan.mypalace.ca/forum/)**
 
-For more in-depth articles, tutorials, and troubleshooting available in the Knowledge Base.
+---
 
+## About Mayan EDMS
 
-<a href="https://forum.mayan-edms.com/s/prod_Ogq3lYaoROC02Q">
-    <img align="center" src="https://docs.mayan-edms.com/_static/knowledge-base.jpg" width="400">
-</a>
+Mayan EDMS is a free, open source document management system written in Python / Django.
+It provides document storage, OCR, workflows, metadata, access control, and much more,
+and is designed for self-hosted enterprise deployments.
 
-Click the image or visit: https://forum.mayan-edms.com/s/prod_Ogq3lYaoROC02Q
+- **Source code**: [gitlab.com/mayan-edms/mayan-edms](https://gitlab.com/mayan-edms/mayan-edms)
+- **Documentation**: [docs.mayan-edms.com](https://docs.mayan-edms.com)
+- **License**: Apache 2.0
 
-# Important links
-
-- [Homepage](http://www.mayan-edms.com)
-- [Documentation](https://docs.mayan-edms.com)
-- [Forum](https://forum.mayan-edms.com/)
-- [Source code, issues, bugs](https://gitlab.com/mayan-edms/mayan-edms)
-
+Egyptian tracks the Mayan EDMS 4.x branch. Changes in this fork that are generic enough
+are submitted upstream when possible.
