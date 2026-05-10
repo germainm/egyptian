@@ -18,6 +18,34 @@ All fixes below are available to anyone who runs this fork, at no cost.
 - Fix JavaScript injection in logout view
 - Add cross-origin SSO logout support
 - Add missing OIDC parameters (token expiry, logout endpoint, id token storage)
+- Add HTTP timeout on OIDC discovery requests
+- Add ModelBackend fallback for OIDC-down scenarios
+
+#### Encrypted storage
+
+- Migrate AES-256-CBC to AES-256-GCM (authenticated encryption)
+- Replace fixed salt with per-file random salt (32 bytes)
+- Add per-file random nonce (12 bytes)
+- Increase PBKDF2 iterations: 100k to 600k (OWASP 2024)
+- Switch from pycryptodome to cryptography (PyCA)
+
+#### Elasticsearch search
+
+- Fix partial search on text fields (wildcard to match)
+- Add shared Point-in-Time for multi-scope queries
+- Cap page size to SEARCH_RESULTS_LIMIT
+- Tolerate deleted objects in index/deindex tasks
+
+#### Core
+
+- Fix intermediate file cache race condition
+- Fix file cache eviction order (oldest first)
+- Fix Redis lock blocking with timeout (30s)
+- Fix OCR task FileNotFoundError retry
+- Fix GPG signature_id from sig_info fallback
+- Fix default search model to DocumentFilePage
+- Fix setting migrations value preservation
+- Fix appearance checkbox label attribute
 
 ---
 
