@@ -1,0 +1,3 @@
+[submodule "mayan/apps/workflow_ui"]
+	path = mayan/apps/workflow_ui
+	url = git@github.com:germainm/egyptian-workflow-ui.git
