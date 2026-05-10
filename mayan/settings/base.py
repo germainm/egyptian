@@ -152,8 +152,6 @@ INSTALLED_APPS = (
     'mayan.apps.document_parsing.apps.DocumentParsingApp',
     'mayan.apps.document_signatures.apps.DocumentSignaturesApp',
     'mayan.apps.document_states.apps.DocumentStatesApp',
-    'mayan.apps.approvals.apps.ApprovalsApp',
-    'mayan.apps.workflow_ui.apps.WorkflowUIApp',
     'mayan.apps.duplicates.apps.DuplicatesApp',
     'mayan.apps.file_metadata.apps.FileMetadataApp',
     'mayan.apps.file_metadata_clamav.apps.FileMetadataClamAVApp',
