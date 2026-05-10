@@ -11,40 +11,13 @@ commercial extensions built and used in production.
 
 All fixes below are available to anyone who runs this fork, at no cost.
 
-### Security
+### Security and core fixes
 
-- **OIDC — JavaScript injection** fixed in the logout view
-- **OIDC** — cross-origin SSO logout support added
-- **OIDC** — missing parameters restored (token expiry, logout endpoint, id token storage)
-- **OIDC** — HTTP timeout added on discovery requests to prevent hanging on unreachable providers
-- **OIDC** — `ModelBackend` fallback added for scenarios where the OIDC provider is unavailable
-- **Encrypted storage** — migrated from AES-256-CBC to AES-256-GCM (authenticated encryption)
-- **Encrypted storage** — replaced fixed salt with a per-file random salt (32 bytes)
-- **Encrypted storage** — added per-file random nonce (12 bytes)
-- **Encrypted storage** — PBKDF2 iterations raised from 100 000 to 600 000 (OWASP 2024 recommendation)
-- **Encrypted storage** — switched from `pycryptodome` to `cryptography` (PyCA)
+#### OIDC
 
-### Interface
-
-- Duplicate page title removed in the **Similar Documents** view
-- Duplicate page title removed in the **Version Diff** view
-- Oversized form and layout issues fixed in the **Semantic Search** view
-- ACL filtering corrected in **Semantic Search** and **Similar Documents** (users no longer see
-  documents they do not have access to)
-- Search toolbar button alignment corrected (`Semantic` button now matches `Search` and `Advanced`)
-- i18n strings corrected in the search toolbar (French locale)
-- Top-bar menu no longer reloads on every page refresh
-
-### Core
-
-- Template tag `math_substract` typo fixed (was breaking arithmetic in templates)
-- Smart setting view imports corrected
-- Literal type mismatch fixed in tag handling
-
-### Docker
-
-- Multi-package `APT` and `PIP` installs fixed in the Dockerfile
-- Docker Compose mirroring services corrected
+- Fix JavaScript injection in logout view
+- Add cross-origin SSO logout support
+- Add missing OIDC parameters (token expiry, logout endpoint, id token storage)
 
 ---
 
