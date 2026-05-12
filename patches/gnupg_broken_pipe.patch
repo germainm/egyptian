@@ -1,0 +1,17 @@
+--- a/gnupg.py
++++ b/gnupg.py
+@@ -165,9 +165,14 @@ def _copy_data(instream, outstream, buffer_size, error_queue):
+         try:
+             outstream.write(data)
+         except UnicodeError:  # pragma: no cover
+             outstream.write(data.encode(enc))
++        except BrokenPipeError:  # pragma: no cover
++            # GPG exited before we finished writing (e.g. non-PGP file header
++            # misidentified as a PGP packet). Not an error — just stop writing.
++            break
+         except Exception as e:  # pragma: no cover
+             # Can sometimes get 'broken pipe' errors even when the data has all
+             # been sent
+             logger.exception('Error sending data')
+             error_queue.put_nowait(e)
+             break
