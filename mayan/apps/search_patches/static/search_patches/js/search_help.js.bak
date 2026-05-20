@@ -1,0 +1,467 @@
+/**
+ * search_help.js — Aide contextuelle pour les formulaires de recherche avancée Mayan
+ * Thème Bootstrap 3 clair — compatible Mayan EDMS
+ */
+
+(function () {
+  'use strict';
+
+  function detectBackend() {
+    var meta = document.querySelector('meta[name="search-backend"]');
+    if (meta) return meta.getAttribute('content');
+    return window.MAYAN_SEARCH_BACKEND || 'elasticsearch';
+  }
+
+  var OPERATORS = {
+    partial:    { alias: '(défaut)', label: 'Recherche partielle',       supported: { elasticsearch: true, django: true, whoosh: true }, example: 'contrat' },
+    exact:      { alias: '=',        label: 'Correspondance exacte',     supported: { elasticsearch: true, django: true, whoosh: true }, example: '=Facture' },
+    phrase:     { alias: '"..."',    label: 'Phrase exacte',             supported: { elasticsearch: true, django: true, whoosh: true }, example: '"rapport annuel"' },
+    fuzzy:      { alias: '~',        label: 'Approximatif (fuzzy)',      supported: { elasticsearch: true, django: true, whoosh: true }, example: '~kontra' },
+    regex:      { alias: '%',        label: 'Expression régulière',      supported: { elasticsearch: true, django: true, whoosh: true }, example: '%facture_2024_\\d{3}' },
+    gt:         { alias: '>',        label: 'Supérieur strict',          supported: { elasticsearch: true, django: true, whoosh: true }, example: '>2024-01-01' },
+    gte:        { alias: '>=',       label: 'Supérieur ou égal',         supported: { elasticsearch: true, django: true, whoosh: true }, example: '>=1000000' },
+    lt:         { alias: '<',        label: 'Inférieur strict',          supported: { elasticsearch: true, django: true, whoosh: true }, example: '<2024-06-01' },
+    lte:        { alias: '<=',       label: 'Inférieur ou égal',         supported: { elasticsearch: true, django: true, whoosh: true }, example: '<=200000' },
+    range:      { alias: '[]',       label: 'Intervalle inclusif',       supported: { elasticsearch: true, django: true, whoosh: true }, example: '[]2024-01-01..2024-12-31' },
+    range_excl: { alias: '{}',       label: 'Intervalle exclusif',       supported: { elasticsearch: true, django: true, whoosh: true }, example: '{}100000..1000000' }
+  };
+
+  var FIELD_TYPE_OPERATORS = {
+    text: {
+      label: 'Texte',
+      operators_elasticsearch: ['partial','exact','phrase','fuzzy','regex','gt','lt','gte','lte'],
+      operators_django:        ['partial','exact','phrase','fuzzy','regex','gt','lt','gte','lte'],
+      operators_whoosh:        ['partial','exact','phrase','fuzzy','regex','gt','lt','gte','lte'],
+      notes: 'Les tirets (-) sont convertis en _ lors de l\'indexation. Utilisez _ dans les regex.',
+      examples_extra: [
+        { q: 'contrat',            desc: 'Contient "contrat"' },
+        { q: '=Facture',           desc: 'Exactement "Facture"' },
+        { q: '"rapport annuel"',   desc: 'La phrase exacte' },
+        { q: '~raport',            desc: 'Approximatif — trouve "rapport"' },
+        { q: '%facture_2024_\\d+', desc: 'Regex — facture-2024-001, etc.' },
+        { q: '%^[A-Z]{2,4}_\\d+',  desc: 'Regex — codes comme ABC_1234' }
+      ]
+    },
+    datetime: {
+      label: 'Date',
+      operators_elasticsearch: ['range','range_excl','gt','lt','gte','lte'],
+      operators_django:        ['exact','range','range_excl','gt','lt','gte','lte'],
+      operators_whoosh:        ['exact','range','range_excl','gt','lt','gte','lte'],
+      notes: 'ES : = (exact) non supporté — utilisez [] avec la même borne des deux côtés.',
+      examples_extra: [
+        { q: '[]2024-01-01..2024-12-31', desc: 'Toute l\'année 2024' },
+        { q: '>=2024-03-01',             desc: 'A partir du 1er mars 2024' },
+        { q: '>last week',               desc: 'Créé la semaine dernière' },
+        { q: '<2024-06-01',              desc: 'Avant le 1er juin 2024' }
+      ]
+    },
+    integer: {
+      label: 'Nombre entier',
+      operators_elasticsearch: ['exact','range','range_excl','gt','lt','gte','lte'],
+      operators_django:        ['partial','exact','range','range_excl','gt','lt','gte','lte'],
+      operators_whoosh:        ['exact','range','range_excl','gt','lt','gte','lte'],
+      notes: 'ES : la recherche partielle n\'est pas supportée sur les entiers — utilisez = ou >=.',
+      examples_extra: [
+        { q: '>=1000000',         desc: 'Taille >= 1 MB' },
+        { q: '<200000',           desc: 'Taille < 200 KB' },
+        { q: '[]100000..5000000', desc: 'Entre 100 KB et 5 MB' },
+        { q: '=145728',           desc: 'Exactement 145 728 octets' }
+      ]
+    },
+    uuid: {
+      label: 'UUID',
+      operators_elasticsearch: ['exact','partial','regex'],
+      operators_django:        ['exact','partial','regex'],
+      operators_whoosh:        ['exact','partial','regex'],
+      notes: 'ES : tirets supprimés. ORM/Whoosh : tirets remplaces par _.',
+      examples_extra: [
+        { q: '=550e8400e29b41d4a716446655440000', desc: 'UUID exact sans tirets (ES)' },
+        { q: '550e8400',                          desc: 'Début de l\'UUID' }
+      ]
+    },
+    boolean: {
+      label: 'Booléen',
+      operators_elasticsearch: ['exact'],
+      operators_django:        ['exact'],
+      operators_whoosh:        ['exact'],
+      notes: 'Seul = (exact) est supporté. Valeurs : true, false.',
+      examples_extra: [
+        { q: '=true',  desc: 'Valeur vraie' },
+        { q: '=false', desc: 'Valeur fausse' }
+      ]
+    }
+  };
+
+  var FIELD_TYPE_MAP = {
+    'datetime_created':   'datetime',
+    'datetime_published': 'datetime',
+    'files__size':        'integer',
+    'file__size':         'integer',
+    'size':               'integer',
+    'id':                 'integer',
+    'document__id':       'integer',
+    'page_number':        'integer',
+    'uuid':               'uuid',
+    'document__uuid':     'uuid',
+    'versions__active':   'boolean'
+  };
+
+  function getFieldType(fieldName) {
+    return FIELD_TYPE_MAP[fieldName] || 'text';
+  }
+
+  var CSS = [
+    '.sh-tooltip-btn {',
+    '  display:inline-flex;align-items:center;justify-content:center;',
+    '  width:16px;height:16px;background:#5b9bd5;border:1px solid #2e6da4;',
+    '  border-radius:50%;color:#fff;font-size:10px;font-weight:700;',
+    '  cursor:pointer;margin-left:5px;vertical-align:middle;',
+    '  flex-shrink:0;line-height:1;font-family:monospace;',
+    '}',
+    '.sh-tooltip-btn:hover{background:#2e6da4;}',
+    '.sh-panel{',
+    '  display:none;position:absolute;z-index:9999;background:#fff;',
+    '  border:1px solid #ddd;border-radius:4px;padding:0;',
+    '  min-width:360px;max-width:460px;box-shadow:0 6px 18px rgba(0,0,0,.15);',
+    '  font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:13px;color:#333;',
+    '}',
+    '.sh-panel.sh-visible{display:block;}',
+    '.sh-panel-header{',
+    '  background:#f5f5f5;border-bottom:1px solid #ddd;padding:8px 12px;',
+    '  border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:space-between;',
+    '}',
+    '.sh-panel-title{font-size:12px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;}',
+    '.sh-panel-close{cursor:pointer;color:#999;font-size:16px;line-height:1;}',
+    '.sh-panel-close:hover{color:#333;}',
+    '.sh-panel-body{padding:10px 12px;}',
+    '.sh-field-type{font-size:11px;background:#e8f4f8;border:1px solid #b8dce8;border-radius:3px;padding:1px 6px;color:#31708f;font-family:monospace;margin-bottom:8px;display:inline-block;}',
+    '.sh-note{font-size:11px;color:#666;margin-bottom:8px;line-height:1.5;}',
+    '.sh-note.sh-warn{color:#8a6d3b;background:#fcf8e3;border:1px solid #faebcc;border-radius:3px;padding:4px 8px;}',
+    '.sh-ops-title{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}',
+    '.sh-op-row{display:flex;align-items:flex-start;gap:6px;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:12px;}',
+    '.sh-op-row:last-child{border-bottom:none;}',
+    '.sh-op-alias{font-family:monospace;color:#c7254e;background:#f9f2f4;padding:0 3px;border-radius:2px;min-width:52px;font-weight:700;flex-shrink:0;}',
+    '.sh-op-label{color:#333;flex:1;}',
+    '.sh-op-example{font-family:monospace;font-size:10px;color:#3c763d;background:#dff0d8;padding:1px 4px;border-radius:3px;border:1px solid #d6e9c6;}',
+    '.sh-examples-title{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px;}',
+    '.sh-example-row{display:flex;gap:8px;padding:2px 0;font-size:11px;align-items:flex-start;}',
+    '.sh-example-q{font-family:monospace;color:#8b008b;min-width:160px;flex-shrink:0;background:#f9f2f4;padding:0 3px;border-radius:2px;}',
+    '.sh-example-desc{color:#666;}',
+    '.sh-backend-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;font-family:monospace;margin-left:4px;}',
+    '.sh-be-es{background:#d9edf7;color:#31708f;border:1px solid #bce8f1;}',
+    '.sh-be-orm{background:#dff0d8;color:#3c763d;border:1px solid #d6e9c6;}',
+    '.sh-be-wh{background:#fcf8e3;color:#8a6d3b;border:1px solid #faebcc;}'
+  ].join('\n');
+
+  function injectCSS() {
+    if (document.getElementById('sh-styles')) return;
+    var style = document.createElement('style');
+    style.id = 'sh-styles';
+    style.textContent = CSS;
+    document.head.appendChild(style);
+  }
+
+  function buildPanel(fieldName, backend) {
+    var fieldType = getFieldType(fieldName);
+    var fieldInfo = FIELD_TYPE_OPERATORS[fieldType];
+    var opsKey = 'operators_' + backend;
+    var supportedOps = fieldInfo[opsKey] || fieldInfo['operators_elasticsearch'];
+
+    var backendLabels = { elasticsearch: 'ES', django: 'ORM', whoosh: 'WH' };
+    var backendClass  = { elasticsearch: 'sh-be-es', django: 'sh-be-orm', whoosh: 'sh-be-wh' };
+    var bl = backendLabels[backend] || 'ES';
+    var bc = backendClass[backend]  || 'sh-be-es';
+
+    var html = '<div class="sh-panel-header">'
+      + '<span class="sh-panel-title">Aide \u2014 ' + fieldName + '</span>'
+      + '<span class="sh-backend-badge ' + bc + '">' + bl + '</span>'
+      + '<span class="sh-panel-close" data-sh-close>&times;</span>'
+      + '</div><div class="sh-panel-body">'
+      + '<span class="sh-field-type">' + fieldInfo.label + '</span>';
+
+    if (fieldInfo.notes) {
+      var isWarn = fieldInfo.notes.indexOf('non support') >= 0;
+      html += '<div class="sh-note' + (isWarn ? ' sh-warn' : '') + '">' + fieldInfo.notes + '</div>';
+    }
+
+    html += '<div class="sh-ops-title">Op\u00e9rateurs disponibles</div>';
+    supportedOps.forEach(function(opKey) {
+      var op = OPERATORS[opKey];
+      if (!op) return;
+      html += '<div class="sh-op-row">'
+        + '<span class="sh-op-alias">' + op.alias + '</span>'
+        + '<span class="sh-op-label">' + op.label + '</span>'
+        + '<span class="sh-op-example">' + op.example + '</span>'
+        + '</div>';
+    });
+
+    if (fieldInfo.examples_extra && fieldInfo.examples_extra.length) {
+      html += '<div class="sh-examples-title">Exemples</div>';
+      fieldInfo.examples_extra.forEach(function(ex) {
+        html += '<div class="sh-example-row">'
+          + '<span class="sh-example-q">' + ex.q + '</span>'
+          + '<span class="sh-example-desc">' + ex.desc + '</span>'
+          + '</div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function buildGlobalPanel(backend) {
+    var backendLabels = { elasticsearch: 'Elasticsearch', django: 'Django ORM', whoosh: 'Whoosh' };
+    var backendColors = { elasticsearch: '#31708f', django: '#3c763d', whoosh: '#8a6d3b' };
+    var backendBg     = { elasticsearch: '#d9edf7', django: '#dff0d8', whoosh: '#fcf8e3' };
+    var bl = backendLabels[backend] || 'Elasticsearch';
+    var bc = backendColors[backend] || '#31708f';
+    var bb = backendBg[backend]     || '#d9edf7';
+
+    var REGEX_EX = [
+      ['%facture_2024_\\d{3}',  'facture-2024-001.pdf (tirets \u2192 _)'],
+      ['%^[A-Z]{2,5}_\\d{4}',   'Codes comme ABC_1234, FACT_2024'],
+      ['%rapport.*(2023|2024)',  'Rapports de 2023 ou 2024'],
+      ['%\\d{4}_\\d{2}_\\d{2}', 'Format date : 2024_01_15'],
+      ['%^(contrat|facture)',    'Commence par "contrat" ou "facture"'],
+      ['%mao\\.zedong',         'Nom avec point (le . doit \u00eatre \u00e9chapp\u00e9)']
+    ];
+
+    var WILD_EX = [
+      ['rapport*',      'Commence par "rapport"'],
+      ['*2024*',        'Contient "2024"'],
+      ['contrat*2024*', 'Commence par "contrat" et contient "2024"'],
+      ['facture_2024_*','facture-2024-XXX (tirets \u2192 _ dans l\'index)']
+    ];
+
+    var DATE_EX = [
+      ['[]2024-01-01..2024-12-31', 'Toute l\'ann\u00e9e 2024'],
+      ['>=2024-03-01',             'A partir du 1er mars 2024'],
+      ['>last week',               'La semaine derni\u00e8re'],
+      ['<yesterday',               'Avant hier'],
+      ['>3 days ago',              'Dans les 3 derniers jours'],
+      ['[]Jan 2024..Mar 2024',     'De janvier \u00e0 mars 2024']
+    ];
+
+    var codeStyle = 'color:#c7254e;background:#f9f2f4;padding:1px 4px;border-radius:2px;display:inline-block;';
+
+    var html = '<div class="panel panel-default" style="margin-top:16px;">'
+      + '<div class="panel-heading" style="display:flex;align-items:center;justify-content:space-between;">'
+      + '<strong>Aide \u00e0 la recherche avanc\u00e9e</strong>'
+      + '<span style="font-size:11px;padding:2px 8px;border-radius:3px;background:' + bb + ';color:' + bc + ';border:1px solid ' + bc + ';">Backend : <strong>' + bl + '</strong></span>'
+      + '</div><div class="panel-body">';
+
+    // Opérateurs
+    var sectionStyle = 'font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;';
+    html += '<p style="' + sectionStyle + '">PREFIXES D\'OPERATEUR</p>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px;margin-bottom:14px;">';
+
+    ['exact','phrase','fuzzy','regex','gt','gte','lt','lte','range','range_excl'].forEach(function(key) {
+      var op = OPERATORS[key];
+      if (!op) return;
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;background:#f9f9f9;border:1px solid #eee;border-radius:3px;">'
+        + '<code style="' + codeStyle + 'min-width:36px;text-align:center;font-size:11px;">' + op.alias + '</code>'
+        + '<span style="font-size:11px;color:#555;">' + op.label + '</span>'
+        + '</div>';
+    });
+    html += '</div>';
+
+    // Regex
+    html += '<p style="' + sectionStyle + '">EXEMPLES \u2014 EXPRESSIONS REGULIERES (PREFIXE %)</p>'
+      + '<div class="well well-sm" style="margin-bottom:10px;">'
+      + '<div class="alert alert-warning" style="padding:4px 8px;margin-bottom:6px;font-size:11px;">'
+      + '\u26a0 Les tirets (-) sont convertis en _ dans l\'index. Utilisez _ dans vos patterns.'
+      + '</div>';
+    REGEX_EX.forEach(function(ex) {
+      html += '<div style="display:flex;gap:10px;padding:2px 0;font-size:12px;">'
+        + '<code style="' + codeStyle + 'min-width:200px;flex-shrink:0;">' + ex[0] + '</code>'
+        + '<span class="text-muted">' + ex[1] + '</span></div>';
+    });
+    html += '</div>';
+
+    // Wildcards
+    html += '<p style="' + sectionStyle + '">EXEMPLES \u2014 WILDCARDS * ET ?</p>'
+      + '<div class="well well-sm" style="margin-bottom:10px;">'
+      + '<p class="text-muted" style="font-size:11px;margin-bottom:4px;">* = z\u00e9ro ou plusieurs caract\u00e8res &nbsp;&middot;&nbsp; ? = exactement un caract\u00e8re</p>';
+    WILD_EX.forEach(function(ex) {
+      html += '<div style="display:flex;gap:10px;padding:2px 0;font-size:12px;">'
+        + '<code style="' + codeStyle + 'min-width:180px;flex-shrink:0;">' + ex[0] + '</code>'
+        + '<span class="text-muted">' + ex[1] + '</span></div>';
+    });
+    html += '</div>';
+
+    // Dates
+    html += '<p style="' + sectionStyle + '">FORMATS DE DATES ACCEPTES</p>'
+      + '<div class="well well-sm">';
+    DATE_EX.forEach(function(ex) {
+      html += '<div style="display:flex;gap:10px;padding:2px 0;font-size:12px;">'
+        + '<code style="' + codeStyle + 'min-width:200px;flex-shrink:0;">' + ex[0] + '</code>'
+        + '<span class="text-muted">' + ex[1] + '</span></div>';
+    });
+    html += '</div></div></div>';
+    return html;
+  }
+
+  function init() {
+    var isAdvanced = window.location.href.indexOf('search/advanced') >= 0 ||
+                     window.location.href.indexOf('search/results') >= 0;
+    if (!isAdvanced) return;
+
+    var form = null;
+    var allForms = document.querySelectorAll('form[method="get"]');
+    for (var i = 0; i < allForms.length; i++) {
+      if (allForms[i].querySelector('fieldset')) { form = allForms[i]; break; }
+    }
+    if (!form) return;
+
+    if (form.dataset.shInit === '1') return;
+    form.dataset.shInit = '1';
+
+    injectCSS();
+    var backend = detectBackend();
+
+    var floatingPanel = document.getElementById('sh-floating-panel');
+    if (!floatingPanel) {
+      floatingPanel = document.createElement('div');
+      floatingPanel.className = 'sh-panel';
+      floatingPanel.id = 'sh-floating-panel';
+      document.body.appendChild(floatingPanel);
+
+      document.addEventListener('mousedown', function(e) {
+        if (e.target.hasAttribute('data-sh-field')) return;
+        if (floatingPanel.contains(e.target)) return;
+        floatingPanel.classList.remove('sh-visible');
+      });
+    }
+
+    var inputs = form.querySelectorAll('fieldset input[type="search"], fieldset input[type="text"]');
+
+    inputs.forEach(function(input) {
+      var fieldName = input.name;
+      if (!fieldName || fieldName.charAt(0) === '_') return;
+
+      var formGroup = input.closest('.form-group');
+      if (!formGroup) return;
+      var label = formGroup.querySelector('label');
+
+      var btn = document.createElement('span');
+      btn.className = 'sh-tooltip-btn';
+      btn.textContent = '?';
+      btn.setAttribute('data-sh-field', fieldName);
+      btn.title = 'Aide pour ce champ';
+
+      if (label) {
+        label.appendChild(btn);
+      } else {
+        input.insertAdjacentElement('afterend', btn);
+      }
+
+      btn.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        var isVisible = floatingPanel.classList.contains('sh-visible') &&
+                        floatingPanel.dataset.field === fieldName;
+        if (isVisible) {
+          floatingPanel.classList.remove('sh-visible');
+          return;
+        }
+
+        floatingPanel.innerHTML = buildPanel(fieldName, backend);
+        floatingPanel.dataset.field = fieldName;
+        floatingPanel.classList.add('sh-visible');
+
+        var rect = btn.getBoundingClientRect();
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        floatingPanel.style.top  = (rect.bottom + scrollTop + 4) + 'px';
+        floatingPanel.style.left = Math.max(4, rect.left - 100) + 'px';
+
+        var closeBtn = floatingPanel.querySelector('[data-sh-close]');
+        if (closeBtn) {
+          closeBtn.addEventListener('mousedown', function(ev) {
+            ev.stopPropagation();
+            floatingPanel.classList.remove('sh-visible');
+          });
+        }
+      });
+    });
+
+    if (form.querySelector('.sh-toggle-btn')) return;
+
+    var globalContainer = document.createElement('div');
+    globalContainer.innerHTML = buildGlobalPanel(backend);
+    var helpDiv = globalContainer.querySelector('div');
+    if (helpDiv) helpDiv.style.display = 'none';
+
+    var toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'sh-toggle-btn btn btn-default btn-sm';
+    toggleBtn.textContent = 'Aide \u00e0 la recherche';
+    toggleBtn.style.marginTop = '12px';
+
+    toggleBtn.addEventListener('click', function() {
+      if (!helpDiv) return;
+      if (helpDiv.style.display === 'none') {
+        helpDiv.style.display = 'block';
+        toggleBtn.textContent = 'Masquer l\'aide';
+      } else {
+        helpDiv.style.display = 'none';
+        toggleBtn.textContent = 'Aide \u00e0 la recherche';
+      }
+    });
+
+    var fieldsets = form.querySelectorAll('fieldset');
+    var lastFieldset = fieldsets[fieldsets.length - 1];
+    if (lastFieldset && lastFieldset.parentNode) {
+      lastFieldset.parentNode.insertBefore(toggleBtn, lastFieldset.nextSibling);
+      lastFieldset.parentNode.insertBefore(globalContainer, toggleBtn.nextSibling);
+    } else {
+      form.appendChild(toggleBtn);
+      form.appendChild(globalContainer);
+    }
+  }
+
+  function waitForForm() {
+    var attempts = 0;
+    var timer = setInterval(function() {
+      attempts++;
+      if (window.location.href.indexOf('search') < 0) { clearInterval(timer); return; }
+      var form = null;
+      var allForms = document.querySelectorAll('form[method="get"]');
+      for (var i = 0; i < allForms.length; i++) {
+        if (allForms[i].querySelector('fieldset')) { form = allForms[i]; break; }
+      }
+      if (form) { clearInterval(timer); init(); }
+      if (attempts > 50) clearInterval(timer);
+    }, 100);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', waitForForm);
+  } else {
+    waitForForm();
+  }
+
+  document.addEventListener('mayan:content-loaded', function() {
+    setTimeout(init, 200);
+  });
+
+  if (window.MutationObserver) {
+    var observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length) {
+          var hasForm = Array.from(mutation.addedNodes).some(function(node) {
+            return node.nodeType === 1 && node.querySelector && node.querySelector('fieldset input');
+          });
+          if (hasForm) setTimeout(init, 100);
+        }
+      });
+    });
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    } else {
+      document.addEventListener('DOMContentLoaded', function() {
+        if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+      });
+    }
+  }
+
+}());
