@@ -37,3 +37,6 @@
 [submodule "mayan/apps/recherche_similaire"]
 	path = mayan/apps/recherche_similaire
 	url = git@github.com:germainm/egyptian-recherche_similaire.git
+[submodule "mayan/apps/acl_explorer"]
+	path = mayan/apps/acl_explorer
+	url = git@github.com:germainm/egyptian-acl_explorer.git
