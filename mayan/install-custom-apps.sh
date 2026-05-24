@@ -113,8 +113,10 @@ if grep -qF "${THIS_APP}|" "$REGISTRY"; then
     echo ""
 fi
 
-# Update registry: remove old entry for this app, add current one
-grep -vF "${THIS_APP}|" "$REGISTRY" > "$REGISTRY.tmp" && mv "$REGISTRY.tmp" "$REGISTRY" || true
+# Update registry: remove old entry for this app, add current one.
+# grep -vF exits 1 when no lines remain — separate || true so mv always runs.
+{ grep -vF "${THIS_APP}|" "$REGISTRY" || true; } > "$REGISTRY.tmp"
+mv "$REGISTRY.tmp" "$REGISTRY"
 echo "${THIS_APP}|${INSTALL_DIR}|${MOUNT_TARGET}" >> "$REGISTRY"
 
 # Build merged app list from the full registry
