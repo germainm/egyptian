@@ -117,6 +117,27 @@ class KeyTestCase(BaseTestCase):
 
         cleartext_file.close()
 
+    def test_detached_verification_signature_id(self):
+        Key.objects.create(key_data=TEST_KEY_PRIVATE_DATA)
+
+        with open(file=TEST_DETACHED_SIGNATURE, mode='rb') as signature_file:
+            with open(file=TEST_FILE, mode='rb') as test_file:
+                result = Key.objects.verify_file(
+                    file_object=test_file, signature_file=signature_file
+                )
+
+        self.assertTrue(result.valid)
+        self.assertTrue(result.signature_id)
+
+    def test_embedded_verification_signature_id(self):
+        Key.objects.create(key_data=TEST_KEY_PRIVATE_DATA)
+
+        with open(file=TEST_SIGNED_FILE, mode='rb') as signed_file:
+            result = Key.objects.verify_file(file_object=signed_file)
+
+        self.assertTrue(result.valid)
+        self.assertTrue(result.signature_id)
+
     def test_detached_verification_no_key(self):
         with open(file=TEST_DETACHED_SIGNATURE, mode='rb') as signature_file:
             with open(file=TEST_FILE, mode='rb') as test_file:

@@ -99,6 +99,8 @@ TEST_KEYSERVERS = ['pool.sks-keyservers.net']
 TEST_SEARCH_UID = 'Roberto Rosario'
 TEST_SEARCH_FINGERPRINT = '607138F1AECC5A5CA31CB7715F3F7F75D210724D'
 
+TEST_SIGNATURE_ID = 'mWp7K1uZ8nQv3xRcT5eY2sLfD0o'
+TEST_SIGNATURE_ID_ALTERNATE = 'aB4hN9jM6kP1wXcR3eU8tS5vQ7z'
 TEST_SIGNED_FILE = os.path.join(
     settings.BASE_DIR, 'apps', 'django_gpg', 'tests', 'contrib',
     'test_files', 'test_file.txt.gpg'

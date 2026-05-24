@@ -25,6 +25,25 @@ class PythonGNUPGBackend(GPGBackend):
         return gpg.decrypt_file(fileobj_or_path=file_object)
 
     @staticmethod
+    def _get_verify_result_signature_id(verify_result):
+        if verify_result.signature_id:
+            return verify_result.signature_id
+
+        fingerprint = verify_result.fingerprint
+        signature_information = verify_result.sig_info or {}
+
+        for signature_id, entry in signature_information.items():
+            if fingerprint and entry.get('fingerprint') == fingerprint:
+                return signature_id
+
+        # No fingerprint match was found. Fall back to the first entry
+        # available, if any.
+        for signature_id in signature_information:
+            return signature_id
+
+        return None
+
+    @staticmethod
     def _import_and_list_keys(gpg, **kwargs):
         import_results = gpg.import_keys(**kwargs)
         return import_results, gpg.list_keys(
@@ -74,9 +93,15 @@ class PythonGNUPGBackend(GPGBackend):
                 key_data=key['key_data']
             )
 
-        return gpg.verify_file(
+        verify_result = gpg.verify_file(
             fileobj_or_path=file_object, data_filename=data_filename
         )
+
+        verify_result.signature_id = PythonGNUPGBackend._get_verify_result_signature_id(
+            verify_result=verify_result
+        )
+
+        return verify_result
 
     def decrypt_file(self, file_object, keys):
         return self.gpg_command(
