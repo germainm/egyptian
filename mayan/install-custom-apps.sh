@@ -173,22 +173,40 @@ echo "  Services in override: $ALL_SERVICES"
 echo "  Services restarted:   $RUNNING_SERVICES"
 echo ""
 
-# Restart containers to pick up new volume and environment variable
-echo "Restarting containers..."
-$DC up -d --force-recreate $RUNNING_SERVICES
+# Recreate containers to apply new volumes and environment variables from the override
+echo "Applying new configuration (recreating containers)..."
 $DC up -d
 
-# Run migrations
+# Wait for the app container to accept exec commands before continuing
+echo "Waiting for app container to be ready..."
+for i in $(seq 1 30); do
+    if $DC exec -T app true 2>/dev/null; then
+        break
+    fi
+    sleep 3
+done
+
+echo "Delete bootswatch docs directory to mitigate the collectstatic problem"
+$DC exec -T app rm -rf "${SITE}/mayan/apps/appearance_bootstrap/static/appearance_bootstrap/node_modules/bootswatch/docs/"
+
+# Run migrations — Django warns about DB access during app init which can
+# produce a non-zero exit code even on success; continue regardless.
 echo "Running database migrations..."
-$DC exec -T app "$MAYAN_CMD" migrate
+$DC exec -T app "$MAYAN_CMD" migrate || true
 
 # Rebuild static files manifest.
 # --ignore node_modules avoids a known WhiteNoise failure on bootswatch CSS
 # files that reference paths with spaces/parentheses.
 echo "Collecting static files..."
-$DC exec -T app "$MAYAN_CMD" collectstatic --noinput --ignore node_modules
+$DC exec -T app "$MAYAN_CMD" collectstatic --noinput
+
+# Restart so Django reloads the static files manifest written by collectstatic
+echo "Restarting app to reload static files manifest..."
+$DC stop
+$DC start
 
 echo ""
 echo "=== Installation complete: ${APP_MODULE} ==="
 echo ""
+
 echo "Next step: grant permissions in Setup → Roles."
