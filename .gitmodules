@@ -40,3 +40,6 @@
 [submodule "mayan/apps/acl_explorer"]
 	path = mayan/apps/acl_explorer
 	url = git@github.com:germainm/egyptian-acl_explorer.git
+[submodule "mayan/apps/finance"]
+	path = mayan/apps/finance
+	url = git@github.com:germainm/egyptian-finance.git
