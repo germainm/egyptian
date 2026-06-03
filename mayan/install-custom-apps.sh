@@ -205,6 +205,35 @@ echo "Restarting app to reload static files manifest..."
 $DC stop
 $DC start
 
+# Wait for app to be ready before regenerating supervisor config
+echo "Waiting for app container to be ready (supervisor update)..."
+for i in $(seq 1 30); do
+    if $DC exec -T app true 2>/dev/null; then
+        break
+    fi
+    sleep 3
+done
+
+# Regenerate supervisord configuration so new Celery queues from custom apps
+# are registered with their workers. platforms_template docker_supervisord
+# runs Django (which loads MAYAN_COMMON_EXTRA_APPS) and builds the --queues
+# list dynamically from all registered CeleryQueue objects.
+# This applies to single-container mode (supervisord manages all workers).
+# In multi-container mode the individual worker containers already restarted
+# above with the updated MAYAN_COMMON_EXTRA_APPS — run_worker.sh discovers
+# queues at that point.
+if $DC exec -T app supervisorctl status > /dev/null 2>&1; then
+    echo "Regenerating supervisord configuration to register new Celery queues..."
+    $DC exec -T app sh -c \
+        "'$MAYAN_CMD' platforms_template docker_supervisord \
+         > /etc/supervisor/conf.d/mayan-edms.conf \
+         && supervisorctl reread \
+         && supervisorctl update"
+    echo "Supervisord updated."
+else
+    echo "Multi-container mode detected — worker containers restarted with new queue list."
+fi
+
 echo ""
 echo "=== Installation complete: ${APP_MODULE} ==="
 echo ""
