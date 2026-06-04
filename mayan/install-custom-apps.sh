@@ -222,13 +222,17 @@ done
 # In multi-container mode the individual worker containers already restarted
 # above with the updated MAYAN_COMMON_EXTRA_APPS — run_worker.sh discovers
 # queues at that point.
-if $DC exec -T app supervisorctl status > /dev/null 2>&1; then
+# supervisorctl pid returns 0 as soon as supervisord is reachable, regardless
+# of whether programs are still starting — unlike supervisorctl status which
+# returns exit 3 when any program is not yet RUNNING.
+if $DC exec -T app supervisorctl pid > /dev/null 2>&1; then
     echo "Regenerating supervisord configuration to register new Celery queues..."
     $DC exec -T app sh -c \
         "'$MAYAN_CMD' platforms_template docker_supervisord \
          > /etc/supervisor/conf.d/mayan-edms.conf \
          && supervisorctl reread \
-         && supervisorctl update"
+         && supervisorctl update" \
+        || echo "Warning: supervisord config update failed — restart the stack manually to apply new queues."
     echo "Supervisord updated."
 else
     echo "Multi-container mode detected — worker containers restarted with new queue list."
