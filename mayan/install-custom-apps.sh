@@ -227,7 +227,9 @@ done
 # returns exit 3 when any program is not yet RUNNING.
 if $DC exec -T app supervisorctl pid > /dev/null 2>&1; then
     echo "Regenerating supervisord configuration to register new Celery queues..."
-    $DC exec -T app sh -c \
+    # -u root: writing /etc/supervisor/conf.d/mayan-edms.conf requires root;
+    # docker compose exec runs as the container user (mayan) by default.
+    $DC exec -T -u root app sh -c \
         "'$MAYAN_CMD' platforms_template docker_supervisord \
          > /etc/supervisor/conf.d/mayan-edms.conf \
          && supervisorctl reread \
