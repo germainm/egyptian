@@ -46,3 +46,6 @@
 [submodule "mayan/apps/legal"]
 	path = mayan/apps/legal
 	url = git@github.com:germainm/egyptian-legal.git
+[submodule "mayan/apps/healthcare"]
+	path = mayan/apps/healthcare
+	url = git@github.com:germainm/egyptian-healthcare.git
