@@ -271,6 +271,7 @@ class StorageProcessorTestMixin:
         cls.defined_storage = DefinedStorage.get(
             name=STORAGE_NAME_DOCUMENT_FILES
         )
+        cls.document_storage_dotted_path = cls.defined_storage.dotted_path
         cls.document_storage_kwargs = cls.defined_storage.kwargs
 
     def setUp(self):
@@ -282,6 +283,7 @@ class StorageProcessorTestMixin:
     def tearDown(self):
         super().tearDown()
         shutil.rmtree(path=self.temporary_directory, ignore_errors=True)
+        self.defined_storage.dotted_path = self.document_storage_dotted_path
         self.defined_storage.kwargs = self.document_storage_kwargs
 
 
