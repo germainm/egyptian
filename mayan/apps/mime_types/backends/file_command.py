@@ -53,6 +53,7 @@ class MIMETypeBackendFileCommand(MIMETypeBackend):
             if mime_type_only:
                 file_mime_encoding = 'binary'
             else:
+                file_mime_encoding = ''
                 if len(output) > 1:
                     charset_part = output[1]
                     if 'charset=' in charset_part:
