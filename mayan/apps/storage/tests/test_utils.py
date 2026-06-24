@@ -1,3 +1,4 @@
+import dbm
 from pathlib import Path
 import shutil
 
@@ -149,3 +150,18 @@ class StorageProcessorTestCase(
             self._test_document.file_latest.checksum,
             self._test_document.file_latest.checksum_update(save=False)
         )
+
+    def test_processor_log_is_persisted_after_execute(self):
+        self._upload_and_process()
+
+        # If the log was closed properly, re-opening it must succeed and
+        # show at least one processed entry.
+
+        file = str(self.path_test_file)
+        database = dbm.open(file=file, flag='r')
+        try:
+            database_keys = database.keys()
+            keys_length = len(database_keys)
+            self.assertGreater(keys_length, 0)
+        finally:
+            database.close()

@@ -66,23 +66,24 @@ class PassthroughStorageProcessor:
 
             self.database = dbm.open(file=self.log_file, flag='c')
 
-            for instance in model.objects.all():
-                key = '{}.{}'.format(content_type.name, instance.pk)
-                if self._inclusion_condition(key=key):
-                    file_name = getattr(instance, self.file_attribute).name
+            try:
+                for instance in model.objects.all():
+                    key = '{}.{}'.format(content_type.name, instance.pk)
+                    if self._inclusion_condition(key=key):
+                        file_name = getattr(instance, self.file_attribute).name
 
-                    content = storage_instance.open(
-                        name=file_name, mode='rb',
-                        _direct=not self.reverse
-                    )
-                    storage_instance.delete(name=file_name)
-                    storage_instance.save(
-                        _direct=self.reverse, content=content,
-                        name=file_name
-                    )
-                    self._update_entry(key=key)
-
-            self.database.close
+                        content = storage_instance.open(
+                            name=file_name, mode='rb',
+                            _direct=not self.reverse
+                        )
+                        storage_instance.delete(name=file_name)
+                        storage_instance.save(
+                            _direct=self.reverse, content=content,
+                            name=file_name
+                        )
+                        self._update_entry(key=key)
+            finally:
+                self.database.close()
 
 
 def TemporaryDirectory(*args, **kwargs):
