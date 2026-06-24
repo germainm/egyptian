@@ -67,7 +67,7 @@ class AuthenticationFormTOTP(AuthenticationFormBase):
                 request=self.request, user=user
             )
             if self.user_cache is None:
-                raise forms.ValidationError(
+                raise ValidationError(
                     code='invalid_token',
                     message=self.error_messages['invalid_token']
                 )
