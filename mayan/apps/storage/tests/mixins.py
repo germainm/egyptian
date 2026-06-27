@@ -1,9 +1,12 @@
 import glob
 import importlib
+from io import BytesIO
 import logging
 import os
 from pathlib import Path
 import shutil
+import tarfile
+import zipfile
 
 import psutil
 
@@ -21,8 +24,18 @@ from mayan.apps.smart_settings.utils import get_environment_variable_full_name
 
 from ..classes import DefinedStorage
 from ..compressed_files import Archive
+from ..literals import (
+    DEFAULT_STORAGE_COMPRESSED_FILE_COMPRESSION_RATIO_MAXIMUM,
+    DEFAULT_STORAGE_COMPRESSED_FILE_INPUT_SIZE_MAXIMUM,
+    DEFAULT_STORAGE_COMPRESSED_FILE_MEMBER_SIZE_MAXIMUM
+)
 from ..models import DownloadFile, SharedUploadedFile
-from ..settings import setting_temporary_directory
+from ..settings import (
+    setting_compressed_file_compression_ratio_maximum,
+    setting_compressed_file_input_size_maximum,
+    setting_compressed_file_member_size_maximum,
+    setting_temporary_directory
+)
 from ..utils import mkdtemp
 
 from .literals import (
@@ -77,6 +90,47 @@ class ArchiveClassTestCaseMixin:
             self.assertEqual(
                 file_object.read(), self.member_contents
             )
+
+
+class ArchiveZipFileBuilderMixin:
+    def _build_zip_archive(self, members):
+        buffer = BytesIO()
+        with zipfile.ZipFile(file=buffer, mode='w') as archive:
+            for filename, content, compression in members:
+                archive.writestr(
+                    zinfo_or_arcname=filename, data=content,
+                    compress_type=compression
+                )
+
+        buffer.seek(0)
+        return buffer
+
+
+class ArchiveTarFileBuilderMixin:
+    def _build_tar_archive(self, members):
+        buffer = BytesIO()
+        with tarfile.open(fileobj=buffer, mode='w') as archive:
+            for filename, content in members:
+                tarinfo = tarfile.TarInfo(name=filename)
+                tarinfo.size = len(content)
+                archive.addfile(tarinfo=tarinfo, fileobj=BytesIO(content))
+
+        buffer.seek(0)
+        return buffer
+
+
+class CompressedFileSettingsResetMixin:
+    def tearDown(self):
+        setting_compressed_file_compression_ratio_maximum.do_value_override(
+            value=DEFAULT_STORAGE_COMPRESSED_FILE_COMPRESSION_RATIO_MAXIMUM
+        )
+        setting_compressed_file_input_size_maximum.do_value_override(
+            value=DEFAULT_STORAGE_COMPRESSED_FILE_INPUT_SIZE_MAXIMUM
+        )
+        setting_compressed_file_member_size_maximum.do_value_override(
+            value=DEFAULT_STORAGE_COMPRESSED_FILE_MEMBER_SIZE_MAXIMUM
+        )
+        super().tearDown()
 
 
 class DescriptorLeakCheckTestCaseMixin:

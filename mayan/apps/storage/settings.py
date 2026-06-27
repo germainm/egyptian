@@ -5,6 +5,9 @@ from mayan.apps.smart_settings.setting_clusters import setting_cluster
 from .literals import (
     DEFAULT_DOWNLOAD_FILE_EXPIRATION_INTERVAL,
     DEFAULT_SHARED_UPLOADED_FILE_EXPIRATION_INTERVAL,
+    DEFAULT_STORAGE_COMPRESSED_FILE_COMPRESSION_RATIO_MAXIMUM,
+    DEFAULT_STORAGE_COMPRESSED_FILE_INPUT_SIZE_MAXIMUM,
+    DEFAULT_STORAGE_COMPRESSED_FILE_MEMBER_SIZE_MAXIMUM,
     DEFAULT_STORAGE_DOWNLOAD_FILE_STORAGE,
     DEFAULT_STORAGE_DOWNLOAD_FILE_STORAGE_ARGUMENTS,
     DEFAULT_STORAGE_SHARED_STORAGE, DEFAULT_STORAGE_SHARED_STORAGE_ARGUMENTS,
@@ -15,6 +18,38 @@ setting_namespace = setting_cluster.do_namespace_add(
     label=_(message='Storage'), name='storage'
 )
 
+setting_compressed_file_input_size_maximum = setting_namespace.do_setting_add(
+    data_type=int,
+    default=DEFAULT_STORAGE_COMPRESSED_FILE_INPUT_SIZE_MAXIMUM,
+    global_name='STORAGE_COMPRESSED_FILE_INPUT_SIZE_MAXIMUM', help_text=_(
+        message='Maximum size in bytes of a compressed-archive input file '
+        '(EML, MSG, PDF, TAR, ZIP, and friends) that will be attempted '
+        'to parse. Files larger than this are rejected before being read '
+        'into memory, to prevent memory-exhaustion attacks. Set to 0 to '
+        'disable.'
+    )
+)
+setting_compressed_file_member_size_maximum = setting_namespace.do_setting_add(
+    data_type=int,
+    default=DEFAULT_STORAGE_COMPRESSED_FILE_MEMBER_SIZE_MAXIMUM,
+    global_name='STORAGE_COMPRESSED_FILE_MEMBER_SIZE_MAXIMUM', help_text=_(
+        message='Maximum size in bytes of a single member inside a '
+        'compressed archive. Members whose declared (uncompressed) size '
+        'exceeds this value are rejected before being decompressed. '
+        'Set to 0 to disable.'
+    )
+)
+setting_compressed_file_compression_ratio_maximum = setting_namespace.do_setting_add(
+    data_type=int,
+    default=DEFAULT_STORAGE_COMPRESSED_FILE_COMPRESSION_RATIO_MAXIMUM,
+    global_name='STORAGE_COMPRESSED_FILE_COMPRESSION_RATIO_MAXIMUM',
+    help_text=_(
+        message='Maximum ratio of uncompressed size to compressed size '
+        'permitted for a single archive member. Ratios above this value '
+        'are characteristic of zip-bomb / tar-bomb payloads and are '
+        'rejected. Set to 0 to disable.'
+    )
+)
 setting_download_file_expiration_interval = setting_namespace.do_setting_add(
     data_type=int, default=DEFAULT_DOWNLOAD_FILE_EXPIRATION_INTERVAL,
     global_name='DOWNLOAD_FILE_EXPIRATION_INTERVAL', help_text=_(

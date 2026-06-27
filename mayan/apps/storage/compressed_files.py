@@ -1,5 +1,6 @@
 import email
 from io import BytesIO
+import logging
 import tarfile
 import zipfile
 
@@ -18,12 +19,36 @@ from django.utils.encoding import force_bytes, force_str
 
 from mayan.apps.mime_types.classes import MIMETypeBackend
 
-from .exceptions import NoMIMETypeMatch
+from .exceptions import (
+    ArchiveCompressionRatioExceeded, ArchiveInputSizeExceeded,
+    ArchiveMemberSizeExceeded, NoMIMETypeMatch
+)
 from .literals import MIME_TYPE_EML, MSG_MIME_TYPES
+
+logger = logging.getLogger(name=__name__)
 
 
 class Archive:
     _registry = {}
+
+    @staticmethod
+    def _get_seekable_size(file_object):
+        """
+        Return the size in bytes of a seekable file-like object by seeking
+        to end and back to the original position. Returns ``None`` if the
+        object is not seekable (no ``seek``/``tell``), in which case the
+        size check is skipped, the caller is responsible for any further
+        bounded reads.
+        """
+        try:
+            original_position = file_object.tell()
+            file_object.seek(0, 2)
+            size = file_object.tell()
+            file_object.seek(original_position)
+        except (AttributeError, OSError):
+            return None
+        else:
+            return size
 
     @classmethod
     def register(cls, mime_types, archive_classes):
@@ -48,6 +73,84 @@ class Archive:
                 instance = archive_class()
                 instance._open(file_object=file_object)
                 return instance
+
+    def _check_compression_ratio(self, uncompressed_size, compressed_size):
+        """
+        Refuse a member whose declared-to-compressed size ratio exceeds
+        the configured maximum. ``compressed_size`` of zero (e.g.
+        directory entries, zero-byte files) is treated as a 1:1 ratio
+        to avoid division by zero and false positives on legitimately
+        empty members.
+        """
+        # Local import to avoid a circular import at module load time:
+        # settings.py imports from literals.py which is in this app.
+        from .settings import (
+            setting_compressed_file_compression_ratio_maximum
+        )
+
+        ratio_maximum = (
+            setting_compressed_file_compression_ratio_maximum.value
+        )
+        if not ratio_maximum:
+            return
+
+        if compressed_size <= 0:
+            return
+
+        ratio = uncompressed_size / compressed_size
+        if ratio > ratio_maximum:
+            raise ArchiveCompressionRatioExceeded(
+                'Archive member compression ratio {ratio:.0f} exceeds '
+                'maximum {maximum}.'.format(
+                    maximum=ratio_maximum, ratio=ratio
+                )
+            )
+
+    def _check_input_size(self, file_object):
+        """
+        Refuse to parse an input archive whose size exceeds the
+        configured maximum. Called from each subclass's ``_open``. A
+        non-seekable input is allowed through (size unknown), the
+        per-member checks and upstream-library memory limits provide
+        the next line of defense.
+        """
+        from .settings import setting_compressed_file_input_size_maximum
+
+        size_maximum = setting_compressed_file_input_size_maximum.value
+        if not size_maximum:
+            return
+
+        input_size = Archive._get_seekable_size(file_object=file_object)
+        if input_size is None:
+            return
+
+        if input_size > size_maximum:
+            raise ArchiveInputSizeExceeded(
+                'Archive input size {size} exceeds maximum '
+                '{maximum}.'.format(
+                    maximum=size_maximum, size=input_size
+                )
+            )
+
+    def _check_member_size(self, member_size, filename=None):
+        """
+        Refuse a member whose declared (uncompressed) size exceeds the
+        configured maximum.
+        """
+        from .settings import setting_compressed_file_member_size_maximum
+
+        size_maximum = setting_compressed_file_member_size_maximum.value
+        if not size_maximum:
+            return
+
+        if member_size > size_maximum:
+            raise ArchiveMemberSizeExceeded(
+                'Archive member {filename!r} size {size} exceeds '
+                'maximum {maximum}.'.format(
+                    filename=filename, maximum=size_maximum,
+                    size=member_size
+                )
+            )
 
     def _open(self, file_object):
         raise NotImplementedError
@@ -118,7 +221,21 @@ class EMLArchive(Archive):
                 # part.
                 yield {'label': 'body', 'message': message}
 
+    def _get_part_content(self, part, filename):
+        """
+        Return a part's content as bytes, after enforcing the
+        per-member size cap. The EML parser has already materialized
+        the part into memory by the time we get here; the cap defends
+        downstream consumers, not this layer.
+        """
+        content = force_bytes(s=part['message'].get_content())
+        self._check_member_size(
+            filename=filename, member_size=len(content)
+        )
+        return content
+
     def _open(self, file_object):
+        self._check_input_size(file_object=file_object)
         self._archive = email.message_from_binary_file(
             fp=file_object, policy=email.policy.default
         )
@@ -129,8 +246,8 @@ class EMLArchive(Archive):
     def member_contents(self, filename):
         for part in self.get_parts():
             if part['label'] == filename:
-                return force_bytes(
-                    s=part['message'].get_content()
+                return self._get_part_content(
+                    filename=filename, part=part
                 )
 
     def members(self):
@@ -145,26 +262,35 @@ class EMLArchive(Archive):
     def open_member(self, filename):
         for part in self.get_parts():
             if part['label'] == filename:
+                content = self._get_part_content(
+                    filename=filename, part=part
+                )
                 return File(
-                    file=BytesIO(
-                        initial_bytes=force_bytes(
-                            s=part['message'].get_content()
-                        )
-                    ), name=filename
+                    file=BytesIO(initial_bytes=content),
+                    name=filename
                 )
 
 
 class MsgArchive(Archive):
     def _open(self, file_object):
+        self._check_input_size(file_object=file_object)
         self._archive = extract_msg.Message(path=file_object)
 
     def member_contents(self, filename):
         if filename == 'message.txt':
-            return force_bytes(s=self._archive.body)
+            content = force_bytes(s=self._archive.body)
+            self._check_member_size(
+                filename=filename, member_size=len(content)
+            )
+            return content
 
         for member in self._archive.attachments:
             if member.longFilename == filename:
-                return force_bytes(s=member.data)
+                content = force_bytes(s=member.data)
+                self._check_member_size(
+                    filename=filename, member_size=len(content)
+                )
+                return content
 
     def members(self):
         results = []
@@ -178,18 +304,22 @@ class MsgArchive(Archive):
 
     def open_member(self, filename):
         if filename == 'message.txt':
+            content = force_bytes(s=self._archive.body)
+            self._check_member_size(
+                filename=filename, member_size=len(content)
+            )
             return File(
-                file=BytesIO(
-                    initial_bytes=force_bytes(s=self._archive.body)
-                ), name=filename
+                file=BytesIO(initial_bytes=content), name=filename
             )
 
         for member in self._archive.attachments:
             if member.longFilename == filename:
+                content = force_bytes(s=member.data)
+                self._check_member_size(
+                    filename=filename, member_size=len(content)
+                )
                 return File(
-                    file=BytesIO(
-                        initial_bytes=force_bytes(s=member.data)
-                    ), name=filename
+                    file=BytesIO(initial_bytes=content), name=filename
                 )
 
 
@@ -203,11 +333,15 @@ class PDFArchive(Archive):
                 yield member_filename, content
 
     def _open(self, file_object):
+        self._check_input_size(file_object=file_object)
         self._archive = PdfReader(stream=file_object)
 
     def member_contents(self, filename):
         for member_filename, content in self._get_member_and_content_list():
             if filename == member_filename:
+                self._check_member_size(
+                    filename=filename, member_size=len(content)
+                )
                 yield from content
 
     def members(self):
@@ -221,13 +355,24 @@ class PDFArchive(Archive):
         for member_filename, content in self._get_member_and_content_list():
             if filename == member_filename:
                 initial_bytes = force_bytes(s=content)
+                self._check_member_size(
+                    filename=filename, member_size=len(initial_bytes)
+                )
                 buffer = BytesIO(initial_bytes=initial_bytes)
                 return File(file=buffer, name=filename)
 
 
 class TarArchive(Archive):
     def _open(self, file_object):
+        self._check_input_size(file_object=file_object)
         self._archive = tarfile.open(fileobj=file_object)
+
+    def _get_tarinfo(self, filename):
+        """
+        Resolve a member name to its ``TarInfo`` so callers can read
+        the declared size before any decompression.
+        """
+        return self._archive.getmember(name=filename)
 
     def add_file(self, file_object, filename):
         self._archive.addfile(
@@ -242,18 +387,34 @@ class TarArchive(Archive):
         self._archive = tarfile.TarFile(fileobj=self.string_buffer, mode='w')
 
     def member_contents(self, filename):
+        tarinfo = self._get_tarinfo(filename=filename)
+        self._check_member_size(
+            filename=filename, member_size=tarinfo.size
+        )
         return self._archive.extractfile(filename).read()
 
     def members(self):
         return self._archive.getnames()
 
     def open_member(self, filename):
+        tarinfo = self._get_tarinfo(filename=filename)
+        self._check_member_size(
+            filename=filename, member_size=tarinfo.size
+        )
         return self._archive.extractfile(filename)
 
 
 class ZipArchive(Archive):
     def _open(self, file_object):
+        self._check_input_size(file_object=file_object)
         self._archive = zipfile.ZipFile(file=file_object)
+
+    def _get_zipinfo(self, filename):
+        """
+        Resolve a member name to its ``ZipInfo`` so callers can read
+        the declared size and compressed size before any decompression.
+        """
+        return self._archive.getinfo(name=filename)
 
     def add_file(self, file_object, filename):
         self._archive.writestr(
@@ -267,6 +428,14 @@ class ZipArchive(Archive):
         self._archive = zipfile.ZipFile(file=self.string_buffer, mode='w')
 
     def member_contents(self, filename):
+        zipinfo = self._get_zipinfo(filename=filename)
+        self._check_member_size(
+            filename=filename, member_size=zipinfo.file_size
+        )
+        self._check_compression_ratio(
+            compressed_size=zipinfo.compress_size,
+            uncompressed_size=zipinfo.file_size
+        )
         return self._archive.read(name=filename)
 
     def members(self):
@@ -300,6 +469,14 @@ class ZipArchive(Archive):
         return results
 
     def open_member(self, filename):
+        zipinfo = self._get_zipinfo(filename=filename)
+        self._check_member_size(
+            filename=filename, member_size=zipinfo.file_size
+        )
+        self._check_compression_ratio(
+            compressed_size=zipinfo.compress_size,
+            uncompressed_size=zipinfo.file_size
+        )
         return self._archive.open(name=filename)
 
     def write(self, filename=None):
