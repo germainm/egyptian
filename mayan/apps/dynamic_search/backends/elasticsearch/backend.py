@@ -1,6 +1,7 @@
 from collections import deque
 from contextlib import contextmanager
 import functools
+import threading
 
 import elasticsearch
 from elasticsearch import Elasticsearch, helpers
@@ -27,6 +28,9 @@ from .literals import (
 
 
 class ElasticsearchSearchBackend(SearchBackend):
+    _client_registry = {}
+    _client_registry_lock = threading.Lock()
+
     feature_reindex = True
     field_type_mapping = DJANGO_TO_ELASTICSEARCH_FIELD_MAP
 
@@ -36,7 +40,6 @@ class ElasticsearchSearchBackend(SearchBackend):
         search_page_size=DEFAULT_ELASTICSEARCH_SEARCH_PAGE_SIZE,
         point_in_time_keep_alive=DEFAULT_ELASTICSEARCH_POINT_IN_TIME_KEEP_ALIVE,
         **kwargs
-
     ):
         super().__init__(**kwargs)
 
@@ -57,7 +60,26 @@ class ElasticsearchSearchBackend(SearchBackend):
         if self._test_mode:
             self.indices_namespace = DEFAULT_ELASTICSEARCH_INDICES_NAMESPACE_TEST
 
-        self._client = Elasticsearch(**self.client_kwargs)
+    @property
+    def _client(self):
+        cls = self.__class__
+        cache_key = self._get_client_cache_key()
+        client = cls._client_registry.get(cache_key)
+
+        if client is None:
+            with cls._client_registry_lock:
+                client = cls._client_registry.get(cache_key)
+                if client is None:
+                    client = Elasticsearch(**self.client_kwargs)
+                    cls._client_registry[cache_key] = client
+
+        return client
+
+    def _get_client_cache_key(self):
+        items = self.client_kwargs.items()
+        return repr(
+            sorted(items)
+        )
 
         # Shared PIT id active during a top-level search() call.
         # None means no shared PIT is active; each do_search_execute call
