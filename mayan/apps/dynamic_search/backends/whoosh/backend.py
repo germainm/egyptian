@@ -350,38 +350,41 @@ class WhooshSearchBackend(SearchBackend):
                     index = self._get_or_create_index(search_model=search_model)
 
                     writer = BufferedWriter(index=index)
-                    for instance in queryset:
-                        kwargs = search_model.populate(
-                            search_backend=self, instance=instance
-                        )
-
-                        try:
-                            writer.update_document(**kwargs)
-                        except Exception as exception:
-                            # The parenthesis is used to define a multi
-                            # line error message not a translatable string.
-                            error_text = (
-                                'Unexpected exception while '
-                                'indexing search model: {search_model}, '
-                                'id_list: {id_list}',
-                                'index data: {index_data}, '
-                                'raw data: {raw_data}, '
-                                'field map: {field_map}; '
-                                '{exception}'
-                            ).format(
-                                exception=exception,
-                                field_map=self.get_resolved_field_type_map(
-                                    search_model=search_model
-                                ), id_list=id_list, index_data=kwargs,
-                                raw_data=instance.__dict__,
-                                search_model=search_model.full_name
+                    try:
+                        for instance in queryset:
+                            kwargs = search_model.populate(
+                                search_backend=self, instance=instance
                             )
 
-                            logger.error(error_text, exc_info=True)
-                            raise DynamicSearchBackendException(
-                                error_text
-                            ) from exception
-                    writer.close()
+                            try:
+                                writer.update_document(**kwargs)
+                            except Exception as exception:
+                                # The parenthesis is used to define a multi
+                                # line error message not a translatable
+                                # string.
+                                error_text = (
+                                    'Unexpected exception while '
+                                    'indexing search model: {search_model}, '
+                                    'id_list: {id_list}',
+                                    'index data: {index_data}, '
+                                    'raw data: {raw_data}, '
+                                    'field map: {field_map}; '
+                                    '{exception}'
+                                ).format(
+                                    exception=exception,
+                                    field_map=self.get_resolved_field_type_map(
+                                        search_model=search_model
+                                    ), id_list=id_list, index_data=kwargs,
+                                    raw_data=instance.__dict__,
+                                    search_model=search_model.full_name
+                                )
+
+                                logger.error(error_text, exc_info=True)
+                                raise DynamicSearchBackendException(
+                                    error_text
+                                ) from exception
+                    finally:
+                        writer.close()
             except whoosh.index.LockError:
                 raise DynamicSearchRetry
             finally:
