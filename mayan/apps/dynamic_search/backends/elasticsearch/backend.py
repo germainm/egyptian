@@ -10,7 +10,8 @@ from elasticsearch.dsl import Q, Search
 from mayan.literals import DEFAULT_ELASTICSEARCH_PASSWORD
 
 from ...exceptions import (
-    DynamicSearchBackendException, DynamicSearchValueTransformationError
+    DynamicSearchBackendException, DynamicSearchRetry,
+    DynamicSearchValueTransformationError
 )
 from ...search_backends import SearchBackend
 from ...search_fields import SearchFieldVirtualAllFields
@@ -74,6 +75,12 @@ class ElasticsearchSearchBackend(SearchBackend):
                     cls._client_registry[cache_key] = client
 
         return client
+
+    @_client.setter
+    def _client(self, value):
+        cls = self.__class__
+        cache_key = self._get_client_cache_key()
+        cls._client_registry[cache_key] = value
 
     def _get_client_cache_key(self):
         items = self.client_kwargs.items()
@@ -420,9 +427,18 @@ class ElasticsearchSearchBackend(SearchBackend):
             instance=instance, search_backend=self
         )
         index_name = self._get_index_name(search_model=search_model)
-        self._client.index(
-            document=document, id=instance.pk, index=index_name
-        )
+        try:
+            self._client.index(
+                document=document, id=instance.pk, index=index_name
+            )
+        except (
+            elasticsearch.exceptions.ConnectionError,
+            elasticsearch.exceptions.ConnectionTimeout
+        ) as exception:
+            # Transient transport errors are retried instead of being
+            # allowed to propagate as a permanent failure that would leave
+            # the instance missing from the search index.
+            raise DynamicSearchRetry from exception
 
     def index_instances(self, search_model, id_list):
         index_name = self._get_index_name(search_model=search_model)
@@ -445,7 +461,16 @@ class ElasticsearchSearchBackend(SearchBackend):
             yield_ok=False
         )
 
-        deque(iterable=bulk_indexing_generator, maxlen=0)
+        try:
+            deque(iterable=bulk_indexing_generator, maxlen=0)
+        except (
+            elasticsearch.exceptions.ConnectionError,
+            elasticsearch.exceptions.ConnectionTimeout
+        ) as exception:
+            # Transient transport errors are retried instead of being
+            # allowed to propagate as a permanent failure that would leave
+            # instances missing from the search index.
+            raise DynamicSearchRetry from exception
 
     def refresh(self):
         attempt_count = 0

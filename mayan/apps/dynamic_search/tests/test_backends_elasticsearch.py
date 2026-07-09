@@ -1,6 +1,12 @@
+from unittest import mock
+
+import elasticsearch
+
 from mayan.apps.testing.tests.base import BaseTestCase
 
-from ..exceptions import DynamicSearchBackendException
+from ..backends.elasticsearch import ElasticsearchSearchBackend
+from ..exceptions import DynamicSearchBackendException, DynamicSearchRetry
+from ..search_models import SearchModel
 from ..search_query_types import QueryTypeExact
 
 from .mixins.backend_mixins import (
@@ -14,6 +20,59 @@ from .mixins.backend_search_field_mixins import (
     BackendSearchFieldTestCaseMixin
 )
 from .mixins.base import TestSearchObjectSimpleTestMixin
+
+
+class ElasticsearchSearchBackendRetryTestCase(BaseTestCase):
+    def _get_test_backend(self):
+        backend = ElasticsearchSearchBackend.__new__(
+            ElasticsearchSearchBackend
+        )
+        backend.client_kwargs = {}
+        backend.indices_namespace = 'test'
+        backend._client = mock.Mock()
+
+        return backend
+
+    def test_index_instance_connection_error_is_retried(self):
+        backend = self._get_test_backend()
+        backend._client.index.side_effect = elasticsearch.exceptions.ConnectionError(
+            'Simulated connection error.'
+        )
+
+        search_model = mock.Mock()
+        search_model.full_name = 'app.model'
+        search_model.populate.return_value = {}
+
+        instance = mock.Mock()
+        instance.pk = 1
+
+        with mock.patch.object(
+            target=SearchModel, attribute='get_for_model',
+            return_value=search_model
+        ):
+            with self.assertRaises(expected_exception=DynamicSearchRetry):
+                backend.index_instance(instance=instance)
+
+    def test_index_instances_connection_error_is_retried(self):
+        backend = self._get_test_backend()
+
+        search_model = mock.Mock()
+        search_model.full_name = 'app.model'
+
+        def raising_streaming_bulk(*args, **kwargs):
+            raise elasticsearch.exceptions.ConnectionTimeout(
+                'Simulated connection timeout.'
+            )
+            yield  # pragma: no cover
+
+        with mock.patch(
+            target='elasticsearch.helpers.streaming_bulk',
+            side_effect=raising_streaming_bulk
+        ):
+            with self.assertRaises(expected_exception=DynamicSearchRetry):
+                backend.index_instances(
+                    search_model=search_model, id_list=(1,)
+                )
 
 
 class ElasticsearchSearchSearchBackendLimitTestCase(
