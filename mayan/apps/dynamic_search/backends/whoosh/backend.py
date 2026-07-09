@@ -365,7 +365,7 @@ class WhooshSearchBackend(SearchBackend):
                                 error_text = (
                                     'Unexpected exception while '
                                     'indexing search model: {search_model}, '
-                                    'id_list: {id_list}',
+                                    'id_list: {id_list}, '
                                     'index data: {index_data}, '
                                     'raw data: {raw_data}, '
                                     'field map: {field_map}; '
