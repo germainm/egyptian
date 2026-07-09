@@ -106,6 +106,10 @@ def handler_factory_index_related_instance_m2m(data):
 
     def handler_index_related_instance_m2m(sender, **kwargs):
         action = kwargs.get('action')
+
+        if action not in ('post_add', 'pre_remove'):
+            return
+
         instance = kwargs['instance']
         model = kwargs.get('model')
 
