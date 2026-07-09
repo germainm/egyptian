@@ -231,7 +231,8 @@ class WhooshSearchBackend(SearchBackend):
 
     def deindex_instance(self, instance):
         try:
-            lock = LockingBackend.get_backend().acquire_lock(
+            lock_backend = LockingBackend.get_backend()
+            lock = lock_backend.acquire_lock(
                 name=TEXT_LOCK_INSTANCE_DEINDEX
             )
         except LockError:
@@ -257,7 +258,8 @@ class WhooshSearchBackend(SearchBackend):
 
     def index_instance(self, instance, exclude_model=None, exclude_kwargs=None):
         try:
-            lock = LockingBackend.get_backend().acquire_lock(
+            lock_backend = LockingBackend.get_backend()
+            lock = lock_backend.acquire_lock(
                 name=TEXT_LOCK_INSTANCE_INDEX
             )
         except LockError:
@@ -339,7 +341,8 @@ class WhooshSearchBackend(SearchBackend):
         queryset = queryset.filter(pk__in=id_list)
 
         try:
-            lock = LockingBackend.get_backend().acquire_lock(
+            lock_backend = LockingBackend.get_backend()
+            lock = lock_backend.acquire_lock(
                 name=TEXT_LOCK_INSTANCE_INDEX
             )
         except LockError:
