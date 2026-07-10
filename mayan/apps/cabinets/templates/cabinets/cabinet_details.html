@@ -29,6 +29,7 @@
 {% endblock %}
 
 {% block javascript %}
+    {{ jstree_data|json_script:"cabinet-jstree-data" }}
     <script>
         $.getScript( "{% static 'cabinets/node_modules/jstree/dist/jstree.min.js' %}" )
             .done(function(script, textStatus) {
@@ -43,10 +44,9 @@
                     })
                     .jstree({
                         'core' : {
-                            'data' : [
-                                {{ jstree_data|safe }}
-
-                            ],
+                            'data' : JSON.parse(
+                                $('#cabinet-jstree-data').text()
+                            ),
                             'themes' : {
                                 'responsive' : true,
                             }

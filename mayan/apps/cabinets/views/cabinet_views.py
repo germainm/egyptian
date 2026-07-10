@@ -98,12 +98,12 @@ class CabinetDetailView(ExternalObjectViewMixin, DocumentListView):
             {
                 'column_class': 'col-xs-12 col-sm-6 col-md-4 col-lg-3',
                 'hide_links': True,
-                'jstree_data': '\n'.join(
+                'jstree_data': [
                     jstree_data(
                         node=self.external_object.get_root(),
                         selected_node=self.external_object
                     )
-                ),
+                ],
                 'list_as_items': True,
                 'no_results_icon': icon_cabinet,
                 'no_results_main_link': link_cabinet_child_add.resolve(
