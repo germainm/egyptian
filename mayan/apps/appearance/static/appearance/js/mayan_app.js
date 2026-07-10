@@ -172,6 +172,8 @@ class MayanApp {
         for (const message of context.djangoMessages) {
             let options = {};
 
+            options['escapeHtml'] = true;
+
             if (message.tags === 'error') {
                 // Error messages persist.
                 options['timeOut'] = 0;
