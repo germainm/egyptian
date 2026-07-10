@@ -241,8 +241,6 @@ class ElasticsearchSearchBackend(SearchBackend):
         result.append(title)
         result.append('=' * title_length)
 
-        self.refresh()
-
         for search_model in SearchModel.all():
             index_name = self._get_index_name(search_model=search_model)
             try:
