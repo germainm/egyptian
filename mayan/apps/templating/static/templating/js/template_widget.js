@@ -8,7 +8,10 @@ jQuery(document).ready(function() {
         const $idTemplate = $this.siblings('[data-template-fields="template"]');
         const templateCursorPosition = $idTemplate.prop('selectionStart');
         let templateValue = $idTemplate.val();
-        const fieldText = eval('`' + $this.data('field-template') + '`');
+        const modelVariable = $idTemplate.data('model-variable') || '';
+        const fieldText = $this.data('field-template')
+            .split('{model_variable}').join(modelVariable)
+            .split('{value}').join($this.val());
 
         templateValue = templateValue.slice(
             0, templateCursorPosition

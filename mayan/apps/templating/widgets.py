@@ -22,7 +22,7 @@ class TemplateWidget(form_widgets.NamedMultiWidget):
         'builtin_tags': form_widgets.Select(
             attrs={
                 'data-autocopy': 'true',
-                'data-field-template': '${ $this.val() }'
+                'data-field-template': '{value}'
             }
         ),
         'template': FormWidgetCode(
@@ -117,7 +117,7 @@ class ModelTemplateWidget(TemplateWidget):
         self.widgets['model_attribute'] = form_widgets.Select(
             attrs={
                 'data-autocopy': 'true',
-                'data-field-template': '{{ ${ $idTemplate.data("model-variable") }.${ $this.val() } }}'
+                'data-field-template': '{{ {model_variable}.{value} }}'
             }
         )
         self.subwidgets_order.insert(0, 'model_attribute')
