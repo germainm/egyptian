@@ -14,7 +14,6 @@ from django.conf import settings
 
 from mayan.apps.common.utils import any_to_bool
 from mayan.apps.lock_manager.backends.base import LockingBackend
-from mayan.apps.lock_manager.exceptions import LockError
 from mayan.apps.storage.utils import TemporaryDirectory
 
 from ...exceptions import (
@@ -230,25 +229,21 @@ class WhooshSearchBackend(SearchBackend):
                 self._get_or_create_index(search_model=search_model)
 
     def deindex_instance(self, instance):
+        lock_backend = LockingBackend.get_backend()
+        lock = lock_backend.acquire_lock(
+            name=TEXT_LOCK_INSTANCE_DEINDEX
+        )
         try:
-            lock_backend = LockingBackend.get_backend()
-            lock = lock_backend.acquire_lock(
-                name=TEXT_LOCK_INSTANCE_DEINDEX
-            )
-        except LockError:
-            raise
-        else:
-            try:
-                search_model = SearchModel.get_for_model(instance=instance)
-                index = self._get_or_create_index(search_model=search_model)
+            search_model = SearchModel.get_for_model(instance=instance)
+            index = self._get_or_create_index(search_model=search_model)
 
-                if not settings.COMMON_DISABLE_LOCAL_STORAGE:
-                    with index.writer(**self.writer_kwargs) as writer:
-                        writer.delete_by_term(
-                            'id', str(instance.pk)
-                        )
-            finally:
-                lock.release()
+            if not settings.COMMON_DISABLE_LOCAL_STORAGE:
+                with index.writer(**self.writer_kwargs) as writer:
+                    writer.delete_by_term(
+                        'id', str(instance.pk)
+                    )
+        finally:
+            lock.release()
 
     def do_native_type_conversion(self, value):
         if isinstance(value, (list, tuple)):
@@ -257,29 +252,59 @@ class WhooshSearchBackend(SearchBackend):
             return value
 
     def index_instance(self, instance, exclude_model=None, exclude_kwargs=None):
+        lock_backend = LockingBackend.get_backend()
+        lock = lock_backend.acquire_lock(
+            name=TEXT_LOCK_INSTANCE_INDEX
+        )
         try:
-            lock_backend = LockingBackend.get_backend()
-            lock = lock_backend.acquire_lock(
-                name=TEXT_LOCK_INSTANCE_INDEX
-            )
-        except LockError:
-            raise
-        else:
-            try:
-                search_model = SearchModel.get_for_model(instance=instance)
-                if not settings.COMMON_DISABLE_LOCAL_STORAGE:
-                    with self._get_writer(search_model=search_model) as writer:
+            search_model = SearchModel.get_for_model(instance=instance)
+            if not settings.COMMON_DISABLE_LOCAL_STORAGE:
+                with self._get_writer(search_model=search_model) as writer:
+                    try:
+                        writer.delete_by_term(
+                            'id', str(instance.pk)
+                        )
+                    except Exception as exception:
+                        # The parenthesis is used to define a multi
+                        # line error message not a translatable string.
+                        error_text = (
+                            'Unexpected exception while '
+                            'deleting search object id: {id}, '
+                            'search model: {search_model}, '
+                            'raw data: {raw_data}, '
+                            'field map: {field_map}; '
+                            '{exception}'
+                        ).format(
+                            exception=exception,
+                            field_map=self.get_resolved_field_type_map(
+                                search_model=search_model
+                            ), id=instance.pk,
+                            raw_data=instance.__dict__,
+                            search_model=search_model.full_name
+                        )
+
+                        logger.error(error_text, exc_info=True)
+                        raise DynamicSearchBackendException(
+                            error_text
+                        ) from exception
+                    else:
+                        kwargs = search_model.populate(
+                            search_backend=self, instance=instance,
+                            exclude_model=exclude_model,
+                            exclude_kwargs=exclude_kwargs
+                        )
+
                         try:
-                            writer.delete_by_term(
-                                'id', str(instance.pk)
-                            )
+                            writer.add_document(**kwargs)
                         except Exception as exception:
                             # The parenthesis is used to define a multi
-                            # line error message not a translatable string.
+                            # line error message not a translatable
+                            # string.
                             error_text = (
                                 'Unexpected exception while '
-                                'deleting search object id: {id}, '
+                                'indexing search object id: {id}, '
                                 'search model: {search_model}, '
+                                'index data: {index_data}, '
                                 'raw data: {raw_data}, '
                                 'field map: {field_map}; '
                                 '{exception}'
@@ -287,7 +312,7 @@ class WhooshSearchBackend(SearchBackend):
                                 exception=exception,
                                 field_map=self.get_resolved_field_type_map(
                                     search_model=search_model
-                                ), id=instance.pk,
+                                ), id=instance.pk, index_data=kwargs,
                                 raw_data=instance.__dict__,
                                 search_model=search_model.full_name
                             )
@@ -296,102 +321,64 @@ class WhooshSearchBackend(SearchBackend):
                             raise DynamicSearchBackendException(
                                 error_text
                             ) from exception
-                        else:
-                            kwargs = search_model.populate(
-                                search_backend=self, instance=instance,
-                                exclude_model=exclude_model,
-                                exclude_kwargs=exclude_kwargs
-                            )
 
-                            try:
-                                writer.add_document(**kwargs)
-                            except Exception as exception:
-                                # The parenthesis is used to define a multi
-                                # line error message not a translatable
-                                # string.
-                                error_text = (
-                                    'Unexpected exception while '
-                                    'indexing search object id: {id}, '
-                                    'search model: {search_model}, '
-                                    'index data: {index_data}, '
-                                    'raw data: {raw_data}, '
-                                    'field map: {field_map}; '
-                                    '{exception}'
-                                ).format(
-                                    exception=exception,
-                                    field_map=self.get_resolved_field_type_map(
-                                        search_model=search_model
-                                    ), id=instance.pk, index_data=kwargs,
-                                    raw_data=instance.__dict__,
-                                    search_model=search_model.full_name
-                                )
-
-                                logger.error(error_text, exc_info=True)
-                                raise DynamicSearchBackendException(
-                                    error_text
-                                ) from exception
-
-            except whoosh.index.LockError:
-                raise DynamicSearchRetry
-            finally:
-                lock.release()
+        except whoosh.index.LockError:
+            raise DynamicSearchRetry
+        finally:
+            lock.release()
 
     def index_instances(self, search_model, id_list):
         queryset = search_model.get_queryset()
         queryset = queryset.filter(pk__in=id_list)
 
+        lock_backend = LockingBackend.get_backend()
+        lock = lock_backend.acquire_lock(
+            name=TEXT_LOCK_INSTANCE_INDEX
+        )
         try:
-            lock_backend = LockingBackend.get_backend()
-            lock = lock_backend.acquire_lock(
-                name=TEXT_LOCK_INSTANCE_INDEX
-            )
-        except LockError:
-            raise
-        else:
-            try:
-                if not settings.COMMON_DISABLE_LOCAL_STORAGE:
-                    index = self._get_or_create_index(search_model=search_model)
+            if not settings.COMMON_DISABLE_LOCAL_STORAGE:
+                index = self._get_or_create_index(search_model=search_model)
 
-                    writer = BufferedWriter(index=index)
-                    try:
-                        for instance in queryset:
-                            kwargs = search_model.populate(
-                                search_backend=self, instance=instance
+                writer = BufferedWriter(index=index)
+                try:
+                    for instance in queryset:
+                        kwargs = search_model.populate(
+                            search_backend=self, instance=instance
+                        )
+
+                        try:
+                            writer.update_document(**kwargs)
+                        except Exception as exception:
+                            # The parenthesis is used to define a multi
+                            # line error message not a translatable
+                            # string.
+                            error_text = (
+                                'Unexpected exception while '
+                                'indexing search model: {search_model}, '
+                                'id_list: {id_list}, '
+                                'index data: {index_data}, '
+                                'raw data: {raw_data}, '
+                                'field map: {field_map}; '
+                                '{exception}'
+                            ).format(
+                                exception=exception,
+                                field_map=self.get_resolved_field_type_map(
+                                    search_model=search_model
+                                ), id_list=id_list, index_data=kwargs,
+                                raw_data=instance.__dict__,
+                                search_model=search_model.full_name
                             )
 
-                            try:
-                                writer.update_document(**kwargs)
-                            except Exception as exception:
-                                # The parenthesis is used to define a multi
-                                # line error message not a translatable
-                                # string.
-                                error_text = (
-                                    'Unexpected exception while '
-                                    'indexing search model: {search_model}, '
-                                    'id_list: {id_list}, '
-                                    'index data: {index_data}, '
-                                    'raw data: {raw_data}, '
-                                    'field map: {field_map}; '
-                                    '{exception}'
-                                ).format(
-                                    exception=exception,
-                                    field_map=self.get_resolved_field_type_map(
-                                        search_model=search_model
-                                    ), id_list=id_list, index_data=kwargs,
-                                    raw_data=instance.__dict__,
-                                    search_model=search_model.full_name
-                                )
-
-                                logger.error(error_text, exc_info=True)
-                                raise DynamicSearchBackendException(
-                                    error_text
-                                ) from exception
-                    finally:
-                        writer.close()
-            except whoosh.index.LockError:
-                raise DynamicSearchRetry
-            finally:
-                lock.release()
+                            logger.error(error_text, exc_info=True)
+                            raise DynamicSearchBackendException(
+                                error_text
+                            ) from exception
+                finally:
+                    writer.close()
+        except whoosh.index.LockError:
+            raise DynamicSearchRetry
+        finally:
+            lock.release()
 
     def reset(self, search_model=None):
         self.tear_down(search_model=search_model)
