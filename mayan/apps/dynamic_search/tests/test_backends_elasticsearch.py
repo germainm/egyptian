@@ -75,6 +75,54 @@ class ElasticsearchSearchBackendRetryTestCase(BaseTestCase):
                 )
 
 
+class ElasticsearchSearchBackendRefreshTestCase(
+    ElasticsearchsearchMockBackendMixin, BaseTestCase
+):
+    def test_do_search_execute_refresh_enabled(self):
+        backend = self._get_test_backend(refresh_on_search=True)
+
+        self._do_search_execute(backend=backend)
+        backend._client.indices.refresh.assert_called_once_with(
+            index='test-index'
+        )
+
+    def test_do_search_execute_refresh_disabled(self):
+        backend = self._get_test_backend(refresh_on_search=False)
+
+        self._do_search_execute(backend=backend)
+        backend._client.indices.refresh.assert_not_called()
+
+
+class ElasticsearchSearchBackendRefreshMissingIndexTestCase(
+    ElasticsearchsearchMockBackendMixin, BaseTestCase
+):
+    def test_refresh_skips_missing_index(self):
+        backend = self._get_test_backend()
+
+        search_models = [
+            mock.Mock(full_name='app.first'),
+            mock.Mock(full_name='app.second'),
+            mock.Mock(full_name='app.third')
+        ]
+
+        def refresh_side_effect(index):
+            if index.endswith('app.second'):
+                raise elasticsearch.exceptions.NotFoundError(
+                    'Simulated missing index.', meta=None, body=None
+                )
+
+        backend._client.indices.refresh.side_effect = refresh_side_effect
+
+        with mock.patch.object(
+            target=SearchModel, attribute='all', return_value=search_models
+        ):
+            backend.refresh()
+
+        self.assertEqual(
+            backend._client.indices.refresh.call_count, 3
+        )
+
+
 class ElasticsearchSearchSearchBackendLimitTestCase(
     ElasticsearchSearchBackendTestMixin, SearchBackendLimitTestMixin,
     BaseTestCase

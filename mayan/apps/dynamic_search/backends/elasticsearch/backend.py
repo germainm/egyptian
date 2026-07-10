@@ -23,8 +23,7 @@ from .literals import (
     DEFAULT_ELASTICSEARCH_INDICES_NAMESPACE_TEST,
     DEFAULT_ELASTICSEARCH_POINT_IN_TIME_KEEP_ALIVE,
     DEFAULT_ELASTICSEARCH_SEARCH_PAGE_SIZE,
-    DJANGO_TO_ELASTICSEARCH_FIELD_MAP, INDEX_NAME_DELIMITER,
-    MAXIMUM_API_ATTEMPT_COUNT
+    DJANGO_TO_ELASTICSEARCH_FIELD_MAP, INDEX_NAME_DELIMITER
 )
 
 
@@ -473,31 +472,13 @@ class ElasticsearchSearchBackend(SearchBackend):
             raise DynamicSearchRetry from exception
 
     def refresh(self):
-        attempt_count = 0
-        search_model_index = 0
-        search_models = SearchModel.all()
-
-        while True:
-            search_model = search_models[search_model_index]
+        for search_model in SearchModel.all():
             index_name = self._get_index_name(search_model=search_model)
 
             try:
                 self._client.indices.refresh(index=index_name)
-            except elasticsearch.exceptions.NotFoundError as exception:
-                attempt_count += 1
-
-                if attempt_count > MAXIMUM_API_ATTEMPT_COUNT:
-                    raise DynamicSearchBackendException(
-                        'Refresh attempt count exceeded the maximum'
-                        ' of `{}`.'.format(
-                            MAXIMUM_API_ATTEMPT_COUNT
-                        )
-                    ) from exception
-            else:
-                attempt_count = 0
-                search_model_index += 1
-                if search_model_index >= len(search_models):
-                    break
+            except elasticsearch.exceptions.NotFoundError:
+                """Ignore non existent indexes."""
 
     def reset(self, search_model=None):
         self.tear_down(search_model=search_model)
