@@ -131,7 +131,15 @@ def task_index_related_instance_m2m(
     InstanceModel = apps.get_model(
         app_label=instance_app_label, model_name=instance_model_name
     )
-    instance = InstanceModel.objects.get(pk=instance_object_id)
+
+    # The task can run before the transaction that triggered the many to
+    # many change commits. Retry on a missing instance instead of failing.
+    try:
+        instance = InstanceModel._meta.default_manager.get(
+            pk=instance_object_id
+        )
+    except InstanceModel.DoesNotExist as exception:
+        raise self.retry(exc=exception)
 
     Model = apps.get_model(
         app_label=model_app_label, model_name=model_model_name
@@ -146,10 +154,13 @@ def task_index_related_instance_m2m(
         )
         search_model_related_paths[DeserializedModel] = value
 
-    SearchBackend.index_related_instance_m2m(
-        action=action, instance=instance, model=Model, pk_set=pk_set,
-        search_model_related_paths=search_model_related_paths
-    )
+    try:
+        SearchBackend.index_related_instance_m2m(
+            action=action, instance=instance, model=Model, pk_set=pk_set,
+            search_model_related_paths=search_model_related_paths
+        )
+    except (DynamicSearchRetry, LockError) as exception:
+        raise self.retry(exc=exception)
 
 
 @app.task(ignore_result=True)

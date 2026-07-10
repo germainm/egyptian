@@ -1,4 +1,4 @@
-from unittest import skip
+from unittest import mock, skip
 
 from django.db import models
 
@@ -6,6 +6,7 @@ from mayan.apps.testing.tests.base import BaseTestCase
 
 from ..search_backends import SearchBackend
 from ..search_models import SearchModel
+from ..tasks import task_index_related_instance_m2m
 
 from .mixins.search_task_mixins import SearchTaskTestMixin
 
@@ -72,3 +73,36 @@ class SearchTaskTestCase(SearchTaskTestMixin, BaseTestCase):
             search_terms=self._test_object_list[0].test_field
         )
         self.assertTrue(self._test_object_list[0] in queryset)
+
+
+class TaskIndexRelatedInstanceM2MRetryTestCase(BaseTestCase):
+    def test_retry_on_missing_instance(self):
+        class TestDoesNotExist(Exception):
+            """Stand in for `Model.DoesNotExist`."""
+
+        mock_model = mock.Mock()
+        mock_model.DoesNotExist = TestDoesNotExist
+        mock_model._meta.default_manager.get.side_effect = TestDoesNotExist(
+            'Simulated missing instance.'
+        )
+
+        with mock.patch.object(
+            target=task_index_related_instance_m2m, attribute='retry'
+        ) as mock_retry:
+            mock_retry.return_value = Exception('Simulated retry.')
+
+            with mock.patch(
+                target='mayan.apps.dynamic_search.tasks.apps.get_model',
+                return_value=mock_model
+            ):
+                with self.assertRaises(expected_exception=Exception):
+                    task_index_related_instance_m2m(
+                        action='post_add', instance_app_label='app',
+                        instance_model_name='model', instance_object_id=1,
+                        model_app_label='app', model_model_name='model',
+                        pk_set=(1,), serialized_search_model_related_paths={}
+                    )
+
+        # A missing instance must trigger a retry rather than an uncaught
+        # `DoesNotExist`.
+        mock_retry.assert_called_once()
