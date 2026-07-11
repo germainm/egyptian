@@ -229,12 +229,15 @@ class WhooshSearchBackend(SearchBackend):
                 self._get_or_create_index(search_model=search_model)
 
     def deindex_instance(self, instance):
+        search_model = SearchModel.get_for_model(instance=instance)
+
         lock_backend = LockingBackend.get_backend()
         lock = lock_backend.acquire_lock(
-            name=TEXT_LOCK_INSTANCE_DEINDEX
+            name='{}-{}'.format(
+                TEXT_LOCK_INSTANCE_DEINDEX, search_model.full_name
+            )
         )
         try:
-            search_model = SearchModel.get_for_model(instance=instance)
             index = self._get_or_create_index(search_model=search_model)
 
             if not settings.COMMON_DISABLE_LOCAL_STORAGE:
@@ -252,12 +255,15 @@ class WhooshSearchBackend(SearchBackend):
             return value
 
     def index_instance(self, instance, exclude_model=None, exclude_kwargs=None):
+        search_model = SearchModel.get_for_model(instance=instance)
+
         lock_backend = LockingBackend.get_backend()
         lock = lock_backend.acquire_lock(
-            name=TEXT_LOCK_INSTANCE_INDEX
+            name='{}-{}'.format(
+                TEXT_LOCK_INSTANCE_INDEX, search_model.full_name
+            )
         )
         try:
-            search_model = SearchModel.get_for_model(instance=instance)
             if not settings.COMMON_DISABLE_LOCAL_STORAGE:
                 with self._get_writer(search_model=search_model) as writer:
                     try:
@@ -333,7 +339,9 @@ class WhooshSearchBackend(SearchBackend):
 
         lock_backend = LockingBackend.get_backend()
         lock = lock_backend.acquire_lock(
-            name=TEXT_LOCK_INSTANCE_INDEX
+            name='{}-{}'.format(
+                TEXT_LOCK_INSTANCE_INDEX, search_model.full_name
+            )
         )
         try:
             if not settings.COMMON_DISABLE_LOCAL_STORAGE:

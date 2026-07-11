@@ -1,3 +1,6 @@
+from unittest import mock
+
+from mayan.apps.lock_manager.backends.base import LockingBackend
 from mayan.apps.testing.tests.base import BaseTestCase
 
 from ..search_query_types import QueryTypeExact
@@ -106,3 +109,31 @@ class WhooshSearchBackendSpecificTestCase(
             len(id_list), 1
         )
         self.assertTrue(self._test_object.id in id_list)
+
+
+class WhooshSearchBackendLockTestCase(
+    BackendSearchTestMixin, TestSearchObjectSimpleTestMixin,
+    WhooshSearchBackendTestMixin, BaseTestCase
+):
+    def test_index_instance_uses_model_scoped_lock(self):
+        acquired_names = []
+
+        class MockLock:
+            def release(self):
+                """Nothing to release for the test double."""
+
+        mock_lock_backend = mock.Mock()
+        mock_lock_backend.acquire_lock.side_effect = (
+            lambda name, **kwargs: acquired_names.append(name) or MockLock()
+        )
+
+        with mock.patch.object(
+            target=LockingBackend, attribute='get_backend',
+            return_value=mock_lock_backend
+        ):
+            self._index_instance(instance=self._test_object)
+
+        self.assertTrue(acquired_names)
+        self.assertIn(
+            self._test_search_model.full_name, acquired_names[-1]
+        )
