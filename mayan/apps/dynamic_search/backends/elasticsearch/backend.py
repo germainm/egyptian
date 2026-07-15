@@ -22,6 +22,7 @@ from .literals import (
     DEFAULT_ELASTICSEARCH_HOSTS, DEFAULT_ELASTICSEARCH_INDICES_NAMESPACE,
     DEFAULT_ELASTICSEARCH_INDICES_NAMESPACE_TEST,
     DEFAULT_ELASTICSEARCH_POINT_IN_TIME_KEEP_ALIVE,
+    DEFAULT_ELASTICSEARCH_REFRESH_ON_SEARCH,
     DEFAULT_ELASTICSEARCH_SEARCH_PAGE_SIZE,
     DJANGO_TO_ELASTICSEARCH_FIELD_MAP, INDEX_NAME_DELIMITER
 )
@@ -39,12 +40,14 @@ class ElasticsearchSearchBackend(SearchBackend):
         indices_namespace=DEFAULT_ELASTICSEARCH_INDICES_NAMESPACE,
         search_page_size=DEFAULT_ELASTICSEARCH_SEARCH_PAGE_SIZE,
         point_in_time_keep_alive=DEFAULT_ELASTICSEARCH_POINT_IN_TIME_KEEP_ALIVE,
+        refresh_on_search=DEFAULT_ELASTICSEARCH_REFRESH_ON_SEARCH,
         **kwargs
     ):
         super().__init__(**kwargs)
 
         self.indices_namespace = indices_namespace
         self.point_in_time_keep_alive = point_in_time_keep_alive
+        self.refresh_on_search = refresh_on_search
         # Cap the page size to the results limit so ES never allocates a
         # top-N heap larger than the number of results we will actually use.
         self.search_page_size = min(
@@ -136,7 +139,9 @@ class ElasticsearchSearchBackend(SearchBackend):
         here. Otherwise a new PIT is opened and closed within this method.
         """
         model = self._get_model_for_index(index_name=index_name)
-        #self._client.indices.refresh(index=index_name)
+
+        if self.refresh_on_search:
+            self._client.indices.refresh(index=index_name)
 
         pk_field = model._meta.pk
 
