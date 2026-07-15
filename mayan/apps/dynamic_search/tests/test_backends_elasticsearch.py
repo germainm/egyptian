@@ -4,7 +4,6 @@ import elasticsearch
 
 from mayan.apps.testing.tests.base import BaseTestCase
 
-from ..backends.elasticsearch import ElasticsearchSearchBackend
 from ..exceptions import DynamicSearchBackendException, DynamicSearchRetry
 from ..search_models import SearchModel
 from ..search_query_types import QueryTypeExact
@@ -20,19 +19,12 @@ from .mixins.backend_search_field_mixins import (
     BackendSearchFieldTestCaseMixin
 )
 from .mixins.base import TestSearchObjectSimpleTestMixin
+from .mixins.elasticsearch_mixins import ElasticsearchsearchMockBackendMixin
 
 
-class ElasticsearchSearchBackendRetryTestCase(BaseTestCase):
-    def _get_test_backend(self):
-        backend = ElasticsearchSearchBackend.__new__(
-            ElasticsearchSearchBackend
-        )
-        backend.client_kwargs = {}
-        backend.indices_namespace = 'test'
-        backend._client = mock.Mock()
-
-        return backend
-
+class ElasticsearchSearchBackendRetryTestCase(
+    ElasticsearchsearchMockBackendMixin, BaseTestCase
+):
     def test_index_instance_connection_error_is_retried(self):
         backend = self._get_test_backend()
         backend._client.index.side_effect = elasticsearch.exceptions.ConnectionError(
