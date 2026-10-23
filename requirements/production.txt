@@ -1,4 +1,5 @@
 CairoSVG==2.9.0
+gpxpy==1.6.2
 Markdown==3.10.2
 Pillow==12.3.0
 PyYAML==6.0.3
@@ -62,3 +63,4 @@ sh==2.2.6
 tinycss2==1.5.1
 weasyprint>=62
 whitenoise==6.12.0
+zxing-cpp>=2.2.0
