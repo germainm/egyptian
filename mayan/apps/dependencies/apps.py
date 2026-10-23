@@ -1,6 +1,13 @@
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import (
+    CommandArgument, InitializationStep
+)
+from mayan.apps.app_manager.literals import (
+    PROCESS_INITIAL_SETUP, PROCESS_UPGRADE
+)
+from mayan.apps.app_manager.runlevels import runlevel_dependencies
 from mayan.apps.common.menus import (
     menu_list_facet, menu_return, menu_system, menu_tools
 )
@@ -8,6 +15,7 @@ from mayan.apps.forms import column_widgets
 from mayan.apps.navigation.source_columns import SourceColumn
 
 from .classes import Dependency, DependencyGroup, DependencyGroupEntry
+from .initializers import initializer_dependencies_install
 from .links import (
     link_check_version, link_dependency_group_entry_detail,
     link_dependency_group_entry_list, link_dependency_group_list,
@@ -27,6 +35,20 @@ class DependenciesApp(MayanAppConfig):
         super().ready()
 
         Dependency.load_modules()
+
+        InitializationStep(
+            arguments=(
+                CommandArgument(
+                    '--no-dependencies', shared=True, action='store_true',
+                    dest='no_dependencies',
+                    help='Don\'t install dependencies.'
+                ),
+            ), function=initializer_dependencies_install,
+            label=_(message='Install dependencies'),
+            name='dependencies.install', order=0,
+            process=(PROCESS_INITIAL_SETUP, PROCESS_UPGRADE),
+            runlevel=runlevel_dependencies
+        )
 
         SourceColumn(
             attribute='get_label', is_identifier=True, label=_(message='Label'),
@@ -83,7 +105,6 @@ class DependenciesApp(MayanAppConfig):
             label=_(message='Description'), order=1, source=DependencyGroupEntry
         )
 
-        # Position #7 which is after "License" link.
         menu_system.bind_links(
             links=(link_packages_licenses,), position=7
         )

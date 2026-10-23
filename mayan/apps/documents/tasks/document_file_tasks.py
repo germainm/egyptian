@@ -326,8 +326,7 @@ def task_document_file_size_update(
 @app.task(ignore_result=True)
 def task_document_file_upload(
     document_id, shared_uploaded_file_id, action_name=None,
-    callback_dict=None, comment=None, expand=False, filename=None,
-    user_id=None
+    callback_dict=None, comment=None, filename=None, user_id=None
 ):
     callback_dict = callback_dict or {}
 

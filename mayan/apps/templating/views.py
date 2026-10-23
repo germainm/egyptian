@@ -48,13 +48,13 @@ class ObjectTemplateSandboxView(
         )
 
     def get_external_object_queryset(self):
-        # Here we get a queryset the object model for which an ACL will be
-        # created.
         return self.get_content_type().get_all_objects_for_this_type()
 
     def get_extra_context(self):
         return {
             'object': self.external_object,
+            'previous': None,
+            'submit_label': _(message='Render'),
             'title': _(
                 message='Template sandbox for: %s'
             ) % self.external_object

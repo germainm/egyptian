@@ -13,9 +13,6 @@ logger = logging.getLogger(name=__name__)
 
 
 class DocumentForm(forms.ModelForm):
-    """
-    Base form for the minimal document properties. Meant to be subclassed.
-    """
     class Meta:
         fields = ('label', 'description', 'language')
         model = Document
@@ -25,8 +22,6 @@ class DocumentForm(forms.ModelForm):
 
         super().__init__(*args, **kwargs)
 
-        # Is a document (documents app edit) and has been saved (sources
-        # app upload)?
         if self.instance and self.instance.pk:
             document_type = self.instance.document_type
         else:
@@ -64,8 +59,6 @@ class DocumentForm(forms.ModelForm):
 
     def clean(self):
         self.cleaned_data['label'] = self.get_final_label(
-            # Fallback to the instance label if there is no label key or
-            # there is a label key and is an empty string
             filename=self.cleaned_data.get('label') or self.instance.label
         )
 
@@ -91,9 +84,6 @@ class DocumentForm(forms.ModelForm):
 
 
 class DocumentPropertiesForm(forms.DetailForm):
-    """
-    Detail class form to display a document file based properties
-    """
     def __init__(self, *args, **kwargs):
         document = kwargs['instance']
 

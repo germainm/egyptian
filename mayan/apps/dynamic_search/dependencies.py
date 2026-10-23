@@ -11,5 +11,5 @@ PythonDependency(
 )
 PythonDependency(
     environments=(environment_production,), module=__name__,
-    name='elasticsearch', version_string='==9.3.0'
+    name='elasticsearch', version_string='==9.4.0'
 )

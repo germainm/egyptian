@@ -8,10 +8,6 @@ from mayan.apps.forms import form_widgets
 
 
 class SplitTimeDeltaWidget(form_widgets.NamedMultiWidget):
-    """
-    A Widget that splits a timedelta input into two field: one for unit of
-    time and another for the amount of units.
-    """
     subwidgets = {
         'amount': form_widgets.NumberInput(
             attrs={

@@ -77,7 +77,6 @@ class ScopedQuery:
                 scope_entry, 'scope_identifier', None
             )
             if scope_entry_identifier is not None and scope_entry_identifier == scope_identifier:
-                # None is not a valid scope identifier.
                 return scope_entry
 
         raise DynamicSearchScopedQueryError(
@@ -93,6 +92,20 @@ class ScopedQuery:
             )
             if scope_entry_identifier:
                 result.append(scope_entry_identifier)
+
+        return result
+
+    def get_term_list(self):
+        if self.entry_point:
+            term_list = self.entry_point.get_term_list()
+        else:
+            term_list = ()
+
+        result = []
+
+        for term in term_list:
+            if term not in result:
+                result.append(term)
 
         return result
 
@@ -123,11 +136,6 @@ class ScopedQueryEntry:
 
     @classmethod
     def _check(cls, key, scoped_query, **kwargs):
-        """
-        Required subclass class method that determines if the subclass is
-        the one that should handle the key and value pair submitted.
-        Returns True or False/None.
-        """
         raise NotImplementedError
 
     @classmethod
@@ -144,11 +152,6 @@ class ScopedQueryEntry:
 
     @classmethod
     def init(cls, scoped_query, **kwargs):
-        """
-        Initialization router. Calling this method will cycle all possible
-        subclasses and return an instance of the subclass that can handle
-        the argument values.
-        """
         for klass in cls.all():
             check_kwargs = klass.check(scoped_query=scoped_query, **kwargs)
             if check_kwargs is not None:
@@ -168,14 +171,10 @@ class ScopedQueryEntry:
         self.scoped_query = scoped_query
 
     def do_post_add_callback(self):
-        """
-        Optional callback after entry is added to the scoped query.
-        """
+        pass
 
     def do_pre_add_callback(self):
-        """
-        Optional callback before entry is added to the scoped query.
-        """
+        pass
 
     def do_resolve(self, search_backend):
         raise NotImplementedError
@@ -208,6 +207,9 @@ class ScopedQueryEntry:
 
     def get_template_value_context(self):
         return {}
+
+    def get_term_list(self):
+        return ()
 
     @property
     def is_empty(self):
@@ -246,8 +248,6 @@ class ScopedQueryEntryData(ScopedQueryEntry):
                 scope_identifier=self.scope_identifier
             )
         except DynamicSearchScopedQueryError:
-            # This scope identifier does not exist, it is safe to allow
-            # the entry to claim it.
             return
         else:
             raise DynamicSearchScopedQueryError(
@@ -270,7 +270,6 @@ class ScopedQueryEntryDataFilter(ScopedQueryEntryData):
     @classmethod
     def _check(cls, key, value):
         if key.startswith(cls.scoped_query.scope_marker):
-            # Remove the scope marker.
             key = key[
                 len(cls.scoped_query.scope_marker):
             ]
@@ -409,6 +408,14 @@ class ScopedQueryEntryDataFilter(ScopedQueryEntryData):
     def get_template_value_context(self):
         return {'value': self.value}
 
+    def get_term_list(self):
+        if self.is_empty:
+            return ()
+        else:
+            query_type, value = QueryType.check_all(value=self.value)
+
+            return (value,)
+
     @property
     def is_empty(self):
         return not self.value and not self.is_quoted_value and not self.is_raw_value
@@ -432,11 +439,8 @@ class ScopedQueryEntryDataOperator(ScopedQueryEntryData):
         if key.startswith(cls.scoped_query.scope_marker):
             scope_identifier = key[len(cls.scoped_query.scope_marker):]
 
-            # Check for operator text in value.
-            # Format: `SCOPE`=`OPERATOR`_`SOURCE_SCOPES`_...
             parts = value.split(cls.scoped_query.scope_delimiter)
 
-            # At least three parts are needed: operator, two operands.
             if len(parts) >= 3:
                 if any(
                     operator_text == parts[0] for operator_text in SCOPE_OPERATOR_CHOICES
@@ -533,13 +537,26 @@ class ScopedQueryEntryDataOperator(ScopedQueryEntryData):
             )
         }
 
+    def get_term_list(self):
+        result = []
+
+        for operand in self.operand_list:
+            scope_entry = self.scoped_query.get_scope_entry_by_identifier(
+                scope_identifier=operand
+            )
+            result.extend(
+                scope_entry.get_term_list()
+            )
+
+        return result
+
     @property
     def operator_function(self):
         return SCOPE_OPERATOR_CHOICES.get(self.operator_text)
 
 
 class ScopedQueryEntryControl(ScopedQueryEntry):
-    """Base class for entries that control the flow of the scoped query."""
+    pass
 
 
 class ScopedQueryEntryControlResult(ScopedQueryEntryControl):
@@ -598,6 +615,16 @@ class ScopedQueryEntryControlResult(ScopedQueryEntryControl):
         )
 
         return context
+
+    def get_term_list(self):
+        if self.result_scope_identifier:
+            scope_entry = self.scoped_query.get_scope_entry_by_identifier(
+                scope_identifier=self.result_scope_identifier
+            )
+
+            return scope_entry.get_term_list()
+        else:
+            return ()
 
     def get_template_value_context(self):
         context = super().get_template_value_context()

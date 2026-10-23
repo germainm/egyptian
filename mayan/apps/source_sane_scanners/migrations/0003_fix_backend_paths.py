@@ -1,7 +1,7 @@
 from django.db import migrations
 
 SOURCE_BACKEND_MAPPING = {
-    'mayan.apps.sources.source_backends.SourceBackendSaneScanner': 'mayan.apps.source_sane_scanners.source_backends.SourceBackendSANEScanner'
+    'mayan.apps.sources.source_backends.SourceBackendSANEScanner': 'mayan.apps.source_sane_scanners.source_backends.SourceBackendSANEScanner'
 }
 
 

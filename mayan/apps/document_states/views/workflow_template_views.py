@@ -101,6 +101,7 @@ class DocumentWorkflowTemplatesLaunchView(MultipleObjectFormActionView):
 
     def get_extra_context(self):
         context = {
+            'submit_label': _(message='Launch'),
             'subtitle': _(
                 message='Workflows already launched or workflows not '
                 'applicable to some documents when multiple documents are '
@@ -259,6 +260,7 @@ class WorkflowTemplateLaunchView(ExternalObjectViewMixin, ConfirmView):
                 message='This will launch the workflow for documents that '
                 'have already been uploaded.'
             ),
+            'submit_label': _(message='Launch'),
             'title': _(message='Launch workflow?')
         }
 
@@ -320,6 +322,7 @@ class ToolLaunchWorkflows(ConfirmView):
             message='This will launch all workflows created after documents '
             'have already been uploaded.'
         ),
+        'submit_label': _(message='Launch'),
         'title': _(message='Launch all workflows?')
     }
     view_icon = icon_tool_launch_workflows

@@ -60,7 +60,6 @@ class APISourceActionExecuteView(
 
         action_permission = action.permission
 
-        # Filter the source again if the action has a permission requirement.
 
         if action_permission:
             source_queryset = self.get_parent_queryset_source()
@@ -85,7 +84,6 @@ class APISourceActionExecuteView(
         }
 
     def get_source_queryset(self):
-        # Does nothing. Required by the API view class filtering.
         source = self.get_source()
 
         return source.get_action_list()

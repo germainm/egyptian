@@ -98,13 +98,6 @@ class WorkflowInstance(
 class WorkflowInstanceLogEntry(
     WorkflowInstanceLogEntryBusinessLogicMixin, models.Model
 ):
-    """
-    Fields:
-    * user - The user who last transitioned the document from a state to the
-    Actual State.
-    * datetime - Date Time - The date and time when the last user transitioned
-    the document state to the Actual state.
-    """
     _ordering_fields = ('comment', 'datetime')
 
     workflow_instance = models.ForeignKey(
@@ -115,8 +108,8 @@ class WorkflowInstanceLogEntry(
         auto_now_add=True, db_index=True, verbose_name=_(message='Datetime')
     )
     transition = models.ForeignKey(
-        on_delete=models.CASCADE, to='WorkflowTransition',
-        verbose_name=_(message='Transition')
+        blank=True, null=True, on_delete=models.CASCADE,
+        to='WorkflowTransition', verbose_name=_(message='Transition')
     )
     user = models.ForeignKey(
         blank=True, null=True, on_delete=models.CASCADE,
@@ -135,7 +128,12 @@ class WorkflowInstanceLogEntry(
         verbose_name_plural = _(message='Workflow instance log entries')
 
     def __str__(self):
-        return str(self.transition)
+        if self.transition:
+            return str(self.transition)
+        else:
+            return str(
+                _(message='Initial state')
+            )
 
     def clean(self):
         queryset = self.workflow_instance.get_queryset_valid_transitions(
@@ -164,13 +162,16 @@ class WorkflowInstanceLogEntry(
     def save(self, *args, **kwargs):
         result = super().save(*args, **kwargs)
 
-        actor = getattr(self, '_event_actor', None)
-        event_workflow_instance_transitioned.commit(
-            action_object=self.workflow_instance.document, actor=actor,
-            target=self.workflow_instance
-        )
+        if self.transition:
+            actor = getattr(self, '_event_actor', None)
+            event_workflow_instance_transitioned.commit(
+                action_object=self.workflow_instance.document, actor=actor,
+                target=self.workflow_instance
+            )
 
-        self.transition.origin_state.do_active_unset(log_entry=self)
-        self.transition.destination_state.do_active_set(log_entry=self)
+            self.transition.origin_state.do_active_unset(log_entry=self)
+            self.transition.destination_state.do_active_set(log_entry=self)
+        else:
+            self.workflow_instance.state_active.do_active_set(log_entry=self)
 
         return result

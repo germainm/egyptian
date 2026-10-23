@@ -58,9 +58,6 @@ class DocumentVersionPageMappingFormSet(
         form=DocumentVersionPageMappingForm, extra=0
     )
 ):
-    """
-    Combined formset
-    """
     def clean(self):
         set_of_target_page_numbers = set()
         for form in self.forms:

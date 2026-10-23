@@ -1,5 +1,0 @@
-- Configurable authentication system.
-
-  - Take advantage of the default username or email authentication backends
-    provided for a quick deployment or install your own.
-  - Can extended to support single sign on, LDAP, or other protocols.

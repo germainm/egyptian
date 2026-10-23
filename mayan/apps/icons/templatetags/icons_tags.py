@@ -4,13 +4,12 @@ from django.utils.module_loading import import_string
 register = Library()
 
 
-@register.simple_tag(name='icons_get_icon')
-def tag_icons_get_icon(icon_path, **kwargs):
-    extra_context = {}
+def get_render_kwargs(kwargs):
+    render_kwargs = {}
 
     for key, value in kwargs.items():
         if '__' in key:
-            subdictionary = extra_context
+            subdictionary = render_kwargs
             parts = key.split('__')
             for part in parts:
                 subdictionary.setdefault(
@@ -21,14 +20,26 @@ def tag_icons_get_icon(icon_path, **kwargs):
 
             dictionary_pointer[part] = value
         else:
-            extra_context[key] = value
+            render_kwargs[key] = value
 
-    icon_class = import_string(dotted_path=icon_path)
-    return icon_class.render(**extra_context)
+    return render_kwargs
+
+
+@register.simple_tag(name='icons_get_icon')
+def tag_icons_get_icon(icon_path, **kwargs):
+    icon = import_string(dotted_path=icon_path)
+
+    return icon.render(
+        **get_render_kwargs(kwargs=kwargs)
+    )
 
 
 @register.simple_tag(name='icons_icon_render')
-def tag_icons_icon_render(icon, enable_shadow=False):
-    return icon.render(
-        extra_context={'enable_shadow': enable_shadow}
+def tag_icons_icon_render(icon, enable_shadow=False, **kwargs):
+    render_kwargs = get_render_kwargs(kwargs=kwargs)
+    render_kwargs.setdefault(
+        'extra_context', {}
     )
+    render_kwargs['extra_context']['enable_shadow'] = enable_shadow
+
+    return icon.render(**render_kwargs)

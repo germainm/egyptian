@@ -19,12 +19,6 @@ class UserMailer(
     BackendModelMixin, ExtraDataModelMixin, UserMailerBusinessLogicMixin,
     models.Model
 ):
-    """
-    This model is used to create mailing profiles that can be used from
-    inside the system. These profiles differ from the system mailing
-    profile in that they can be created at runtime and can be assigned
-    ACLs to restrict their use.
-    """
     _backend_model_null_backend = MailerBackendNull
     _ordering_fields = ('default', 'enabled', 'label')
 

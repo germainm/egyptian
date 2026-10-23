@@ -1,6 +1,0 @@
-- Advanced access control system.
-
-  - Role based access control. It is possible to create an unlimited amount
-    of different roles not being restricted to the traditional admin,
-    operator, guest paradigm.
-  - There is a permission for every atomic operation performed by users.

@@ -3,8 +3,10 @@ import errno
 import functools
 import logging
 import os
+from pathlib import Path
 from shutil import copyfile
 import sys
+import tempfile
 
 import yaml
 
@@ -32,7 +34,6 @@ class SettingDomainConfigurationFile(SettingDomain):
         result = yaml_dump(data=data, default_flow_style=False)
         return result
 
-    # Methods internal to the class.
 
     @classmethod
     def _do_configuration_file_read(cls, filepath):
@@ -44,22 +45,53 @@ class SettingDomainConfigurationFile(SettingDomain):
                     try:
                         return cls.deserialize_stream(stream=file_object)
                     except yaml.YAMLError as exception:
-                        exit(
+                        raise SystemExit(
                             'Error loading configuration file: {}; {}'.format(
                                 filepath, exception
                             )
                         )
         except IOError as exception:
             if exception.errno == errno.ENOENT:
-                # No config file, return empty dictionary.
                 return {}
             else:
                 raise
 
+    @staticmethod
+    def _do_configuration_file_write(filepath, data):
+        path = Path(filepath)
+
+        directory = path.parent
+
+        try:
+            mode = path.stat().st_mode & 0o777
+        except OSError:
+            mode = None
+
+        file_descriptor, temporary_filepath = tempfile.mkstemp(
+            dir=directory, prefix='.config_', suffix='.tmp'
+        )
+        temporary_path = Path(temporary_filepath)
+
+        try:
+            with os.fdopen(file_descriptor, mode='w') as file_object:
+                file_object.write(data)
+                file_object.flush()
+                os.fsync(file_object.fileno())
+
+            if mode is not None:
+                temporary_path.chmod(mode=mode)
+
+            temporary_path.replace(target=path)
+        except BaseException:
+            try:
+                temporary_path.unlink()
+            except OSError:
+                """The temporary file was already renamed or removed."""
+
+            raise
+
     @classmethod
     def _do_last_known_good_save(cls, data):
-        # Don't write over the last good configuration if we are trying
-        # to restore the last good configuration.
         if COMMAND_NAME_SETTINGS_REVERT not in sys.argv and not settings.CONFIGURATION_FILE_IGNORE:
             kwargs = {'filepath': settings.CONFIGURATION_LAST_GOOD_FILEPATH}
 
@@ -71,17 +103,13 @@ class SettingDomainConfigurationFile(SettingDomain):
         if settings.CONFIGURATION_FILE_IGNORE:
             return {}
         else:
-            # Cache content the of the configuration file to speed up
-            # initial boot up.
             data = cls._do_configuration_file_read(
                 filepath=settings.CONFIGURATION_FILEPATH
             ) or {}
 
             return data
 
-    # Standard methods.
 
-    # Doers.
 
     @classmethod
     def do_cache_invalidate(cls):
@@ -98,7 +126,6 @@ class SettingDomainConfigurationFile(SettingDomain):
 
             data_serialized = cls.serialize_data(data=data)
 
-            # Add current datetime and Mayan EDMS version.
             line_version = '# Version: {} {}'.format(
                 mayan.__version__, mayan.__build_string__
             )
@@ -110,8 +137,9 @@ class SettingDomainConfigurationFile(SettingDomain):
             )
 
             try:
-                with open(file=filepath, mode='w') as file_object:
-                    file_object.write(data_serialized)
+                cls._do_configuration_file_write(
+                    data=data_serialized, filepath=filepath
+                )
             except IOError as exception:
                 if exception.errno == errno.ENOENT:
                     logger.warning(
@@ -127,7 +155,6 @@ class SettingDomainConfigurationFile(SettingDomain):
     @classmethod
     def do_ready(cls, data):
         if settings.SETTINGS_BACKUP_ENABLED:
-            # Allow disabling saving last known good state in tests.
             cls._do_last_known_good_save(data=data)
 
     @classmethod
@@ -151,7 +178,6 @@ class SettingDomainConfigurationFile(SettingDomain):
                 'configuration.'
             )
 
-    # Getters
 
     @classmethod
     def get_key_value(cls, key):

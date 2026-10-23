@@ -72,8 +72,8 @@ class MetadataTypeModuleMixin(AppsModuleLoaderMixin):
             choices[dotted_path]
         except KeyError:
             raise ImproperlyConfigured(
-                _(
-                    message='Invalid `{}` `%s`'.format(cls._class_label)
+                format_lazy(
+                    _(message='Invalid `{}` `%s`'), cls._class_label
                 ) % dotted_path
             )
         else:

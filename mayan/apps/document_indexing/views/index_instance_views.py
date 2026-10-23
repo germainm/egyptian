@@ -38,7 +38,7 @@ class IndexInstanceListView(SingleObjectListView):
                 'created or that there are index templates '
                 'but they are no properly defined.'
             ),
-            'no_results_title': _(message='There are no index instances available.'),
+            'no_results_title': _(message='There are no index instances available'),
             'title': _(message='Indexes')
         }
 
@@ -125,9 +125,6 @@ class IndexInstanceNodeView(DocumentListView):
 class DocumentIndexInstanceNodeListView(
     ExternalObjectViewMixin, SingleObjectListView
 ):
-    """
-    Show a list of indexes where the current document can be found.
-    """
     external_object_permission = permission_index_instance_view
     external_object_pk_url_kwarg = 'document_id'
     external_object_queryset = Document.valid.all()
@@ -140,8 +137,8 @@ class DocumentIndexInstanceNodeListView(
             'no_results_icon': icon_index,
             'no_results_text': _(
                 message='Assign the document type of this document '
-                'to an index to have it appear in instances of '
-                'those indexes organization units. '
+                'to an index to have it appear in the organization '
+                'units of those indexes.'
             ),
             'no_results_title': _(
                 message='This document is not in any index'

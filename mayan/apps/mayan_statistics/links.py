@@ -8,7 +8,6 @@ from .icons import (
 )
 from .permissions import permission_statistics_view
 
-# Translators: 'Queue' here is the verb, to queue a statistic to update.
 link_statistic_namespace_detail = Link(
     args='resolved_object.slug', icon=icon_statistic_namespace_detail,
     permission=permission_statistics_view, text=_(message='Namespace details'),

@@ -8,8 +8,7 @@ class DependenciesLicensesForm(forms.Form):
         label='',
         widget=form_widgets.TextAreaDiv(
             attrs={
-                'class': 'full-height scrollable',
-                'data-height-difference': 270
+                'class': 'scrollable'
             }
         )
     )
@@ -35,7 +34,6 @@ class DependenciesLicensesForm(forms.Form):
                     )
                 )
 
-                # Implement word wrapping at 79 columns.
                 for line in text_legal.split('\n'):
                     line_length = 0
                     new_line = []

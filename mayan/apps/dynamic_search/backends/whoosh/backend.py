@@ -1,4 +1,3 @@
-import functools
 import logging
 from pathlib import Path
 
@@ -11,6 +10,7 @@ from whoosh.query import Every
 from whoosh.writing import BufferedWriter
 
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.common.utils import any_to_bool
 from mayan.apps.lock_manager.backends.base import LockingBackend
@@ -34,8 +34,10 @@ logger = logging.getLogger(name=__name__)
 
 class WhooshSearchBackend(SearchBackend):
     _local_attribute_backend_temporary_directory = None
+    _schema_cache = {}
     feature_reindex = True
     field_type_mapping = DJANGO_TO_WHOOSH_FIELD_MAP
+    label = _(message='Whoosh')
 
     def __init__(
         self, index_path=None, writer_limitmb=128, writer_multisegment=False,
@@ -72,7 +74,6 @@ class WhooshSearchBackend(SearchBackend):
         schema = self._get_search_model_schema(search_model=search_model)
 
         if not settings.COMMON_DISABLE_LOCAL_STORAGE:
-            # Clear the model index.
             self._get_storage().create_index(
                 indexname=search_model.full_name, schema=schema
             )
@@ -90,8 +91,6 @@ class WhooshSearchBackend(SearchBackend):
         schema = self._get_search_model_schema(search_model=search_model)
 
         try:
-            # Explicitly specify the schema. Allows using existing index
-            # when the schema changes.
             index = storage.open_index(
                 indexname=search_model.full_name, schema=schema
             )
@@ -102,25 +101,27 @@ class WhooshSearchBackend(SearchBackend):
 
         return index
 
-    @functools.cache
     def _get_search_model_schema(self, search_model):
-        field_map = self.get_resolved_field_type_map(
-            search_model=search_model
-        )
-        schema_kwargs = {
-            key: value['field'] for key, value in field_map.items()
-        }
+        cache = WhooshSearchBackend._schema_cache
 
-        return whoosh.fields.Schema(**schema_kwargs)
+        try:
+            return cache[search_model]
+        except KeyError:
+            field_map = self.get_resolved_field_type_map(
+                search_model=search_model
+            )
+            schema_kwargs = {
+                key: value['field'] for key, value in field_map.items()
+            }
+
+            result = whoosh.fields.Schema(**schema_kwargs)
+
+            cache[search_model] = result
+
+            return result
 
     def _get_status(self):
         result = []
-
-        title = 'Whoosh search model indexing status'
-        result.append(title)
-        result.append(
-            len(title) * '='
-        )
 
         for search_model in SearchModel.all():
             index = self._get_or_create_index(search_model=search_model)
@@ -129,14 +130,13 @@ class WhooshSearchBackend(SearchBackend):
                 search_results = searcher.search(
                     q=Every('id')
                 )
+                object_count = search_results.estimated_length()
 
-                result.append(
-                    '{}: {}'.format(
-                        search_model.label, search_results.estimated_length()
-                    )
-                )
+            result.append(
+                {'search_model': search_model, 'object_count': object_count}
+            )
 
-        return '\n'.join(result)
+        return result
 
     def _get_storage(self):
         return FileStorage(path=self.index_path)
@@ -271,8 +271,6 @@ class WhooshSearchBackend(SearchBackend):
                             'id', str(instance.pk)
                         )
                     except Exception as exception:
-                        # The parenthesis is used to define a multi
-                        # line error message not a translatable string.
                         error_text = (
                             'Unexpected exception while '
                             'deleting search object id: {id}, '
@@ -303,9 +301,6 @@ class WhooshSearchBackend(SearchBackend):
                         try:
                             writer.add_document(**kwargs)
                         except Exception as exception:
-                            # The parenthesis is used to define a multi
-                            # line error message not a translatable
-                            # string.
                             error_text = (
                                 'Unexpected exception while '
                                 'indexing search object id: {id}, '
@@ -357,9 +352,6 @@ class WhooshSearchBackend(SearchBackend):
                         try:
                             writer.update_document(**kwargs)
                         except Exception as exception:
-                            # The parenthesis is used to define a multi
-                            # line error message not a translatable
-                            # string.
                             error_text = (
                                 'Unexpected exception while '
                                 'indexing search model: {search_model}, '

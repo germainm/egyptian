@@ -159,10 +159,6 @@ class ValueTransformationToDateTimeTimestamp(
 
     def _execute_(self):
         if self.value is not None:
-            # Elasticsearch works with decimal seconds for exact match
-            # but not for comparison (greater than, etc) matches.
-            # Typecasting to integer works for all use cases for all
-            # backends.
             return int(
                 self.value.timestamp() * 1000
             )

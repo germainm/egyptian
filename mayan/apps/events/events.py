@@ -1,7 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 
-from mayan.apps.events.classes import EventTypeNamespace
-
+from .classes import EventTypeNamespace
 from .literals import (
     EVENT_EVENTS_CLEARED_NAME, EVENT_EVENTS_EXPORTED_NAME,
     EVENT_TYPE_NAMESPACE_NAME

@@ -1,0 +1,26 @@
+{% extends 'appearance/base.html' %}
+
+{% load i18n %}
+
+{% load icons_tags %}
+
+{% block title %}{% trans 'Bad request' %}{% endblock %}
+
+{% block content %}
+    <div class="container d-flex justify-content-center align-items-center appearance-view-error">
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center">
+                    <div class="mayan-icon-6x">
+                        {% icons_get_icon 'mayan.apps.appearance.icons.icon_error_400' %}
+                    </div>
+                </div>
+
+                <h3 class="text-center">{% trans 'Bad request' %}</h3>
+                <div class="text-center">
+                    <p>{% blocktrans %}The request could not be processed.{% endblocktrans %}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

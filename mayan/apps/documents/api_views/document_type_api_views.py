@@ -111,8 +111,6 @@ class APIDocumentTypeQuickLabelListView(
     serializer_class = DocumentTypeQuickLabelSerializer
 
     def get_instance_extra_data(self):
-        # This method is only called during POST, therefore filter only by
-        # edit permission.
         return {
             '_event_actor': self.request.user,
             'document_type': self.get_document_type(
@@ -121,8 +119,6 @@ class APIDocumentTypeQuickLabelListView(
         }
 
     def get_source_queryset(self):
-        # This method is only called during GET, therefore filter only by
-        # the view permission.
         return self.get_document_type(
             permission=permission_document_type_view
         ).filenames.all()

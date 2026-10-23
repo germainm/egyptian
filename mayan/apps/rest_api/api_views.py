@@ -1,6 +1,13 @@
-from drf_yasg.views import get_schema_view
+from django.utils.translation import gettext_lazy as _
 
-from rest_framework import mixins, permissions, renderers
+from drf_spectacular.renderers import (
+    OpenApiJsonRenderer, OpenApiJsonRenderer2, OpenApiYamlRenderer,
+    OpenApiYamlRenderer2
+)
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.views import SpectacularAPIView
+
+from rest_framework import mixins, renderers
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.schemas.generators import EndpointEnumerator
 
@@ -8,20 +15,19 @@ import mayan
 from mayan.apps.organizations.settings import (
     setting_organization_url_base_path
 )
-from mayan.apps.rest_api import generics
 
+from . import generics
 from .classes import BatchRequestCollection, Endpoint
 from .generics import ListAPIView, RetrieveAPIView
-from .schemas import openapi_info
 from .serializers import (
     BatchAPIRequestResponseSerializer, EndpointSerializer,
     ProjectInformationSerializer
 )
 
 
+@extend_schema(exclude=True)
 class APIRoot(ListAPIView):
     serializer_class = EndpointSerializer
-    swagger_schema = None
 
     def get_source_queryset(self):
         """
@@ -29,21 +35,23 @@ class APIRoot(ListAPIView):
         API version root and root services.
         """
         endpoint_api_version = Endpoint(
-            label='API version root', viewname='rest_api:api_version_root'
+            label=_(message='API version root'),
+            viewname='rest_api:api_version_root'
         )
         endpoint_redoc = Endpoint(
-            label='ReDoc UI', viewname='rest_api:schema-redoc'
+            label=_(message='ReDoc UI'), viewname='rest_api:schema-redoc'
         )
         endpoint_swagger = Endpoint(
-            label='Swagger UI', viewname='rest_api:schema-swagger-ui'
+            label=_(message='Swagger UI'),
+            viewname='rest_api:schema-swagger-ui'
         )
         endpoint_swagger_schema_json = Endpoint(
-            label='API schema (JSON)', viewname='rest_api:schema-json',
-            kwargs={'format': '.json'}
+            label=_(message='API schema (JSON)'),
+            viewname='rest_api:schema-json', kwargs={'format': 'json'}
         )
         endpoint_swagger_schema_yaml = Endpoint(
-            label='API schema (YAML)', viewname='rest_api:schema-json',
-            kwargs={'format': '.yaml'}
+            label=_(message='API schema (YAML)'),
+            viewname='rest_api:schema-json', kwargs={'format': 'yaml'}
         )
         return [
             endpoint_api_version,
@@ -54,9 +62,9 @@ class APIRoot(ListAPIView):
         ]
 
 
+@extend_schema(exclude=True)
 class APIVersionRoot(ListAPIView):
     serializer_class = EndpointSerializer
-    swagger_schema = None
 
     def get_source_queryset(self):
         """
@@ -64,12 +72,14 @@ class APIVersionRoot(ListAPIView):
         """
         endpoint_enumerator = EndpointEnumerator()
 
-        if setting_organization_url_base_path.value:
-            url_index = 4
+        base_path = setting_organization_url_base_path.value
+        if base_path:
+            base_path_segment_count = base_path.count('/') + 1
         else:
-            url_index = 3
+            base_path_segment_count = 0
 
-        # Extract the resource names from the API endpoint URLs
+        url_index = 3 + base_path_segment_count
+
         parsed_urls = set()
         for entry in endpoint_enumerator.get_api_endpoints():
             try:
@@ -125,9 +135,8 @@ class ProjectInformationAPIView(RetrieveAPIView):
         return mayan
 
 
-schema_view = get_schema_view(
-    info=openapi_info,
-    public=True,
-    permission_classes=(permissions.AllowAny,),
-    validators=['flex', 'ssv']
-)
+class SchemaAPIView(SpectacularAPIView):
+    renderer_classes = (
+        OpenApiJsonRenderer2, OpenApiYamlRenderer2, OpenApiJsonRenderer,
+        OpenApiYamlRenderer
+    )

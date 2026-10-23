@@ -23,9 +23,6 @@ class LockManagerApp(MayanAppConfig):
 
         if COMMAND_NAME_LOCK_MANAGER_PURGE_LOCKS not in sys.argv:
             logger.info('Starting lock backend connectivity test')
-            # Don't test for locks during the `task_manager_purge_locks`
-            # command as there may be some stuck locks which will block
-            # the command.
             lock_name = '{}-{}'.format(
                 TEST_LOCK_NAME, uuid.uuid4()
             )

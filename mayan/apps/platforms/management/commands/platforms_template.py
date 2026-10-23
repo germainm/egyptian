@@ -59,7 +59,6 @@ class Command(management.BaseCommand):
                 )
                 exit(1)
             else:
-                # Python 2 & 3 way to convert from SafeString to unicode
                 self.stdout.write(
                     msg='{}'.format(
                         template().render(

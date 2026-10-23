@@ -12,10 +12,6 @@ __all__ = ('RecentlyAccessedDocument',)
 
 
 class RecentlyAccessedDocument(models.Model):
-    """
-    Keeps a list of the n most recent accessed or created document for
-    a given user
-    """
     user = models.ForeignKey(
         db_index=True, editable=False, on_delete=models.CASCADE,
         to=settings.AUTH_USER_MODEL, verbose_name=_(message='User')

@@ -418,7 +418,7 @@ api_urls = [
         view=APIWorkflowTemplateTransitionFieldListView.as_view()
     ),
     re_path(
-        route=r'^workflow_templates/(?P<workflow_template_id>[0-9]+)/transitions/(?P<workflow_template_transition_id>[0-9]+)/fields/(?P<workflow_template_transition_field_id>[0-9]+)$',
+        route=r'^workflow_templates/(?P<workflow_template_id>[0-9]+)/transitions/(?P<workflow_template_transition_id>[0-9]+)/fields/(?P<workflow_template_transition_field_id>[0-9]+)/$',
         name='workflow-template-transition-field-detail',
         view=APIWorkflowTemplateTransitionFieldDetailView.as_view()
     ),
@@ -428,7 +428,7 @@ api_urls = [
         view=APIWorkflowTemplateTransitionTriggerListView.as_view()
     ),
     re_path(
-        route=r'^workflow_templates/(?P<workflow_template_id>[0-9]+)/transitions/(?P<workflow_template_transition_id>[0-9]+)/triggers/(?P<workflow_template_transition_trigger_id>[0-9]+)$',
+        route=r'^workflow_templates/(?P<workflow_template_id>[0-9]+)/transitions/(?P<workflow_template_transition_id>[0-9]+)/triggers/(?P<workflow_template_transition_trigger_id>[0-9]+)/$',
         name='workflow-template-transition-trigger-detail',
         view=APIWorkflowTemplateTransitionTriggerDetailView.as_view()
     ),

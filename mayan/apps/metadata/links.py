@@ -19,7 +19,6 @@ from .permissions import (
     permission_metadata_type_edit, permission_metadata_type_view
 )
 
-# Document metadata
 
 link_metadata_add = Link(
     args='object.pk', icon=icon_document_metadata_add,
@@ -54,7 +53,6 @@ link_metadata_list = Link(
     view='metadata:metadata_list',
 )
 
-# Document type
 
 link_document_type_metadata_type_relationship = Link(
     args='resolved_object.pk',
@@ -63,7 +61,6 @@ link_document_type_metadata_type_relationship = Link(
     text=_(message='Metadata types'), view='metadata:document_type_metadata_type_relationship',
 )
 
-# Metadata type
 
 link_metadata_type_document_type_relationship = Link(
     args='resolved_object.pk',
@@ -77,7 +74,7 @@ link_metadata_type_create = Link(
     view='metadata:metadata_type_create'
 )
 link_metadata_type_delete_multiple = Link(
-    icon=icon_metadata_type_delete_multiple,
+    icon=icon_metadata_type_delete_multiple, tags='dangerous',
     text=_(message='Delete'), view='metadata:metadata_type_multiple_delete'
 )
 link_metadata_type_delete_single = Link(

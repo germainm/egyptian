@@ -2,17 +2,18 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.dependencies.classes import BinaryDependency
 from mayan.apps.dependencies.environments import environment_production
-from mayan.apps.sources.settings import setting_backend_arguments
 
-from .literals import DEFAULT_BINARY_SCANIMAGE_PATH
+from .source_backends import SourceBackendSANEScanner
+from .utils import get_command_path_scanimage
 
 BinaryDependency(
-    environments=(environment_production,), label='SANE scanimage',
+    environments=(environment_production,),
+    label=_(message='SANE scanimage'),
     help_text=_(
         message='Utility provided by the SANE package. Used to control the '
         'scanner and obtained the scanned document image.'
     ), module=__name__, name='scanimage',
-    path=setting_backend_arguments.value.get(
-        'mayan.apps.source_sane_scanners.source_backends.SourceBackendSANEScanner', {}
-    ).get('scanimage_path', DEFAULT_BINARY_SCANIMAGE_PATH)
+    path=get_command_path_scanimage(
+        dotted_name=SourceBackendSANEScanner.backend_class_path
+    )
 )

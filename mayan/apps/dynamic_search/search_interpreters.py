@@ -27,11 +27,6 @@ class SearchInterpreter:
 
     @classmethod
     def init(cls, query, search_model, prefix=''):
-        """
-        Initialization router. Calling this method will cycle all possible
-        subclasses and return an instance of the subclass that can handle
-        the query type based on the arguments.
-        """
         for klass in cls.all():
             checked_query = klass.check(prefix=prefix, query=query)
 
@@ -86,14 +81,18 @@ class SearchInterpreter:
     def get_scoped_query_instance(self):
         return self.scoped_query_class(search_model=self.search_model)
 
+    def get_term_list(self):
+        clean_query = self.do_query_cleanup()
+
+        scoped_query = self.do_query_decode(query=clean_query)
+
+        return scoped_query.get_term_list()
+
     @property
     def is_empty(self):
         return self.do_query_decode().is_empty
 
     def to_explain(self):
-        """
-        Generate a human readable version of the query.
-        """
         clean_query = self.do_query_cleanup()
 
         scoped_query = self.do_query_decode(query=clean_query)
@@ -104,10 +103,6 @@ class SearchInterpreter:
 
 
 class SearchInterpreterAdvanced(SearchInterpreter):
-    """
-    Search interpreters that decodes user queries using field names and
-    values.
-    """
 
     @classmethod
     def check(cls, query, prefix=''):
@@ -122,7 +117,8 @@ class SearchInterpreterAdvanced(SearchInterpreter):
             return result
 
     def _do_query_decode(self, query=None):
-        query = query or self.query.copy()
+        if query is None:
+            query = self.query.copy()
 
         query_match_all_value = query.pop(MATCH_ALL_FIELD_NAME, 'no')
 
@@ -214,10 +210,6 @@ class SearchInterpreterAdvanced(SearchInterpreter):
     def do_scope_operators_add(
         self, scope_id_list, scoped_query, result_scope, operator_text='AND'
     ):
-        """
-        Add scope operators in bulk to the specified list of scopes while
-        keeping track of the scopes created in the process.
-        """
         if scope_id_list:
             operand_left = scope_id_list[0]
 
@@ -274,11 +266,9 @@ class SearchInterpreterScoped(SearchInterpreter):
             return result
 
     def _do_query_decode(self, query=None):
-        """
-        Converts a user scoped query into an internal scope query
-        collection.
-        """
-        query = query or self.query
+        if query is None:
+            query = self.query
+
         scoped_query = self.get_scoped_query_instance()
 
         for key, value in query.items():

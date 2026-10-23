@@ -16,7 +16,6 @@ def condition_is_checked_out(context, resolved_object):
     try:
         return context['object'].is_checked_out()
     except KeyError:
-        # Might not have permissions.
         return False
 
 
@@ -24,7 +23,6 @@ def condition_is_not_checked_out(context, resolved_object):
     try:
         return not context['object'].is_checked_out()
     except KeyError:
-        # Might not have permissions.
         return True
 
 

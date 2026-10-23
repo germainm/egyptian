@@ -6,14 +6,12 @@ namespace = PermissionNamespace(
     label=_(message='Sources setup'), name='sources_setup'
 )
 
-# Documents
 
 permission_document_file_sources_metadata_view = namespace.add_permission(
     label=_(message='View document file source metadata'),
     name='source_metadata_view'
 )
 
-# Sources
 
 permission_sources_create = namespace.add_permission(
     label=_(message='Create new document sources'),

@@ -8,10 +8,7 @@ logger = logging.getLogger(name=__name__)
 
 
 class FileMetadataEntryManager(ManagerMinixCreateBulk, models.Manager):
-    """
-    Leave empty as no other methods are necessary at the moment. This is just
-    to allow the mixin into the manager class.
-    """
+    pass
 
 
 class ModelManagerDocumentTypeDriverConfigurationValid(models.Manager):

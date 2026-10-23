@@ -43,10 +43,7 @@ class FileMetadataDriverOllamaChat(FileMetadataDriver):
 
         response = client.chat(model=self.model, messages=self.messages)
 
-        try:
-            # Handle undocumented backwards incompatible change in Ollama.
-            response.items()
-        except AttributeError:
+        if hasattr(response, 'model_dump'):
             dictionary = response.model_dump()
         else:
             dictionary = response

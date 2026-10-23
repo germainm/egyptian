@@ -47,5 +47,8 @@ class Migration(migrations.Migration):
             field=RGBColorField(default='#FFFFFF'),
             preserve_default=False
         ),
-        migrations.RunPython(code=code_convert_color_names_to_rgb)
+        migrations.RunPython(
+            code=code_convert_color_names_to_rgb,
+            reverse_code=migrations.RunPython.noop, elidable=True
+        )
     ]

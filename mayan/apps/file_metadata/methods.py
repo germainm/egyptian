@@ -6,7 +6,6 @@ from .tasks import task_document_file_metadata_process
 
 def method_document_file_metadata_submit(self, user=None):
     latest_file = self.file_latest
-    # Don't error out if document has no file.
     if latest_file:
         latest_file.submit_for_file_metadata_processing(user=user)
 

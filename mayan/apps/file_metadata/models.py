@@ -105,11 +105,11 @@ class FileMetadataEntry(FileMetadataEntryBusinessLogicMixin, models.Model):
     )
     value = models.TextField(
         blank=True, help_text=_(message='Value of the file metadata entry.'),
-        max_length=255, verbose_name=_(message='Value')
+        verbose_name=_(message='Value')
     )
 
     class Meta:
-        ordering = ('internal_name', 'value')
+        ordering = ('internal_name', 'key')
         unique_together = ('document_file_driver_entry', 'internal_name')
         verbose_name = _(message='File metadata entry')
         verbose_name_plural = _(message='File metadata entries')

@@ -53,4 +53,8 @@ class TrashDocumentAction(WorkflowAction):
     label = _(message='Send document to trash')
 
     def execute(self, context):
-        context['workflow_instance'].document.delete()
+        workflow_instance = context['workflow_instance']
+        document = workflow_instance.document
+
+        if not document.in_trash:
+            document.delete()

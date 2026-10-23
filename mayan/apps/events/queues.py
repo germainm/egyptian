@@ -3,12 +3,12 @@ from datetime import timedelta
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.task_manager.classes import CeleryQueue
-from mayan.apps.task_manager.workers import worker_a, worker_c
+from mayan.apps.task_manager.workers import worker_b, worker_c
 
 from .settings import setting_event_prune_task_interval
 
 queue_events_fast = CeleryQueue(
-    label=_(message='Events fast'), name='events_fast', worker=worker_a
+    label=_(message='Events fast'), name='events_fast', worker=worker_b
 )
 queue_events_slow = CeleryQueue(
     label=_(message='Events slow'), name='events_slow', transient=True,

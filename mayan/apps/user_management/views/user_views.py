@@ -33,6 +33,7 @@ class UserCreateView(SingleObjectCreateView):
     }
     fields = FIELDS_ALL
     fieldsets = FIELDSETS_ALL
+    form_save_and_add_another_disabled = True
     model = get_user_model()
     view_icon = icon_user_create
     view_permission = permission_user_create
@@ -129,8 +130,6 @@ class UserEditView(DynamicUserFormFieldViewMixin, SingleObjectEditView):
 
 class UserGroupAddRemoveView(AddRemoveView):
     list_available_title = _(message='Available groups')
-    # Translators: "User groups" here refer to the list of groups of a
-    # specific user. The user's group membership.
     list_added_title = _(message='User groups')
     main_object_method_add_name = 'groups_add'
     main_object_method_remove_name = 'groups_remove'
@@ -171,8 +170,9 @@ class UserListView(SingleObjectListView):
                 context=RequestContext(request=self.request)
             ),
             'no_results_text': _(
-                message='User accounts can be create from this view. After creating '
-                'a user account you will prompted to set a password for it. '
+                message='User accounts can be created from this view. After '
+                'creating a user account you will be prompted to set a '
+                'password for it.'
             ),
             'no_results_title': _(message='There are no user accounts'),
             'title': _(message='Users')

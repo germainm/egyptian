@@ -7,7 +7,6 @@ from mayan.apps.common.utils import (
     ResolverPipelineModelAttribute, flatten_list
 )
 
-from .search_backends import SearchBackend
 from .tasks import (
     task_deindex_instance, task_index_instance,
     task_index_related_instance_m2m
@@ -39,8 +38,6 @@ def handler_factory_index_related_instance_delete(reverse_field_path):
             attribute=reverse_field_path, obj=related_instance
         )
 
-        entries = flatten_list(value=result)
-
         def call_task(instance):
             # Same as handler_deindex_instance: wait for the deletion to be
             # committed so an instance deleted along with the related one is
@@ -58,8 +55,13 @@ def handler_factory_index_related_instance_delete(reverse_field_path):
                 ), using=kwargs.get('using')
             )
 
-        if isinstance(entries, Iterable):
-            for instance in entries:
+        is_iterable = isinstance(result, Iterable)
+        is_single = isinstance(
+            result, (str, bytes)
+        )
+
+        if is_iterable and not is_single:
+            for instance in flatten_list(value=result):
                 call_task(instance=instance)
         else:
             call_task(instance=result)
@@ -67,15 +69,21 @@ def handler_factory_index_related_instance_delete(reverse_field_path):
     return handler_index_by_related_to_delete_instance
 
 
-def handler_factory_index_related_instance_save(reverse_field_path):
+def handler_factory_index_related_instance_save(
+    reverse_field_path, field_name_set=None
+):
     def handler_index_by_related_instance(sender, **kwargs):
         related_instance = kwargs['instance']
+
+        update_fields = kwargs.get('update_fields')
+
+        if field_name_set is not None and update_fields is not None:
+            if field_name_set.isdisjoint(update_fields):
+                return
 
         result = ResolverPipelineModelAttribute.resolve(
             attribute=reverse_field_path, obj=related_instance
         )
-
-        entries = flatten_list(value=result)
 
         def call_task(instance):
             task_index_instance.apply_async(
@@ -86,8 +94,13 @@ def handler_factory_index_related_instance_save(reverse_field_path):
                 }
             )
 
-        if isinstance(entries, Iterable):
-            for instance in entries:
+        is_iterable = isinstance(result, Iterable)
+        is_single = isinstance(
+            result, (str, bytes)
+        )
+
+        if is_iterable and not is_single:
+            for instance in flatten_list(value=result):
                 call_task(instance=instance)
         else:
             call_task(instance=result)
@@ -96,7 +109,6 @@ def handler_factory_index_related_instance_save(reverse_field_path):
 
 
 def handler_factory_index_related_instance_m2m(data):
-    # Serialize search model field paths.
     serialized_search_model_related_paths = {}
 
     for key, value in data.items():
@@ -133,25 +145,22 @@ def handler_factory_index_related_instance_m2m(data):
     return handler_index_related_instance_m2m
 
 
-def handler_index_instance(sender, **kwargs):
-    instance = kwargs['instance']
+def handler_factory_index_instance(field_name_set=None):
+    def handler_index_instance(sender, **kwargs):
+        instance = kwargs['instance']
 
-    task_index_instance.apply_async(
-        kwargs={
-            'app_label': instance._meta.app_label,
-            'model_name': instance._meta.model_name,
-            'object_id': instance.pk
-        }
-    )
+        update_fields = kwargs.get('update_fields')
 
+        if field_name_set and update_fields is not None:
+            if field_name_set.isdisjoint(update_fields):
+                return
 
-def handler_search_backend_initialize(sender, **kwargs):
-    backend = SearchBackend.get_instance()
+        task_index_instance.apply_async(
+            kwargs={
+                'app_label': instance._meta.app_label,
+                'model_name': instance._meta.model_name,
+                'object_id': instance.pk
+            }
+        )
 
-    backend.initialize()
-
-
-def handler_search_backend_upgrade(sender, **kwargs):
-    backend = SearchBackend.get_instance()
-
-    backend.upgrade()
+    return handler_index_instance

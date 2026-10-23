@@ -5,6 +5,45 @@ from django.http import QueryDict
 from django.urls import reverse
 
 
+class RequestQuery:
+    def __init__(self, request):
+        self.query_dict = request.GET.copy()
+
+    def do_exclude(self, name_list=None, prefix_list=None):
+        name_list = name_list or ()
+        prefix_list = prefix_list or ()
+
+        for name in list(self.query_dict):
+            if name in name_list:
+                del self.query_dict[name]
+                continue
+
+            for prefix in prefix_list:
+                if prefix and name.startswith(prefix):
+                    del self.query_dict[name]
+                    break
+
+    def do_update(self, **kwargs):
+        for name, value in kwargs.items():
+            self.query_dict[name] = value
+
+    def to_field_list(self):
+        result = []
+
+        for name in self.query_dict:
+            for value in self.query_dict.getlist(name):
+                result.append(
+                    {'name': name, 'value': value}
+                )
+
+        return result
+
+    def to_query_string(self):
+        return '?{}'.format(
+            self.query_dict.urlencode()
+        )
+
+
 class URL:
     def __init__(
         self, url=None, netloc=None, path=None, port=None, query_string=None,
@@ -18,8 +57,6 @@ class URL:
         if viewname:
             path = reverse(viewname=viewname)
 
-        # `url` argument defaults to '' to force `urlsplit` to return empty
-        # strings and not bytes.
         self._split_result = urlsplit(url=url or '')
 
         self._netloc = netloc
@@ -54,19 +91,16 @@ class URL:
         query = query or {}
 
         for key, value in query.items():
-            # Strings are iterables so tests for them explicitly.
             if isinstance(value, str):
                 self.query_dict[key] = value
             else:
                 try:
-                    # Iterables other than strings.
                     result = []
                     for item in value:
                         result.append(item)
 
                     self.query_dict.setlist(key=key, list_=result)
                 except TypeError:
-                    # Value is not iterable, add as is.
                     self.query_dict[key] = value
 
     def __repr__(self):

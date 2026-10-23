@@ -168,6 +168,19 @@ class SourceBackendIMAPEmail(SourceBackendMixinEmail, SourceBackend):
 
     def action_file_delete(self, message_id):
         with self._get_server() as server:
+            if self.kwargs['mailbox_destination']:
+                try:
+                    server.uid(
+                        'COPY', message_id, self.kwargs['mailbox_destination']
+                    )
+                except Exception as exception:
+                    raise SourceException(
+                        'Error copying message uid {} to mailbox {}; '
+                        '{}'.format(
+                            message_id, self.kwargs['mailbox_destination'], exception
+                        )
+                    )
+
             if self.kwargs['store_commands']:
                 for command in self.kwargs['store_commands'].split('\n'):
                     try:
@@ -183,19 +196,6 @@ class SourceBackendIMAPEmail(SourceBackendMixinEmail, SourceBackend):
                                 command, message_id, exception
                             )
                         )
-
-            if self.kwargs['mailbox_destination']:
-                try:
-                    server.uid(
-                        'COPY', message_id, self.kwargs['mailbox_destination']
-                    )
-                except Exception as exception:
-                    raise SourceException(
-                        'Error copying message uid {} to mailbox {}; '
-                        '{}'.format(
-                            message_id, self.kwargs['mailbox_destination'], exception
-                        )
-                    )
 
             if self.kwargs['execute_expunge']:
                 server.expunge()
@@ -231,7 +231,6 @@ class SourceBackendIMAPEmail(SourceBackendMixinEmail, SourceBackend):
                 )
             else:
                 if data:
-                    # data is a space separated sequence of message uids.
                     uids = data[0].split()
 
                     logger.debug(
@@ -242,6 +241,4 @@ class SourceBackendIMAPEmail(SourceBackendMixinEmail, SourceBackend):
                     for uid in uids:
                         logger.debug('message uid: %s', uid)
 
-                        # uids are bytes. Convert to unicode to allow
-                        # serialization for the background task.
                         yield force_str(s=uid)

@@ -6,15 +6,10 @@ from mayan.apps.credentials.class_mixins import BackendMixinCredentials
 
 
 class MailerBackend(DynamicFormBackendMixin, ModelBaseBackend):
-    """
-    Base class for the mailing backends. This class is mainly a wrapper
-    for other Django backends that adds a few metadata to specify the
-    fields it needs to be instantiated at runtime.
-    """
     _backend_app_label = 'mailer'
     _backend_model_name = 'UserMailer'
     _loader_module_name = 'mailers'
-    class_path = ''  # Dot path to the actual class that will handle the mail.
+    class_path = ''
 
     @classmethod
     def get_form_fieldsets(cls):

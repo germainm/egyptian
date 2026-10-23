@@ -53,6 +53,7 @@ class DocumentDownloadView(
 
     def get_extra_context(self):
         context = {
+            'submit_label': _(message='Download'),
             'form_display_mode_table': True,
             'subtitle': _(
                 message='The process will be performed in the background. The '
@@ -98,10 +99,7 @@ class DocumentDownloadView(
         )
 
     def object_action(self, instance, form=None):
-        """
-        There are no actions for individual objects. This methods still needs
-        to exists to allow the super call to view_actions to complete.
-        """
+        pass
 
     def view_action(self, form=None):
         id_list = [

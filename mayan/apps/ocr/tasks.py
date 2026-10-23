@@ -23,27 +23,36 @@ def task_document_version_ocr_process(
         app_label='documents', model_name='DocumentVersion'
     )
 
-    document_version = DocumentVersion.objects.get(
-        pk=document_version_id
-    )
-
-    document_version_page_tasks = []
-    for document_version_page in document_version.pages.all():
-        document_version_page_tasks.append(
+    try:
+        document_version = DocumentVersion.objects.get(
+            pk=document_version_id
+        )
+    except DocumentVersion.DoesNotExist:
+        return
+    else:
+        document_version_page_tasks = [
             task_document_version_page_ocr_process.s(
                 document_version_page_id=document_version_page.pk,
                 user_id=user_id
+            ) for document_version_page in document_version.pages.all()
+        ]
+
+        if document_version_page_tasks:
+            chord(document_version_page_tasks)(
+                task_document_version_ocr_finished.s(
+                    document_version_id=document_version.pk, user_id=user_id
+                )
             )
-        )
+        else:
+            task_document_version_ocr_finished.apply_async(
+                kwargs={
+                    'document_version_id': document_version.pk, 'results': [],
+                    'user_id': user_id
+                }
+            )
 
-    chord(document_version_page_tasks)(
-        task_document_version_ocr_finished.s(
-            document_version_id=document_version.pk, user_id=user_id
-        )
-    )
 
-
-@app.task(bind=True, retry_backoff=True)
+@app.task(bind=True, ignore_result=False, retry_backoff=True)
 def task_document_version_page_ocr_process(
     self, document_version_page_id, user_id=None
 ):

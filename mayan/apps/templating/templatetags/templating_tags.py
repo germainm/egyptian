@@ -10,7 +10,6 @@ from ..decorators import templating_dangerous_tag
 
 register = Library()
 
-# Filters
 
 
 @register.filter(name='dict_get')
@@ -74,7 +73,6 @@ def filter_to_base64(value, altchars=None):
     return base64.b64encode(s=value, altchars=altchars).decode('utf-8')
 
 
-# Tags
 
 
 class SpacelessPlusNode(Node):

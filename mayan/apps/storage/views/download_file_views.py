@@ -70,6 +70,6 @@ class DownloadFileListView(
                 'process like an export. Download files are retained over '
                 'a span of time and then removed automatically.'
             ),
-            'no_results_title': _(message='There are no files to download.'),
+            'no_results_title': _(message='There are no files to download'),
             'title': _(message='Downloads')
         }

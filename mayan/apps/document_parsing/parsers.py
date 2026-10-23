@@ -12,15 +12,12 @@ from mayan.apps.converter.literals import CONVERTER_OFFICE_FILE_MIMETYPES
 from mayan.apps.storage.utils import NamedTemporaryFile
 
 from .exceptions import ParserError
-from .settings import setting_pdftotext_path
+from .settings import setting_pdftotext_path, setting_pdftotext_timeout
 
 logger = logging.getLogger(name=__name__)
 
 
 class Parser:
-    """
-    Parser base class.
-    """
     _registry = {}
 
     @classmethod
@@ -38,8 +35,6 @@ class Parser:
             except ParserError:
                 """If parser raises error, try next parser in the list."""
             else:
-                # If parser was successful there is no need to try
-                # others in the list for this mimetype.
                 return
 
     @classmethod
@@ -55,8 +50,6 @@ class Parser:
             except ParserError:
                 """If parser raises error, try next parser in the list."""
             else:
-                # If parser was successful there is no need to try
-                # others in the list for this mimetype.
                 return
 
     @classmethod
@@ -122,9 +115,6 @@ class Parser:
 
 
 class PopplerParser(Parser):
-    """
-    PDF parser using the pdftotext execute from the poppler package.
-    """
     def __init__(self):
         self.pdftotext_path = setting_pdftotext_path.value
         if not os.path.exists(self.pdftotext_path):
@@ -156,19 +146,35 @@ class PopplerParser(Parser):
             command.append(temporary_file_object.name)
             command.append('-')
 
-            proc = subprocess.Popen(
+            timeout = setting_pdftotext_timeout.value
+
+            with subprocess.Popen(
                 command, close_fds=True, stderr=subprocess.PIPE,
                 stdout=subprocess.PIPE
-            )
-            return_code = proc.wait()
+            ) as process:
+                try:
+                    output, error_output = process.communicate(
+                        timeout=timeout
+                    )
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+
+                    error_message = _(
+                        message='pdftotext did not finish parsing page '
+                        '%(page_number)d after %(timeout)d seconds and was '
+                        'terminated.'
+                    ) % {'page_number': page_number, 'timeout': timeout}
+                    logger.error(error_message)
+
+                    raise ParserError(error_message)
+
+                return_code = process.returncode
+
             if return_code != 0:
-                logger.error(
-                    proc.stderr.readline()
-                )
+                logger.error(error_output)
 
                 raise ParserError
-
-            output = proc.stdout.read()
 
             if output == b'\x0c':
                 logger.debug('Parser didn\'t return any output')

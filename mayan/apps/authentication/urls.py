@@ -9,6 +9,7 @@ from .views.impersonation_views import (
     UserImpersonateEndView, UserImpersonateFormStartView,
     UserImpersonateStartView
 )
+from .views.lockout_views import UserAccountLockoutResetView
 from .views.password_reset_views import (
     MayanPasswordResetCompleteView, MayanPasswordResetConfirmView,
     MayanPasswordResetDoneView, MayanPasswordResetView
@@ -27,6 +28,18 @@ urlpatterns_authenticattion = [
     re_path(
         route=r'^logout/$', view=MayanLogoutView.as_view(),
         name='logout_view'
+    )
+]
+
+urlpatterns_lockouts = [
+    re_path(
+        route=r'^users/(?P<user_id>\d+)/account_lockout/reset/$',
+        name='lockout_reset_single', view=UserAccountLockoutResetView.as_view()
+    ),
+    re_path(
+        route=r'^users/multiple/account_lockout/reset/$',
+        name='lockout_reset_multiple',
+        view=UserAccountLockoutResetView.as_view()
     )
 ]
 
@@ -90,6 +103,7 @@ urlpatterns_user_impersonation = [
 
 urlpatterns = []
 urlpatterns.extend(urlpatterns_authenticattion)
+urlpatterns.extend(urlpatterns_lockouts)
 urlpatterns.extend(urlpatterns_password_reset)
 urlpatterns.extend(urlpatterns_password_set)
 urlpatterns.extend(urlpatterns_user_impersonation)

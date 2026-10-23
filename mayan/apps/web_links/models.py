@@ -15,10 +15,6 @@ from .model_mixins import (
 
 
 class WebLink(ExtraDataModelMixin, WebLinkBusinessLogicMixin, models.Model):
-    """
-    This model stores the basic fields for a web link. Web links allow
-    generating links from documents to external resources.
-    """
     _ordering_fields = ('enabled', 'label')
 
     label = models.CharField(
@@ -70,10 +66,6 @@ class WebLink(ExtraDataModelMixin, WebLinkBusinessLogicMixin, models.Model):
 
 
 class ResolvedWebLink(ResolvedWebLinkBusinessLogicMixin, WebLink):
-    """
-    Proxy model to represent an already resolved web link. Used for easier
-    columns registration.
-    """
     objects = WebLinkManager()
 
     class Meta:

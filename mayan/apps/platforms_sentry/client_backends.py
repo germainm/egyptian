@@ -59,20 +59,21 @@ class ClientBackendSentry(ClientBackend):
 
         logger.debug('client options: %s', sentry_instance._client.options)
 
+    def get_release(self):
+        return mayan.__build_revision__ or mayan.__version__
+
     def setup_arguments(self):
         logger.debug('raw arguments: %s', self.kwargs)
 
-        # https://docs.sentry.io/platforms/python/configuration/options/
         options = {}
 
-        # Common Options.
         options['dsn'] = self.kwargs['dsn']
 
         options['debug'] = any_to_bool(
             value=self.kwargs.get('debug', False)
         )
 
-        options['release'] = mayan.__build_string__
+        options['release'] = self.get_release()
 
         options['environment'] = self.kwargs.get('environment')
 
@@ -98,7 +99,6 @@ class ClientBackendSentry(ClientBackend):
             value=self.kwargs.get('include_local_variables', True)
         )
 
-        # Transport Options.
         options['transport'] = self.kwargs.get('transport')
 
         options['http_proxy'] = self.kwargs.get('http_proxy')
@@ -109,7 +109,6 @@ class ClientBackendSentry(ClientBackend):
             self.kwargs.get('shutdown_timeout', 2)
         )
 
-        # Tracing Options.
         options['traces_sample_rate'] = float(
             self.kwargs.get('traces_sample_rate', 0.005)
         )

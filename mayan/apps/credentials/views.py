@@ -34,6 +34,7 @@ logger = logging.getLogger(name=__name__)
 
 class StoredCredentialBackendSelectionView(FormView):
     extra_context = {
+        'submit_label': _(message='Next'),
         'title': _(message='New credential backend selection')
     }
     form_class = StoredCredentialBackendSelectionForm

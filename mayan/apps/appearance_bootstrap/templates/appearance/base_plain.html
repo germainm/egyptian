@@ -1,13 +1,17 @@
 {% load i18n %}
 
+{% load appearance_bootstrap_tags %}
 {% load appearance_tags %}
 {% load common_tags %}
 {% load navigation_tags %}
 
+{% appearance_bootstrap_color_mode_get as appearance_color_mode %}
+{% appearance_bootstrap_text_direction_get as appearance_text_direction %}
+
 {% spaceless %}
 
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{{ LANGUAGE_CODE }}" dir="{{ appearance_text_direction }}" data-bs-theme="{{ appearance_color_mode.name|default:'light' }}">
     <head>
         {% include 'appearance/partials/meta.html' %}
         <title>
@@ -52,6 +56,7 @@
     </head>
     <body id="body-plain">
         {% block content %}{% endblock %}
+        {% appearance_app_templates template_name='foot' %}
     </body>
 </html>
 

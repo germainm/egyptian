@@ -10,6 +10,7 @@ from .event_prune_backends import EventLogPruneBackend
 from .events import event_events_cleared
 from .permissions import permission_events_clear
 from .settings import setting_event_prune_backend
+from .utils import event_object_reference_get
 
 
 @app.task(bind=True, ignore_result=True, retry_backoff=True)
@@ -22,34 +23,21 @@ def task_event_commit(
     event_type = EventType.get(id=event_id)
 
     try:
-        if action_object_id:
-            Model = apps.get_model(
-                app_label=action_object_app_label,
-                model_name=action_object_model_name
-            )
+        action_object = event_object_reference_get(
+            app_label=action_object_app_label,
+            model_name=action_object_model_name,
+            object_id=action_object_id
+        )
 
-            action_object = Model.objects.get(pk=action_object_id)
-        else:
-            action_object = None
+        actor = event_object_reference_get(
+            app_label=actor_app_label, model_name=actor_model_name,
+            object_id=actor_id
+        )
 
-        if actor_id:
-            Model = apps.get_model(
-                app_label=actor_app_label, model_name=actor_model_name
-            )
-
-            actor = Model.objects.get(pk=actor_id)
-        else:
-            actor = None
-
-        if target_id:
-            Model = apps.get_model(
-                app_label=target_app_label,
-                model_name=target_model_name
-            )
-
-            target = Model.objects.get(pk=target_id)
-        else:
-            target = None
+        target = event_object_reference_get(
+            app_label=target_app_label, model_name=target_model_name,
+            object_id=target_id
+        )
 
         event_type._commit(
             action_object=action_object, actor=actor, target=target
@@ -87,8 +75,8 @@ def task_event_queryset_clear(
         user = None
 
     if target_content_type_id:
-        target_content_type = ContentType.objects.get(
-            pk=target_content_type_id
+        target_content_type = ContentType.objects.get_for_id(
+            id=target_content_type_id
         )
         target = target_content_type.get_object_for_this_type(
             pk=target_object_id

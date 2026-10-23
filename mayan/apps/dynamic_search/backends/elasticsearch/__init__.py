@@ -1,2 +1,2 @@
-from .backend import ElasticsearchSearchBackend  # NOQA
-from .backend_query_types import *  # NOQA
+from .backend import ElasticsearchSearchBackend
+from .backend_query_types import *

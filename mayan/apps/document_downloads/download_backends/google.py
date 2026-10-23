@@ -9,7 +9,4 @@ class DownloadBackendDocumentFileGoogleCloudStorageSignedURL(
     DownloadBackendMixinDocumentFile,
     DownloadBackendGoogleCloudStorageSignedURL
 ):
-    """
-    Subclass that returns a signed URL for a document file located in an
-    object storage bucket.
-    """
+    pass

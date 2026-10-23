@@ -57,6 +57,7 @@ class Migration(migrations.Migration):
             bases=(models.Model,)
         ),
         migrations.RunPython(
-            code=code_create_ocr_setting_for_existing_document_types
+            code=code_create_ocr_setting_for_existing_document_types,
+            reverse_code=migrations.RunPython.noop, elidable=True
         )
     ]

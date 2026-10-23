@@ -1,8 +1,8 @@
+from django.contrib.auth.decorators import login_not_required
 from django.utils import timezone, translation
+from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.i18n import JavaScriptCatalog
-
-from stronghold.views import StrongholdPublicMixin
 
 from mayan.apps.user_management.permissions import (
     permission_user_edit, permission_user_view
@@ -14,7 +14,9 @@ from mayan.apps.user_management.views.view_mixins import (
 from mayan.apps.views.generics import (
     SingleObjectDetailView, SingleObjectEditView
 )
-from mayan.apps.views.view_mixins import ExternalObjectViewMixin
+from mayan.apps.views.view_mixins import (
+    ExternalObjectViewMixin, RedirectWithPageReloadViewMixin
+)
 
 from .forms import LocaleProfileForm, LocaleProfileForm_view
 from .icons import (
@@ -22,11 +24,9 @@ from .icons import (
 )
 
 
-class JavaScriptCatalogPublic(StrongholdPublicMixin, JavaScriptCatalog):
-    """
-    Sub class of `JavaScriptCatalog` to bypass authentication and avoid
-    JavaScript errors for non authentication users.
-    """
+@method_decorator(login_not_required, name='dispatch')
+class JavaScriptCatalogPublic(JavaScriptCatalog):
+    pass
 
 
 class UserLocaleProfileDetailView(
@@ -59,7 +59,7 @@ class UserLocaleProfileDetailView(
 
 class UserLocaleProfileEditView(
     DynamicExternalUserViewMixin, ExternalObjectViewMixin,
-    SingleObjectEditView
+    RedirectWithPageReloadViewMixin, SingleObjectEditView
 ):
     form_class = LocaleProfileForm
     external_object_permission = permission_user_edit
@@ -92,3 +92,6 @@ class UserLocaleProfileEditView(
 
     def get_object(self):
         return self.external_object.locale_profile
+
+    def get_page_reload_enabled(self):
+        return self.is_current_user

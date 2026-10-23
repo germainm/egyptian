@@ -2,18 +2,18 @@
 
 {% load icons_tags %}
 
-<div class="col-xs-12 col-sm-6 col-md-4 col-lg-3 match-height">
-    <div class="panel panel-secondary dashboards-panel-widget">
-        <div class="panel-heading">
+<div class="col-12 col-sm-6 col-md-4 col-lg-3">
+    <div class="card dashboards-panel-widget border-1 border-dark h-100">
+        <div class="card-header">
             <div class="row">
-                <div class="col-xs-2">
+                <div class="col-2">
                     {% if icon %}
                         <div class="dashboards-panel-widget-icon">
                             {% icons_icon_render icon enable_shadow=True %}
                         </div>
                     {% endif %}
                 </div>
-                <div class="col-xs-10 text-right">
+                <div class="col-10 text-end">
                     <strong>{{ label }}</strong>
                     <div class="huge">
                         {{ count }}
@@ -23,9 +23,9 @@
         </div>
         {% if link %}
             <a href="{{ link }}">
-                <div class="panel-footer">
-                    <span class="pull-left">{% trans 'View details' %}</span>
-                    <span class="pull-right">{% icons_icon_render link_icon %}</span>
+                <div class="card-footer bg-body-secondary">
+                    <span class="float-start">{% trans 'View details' %}</span>
+                    <span class="float-end">{% icons_icon_render link_icon %}</span>
                     <div class="clearfix"></div>
                 </div>
             </a>

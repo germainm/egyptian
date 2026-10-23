@@ -12,6 +12,11 @@ class SearchModelListView(SingleObjectListView):
     extra_context = {
         'hide_link': True,
         'hide_object': True,
+        'no_results_icon': icon_search_model_list,
+        'no_results_text': _(
+            message='Search models expose the app data that can be searched.'
+        ),
+        'no_results_title': _(message='No search models available'),
         'title': _(message='Search models')
     }
     view_icon = icon_search_model_list
@@ -29,6 +34,12 @@ class SearchModelSearchFieldListView(SingleObjectListView):
         return {
             'hide_link': True,
             'hide_object': True,
+            'no_results_icon': icon_search_model_detail,
+            'no_results_text': _(
+                message='Search fields are the individual attributes of a '
+                'search model that can be queried.'
+            ),
+            'no_results_title': _(message='No search fields available'),
             'object': search_model,
             'title': _(
                 message='Fields for search model: %s'

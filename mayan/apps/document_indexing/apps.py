@@ -26,8 +26,9 @@ from .handlers import (
     handler_create_default_document_index, handler_event_trigger,
     handler_index_document, handler_remove_document
 )
-from .html_widgets import (
-    get_instance_link, index_instance_item_link, node_level
+from .column_widgets import (
+    IndexInstanceItemLinkWidget, IndexInstanceNodeLinkWidget,
+    IndexTemplateNodeLevelWidget
 )
 from .links import (
     link_document_index_instance_list, link_document_type_index_templates,
@@ -147,16 +148,13 @@ class DocumentIndexingApp(MayanAppConfig):
             model=IndexInstanceNode, related='index_template_node__index'
         )
 
-        # Document Index Instance Node
 
         SourceColumn(
-            func=lambda context: get_instance_link(
-                index_instance_node=context['object'],
-            ), include_label=True, is_sortable=True, label=_(message='Level'),
-            sort_field='value', source=DocumentIndexInstanceNode
+            include_label=True, is_sortable=True, label=_(message='Level'),
+            sort_field='value', source=DocumentIndexInstanceNode,
+            widget=IndexInstanceNodeLinkWidget
         )
 
-        # Index instance
 
         SourceColumn(
             attribute='get_level_count', include_label=True,
@@ -177,13 +175,11 @@ class DocumentIndexingApp(MayanAppConfig):
             ), source=IndexInstance
         )
 
-        # Index instance node
 
         column_index_instance_node_level = SourceColumn(
-            func=lambda context: index_instance_item_link(
-                index_instance_item=context['object']
-            ), is_identifier=True, is_sortable=True, label=_(message='Level'),
-            sort_field='value', source=IndexInstanceNode
+            is_identifier=True, is_sortable=True, label=_(message='Level'),
+            sort_field='value', source=IndexInstanceNode,
+            widget=IndexInstanceItemLinkWidget
         )
         column_index_instance_node_level.add_exclude(
             source=DocumentIndexInstanceNode
@@ -220,16 +216,14 @@ class DocumentIndexingApp(MayanAppConfig):
         )
 
         SourceColumn(
-            func=lambda context: index_instance_item_link(
-                index_instance_item=context['object']
-            ), is_identifier=True, is_sortable=True, label=_(message='Level'),
-            sort_field='value', source=IndexInstanceNodeSearchResult
+            is_identifier=True, is_sortable=True, label=_(message='Level'),
+            sort_field='value', source=IndexInstanceNodeSearchResult,
+            widget=IndexInstanceItemLinkWidget
         )
         SourceColumn(
             attribute='get_full_path', source=IndexInstanceNodeSearchResult
         )
 
-        # Index template
 
         column_index_label = SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -251,13 +245,10 @@ class DocumentIndexingApp(MayanAppConfig):
         )
         column_index_enabled.add_exclude(source=IndexInstance)
 
-        # Index template node
 
         SourceColumn(
-            func=lambda context: node_level(
-                node=context['object']
-            ), include_label=True, is_identifier=True, label=_(message='Level'),
-            source=IndexTemplateNode
+            include_label=True, is_identifier=True, label=_(message='Level'),
+            source=IndexTemplateNode, widget=IndexTemplateNodeLevelWidget
         )
         SourceColumn(
             attribute='enabled', include_label=True, is_sortable=True,

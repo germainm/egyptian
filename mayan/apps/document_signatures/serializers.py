@@ -29,13 +29,13 @@ class BaseSignatureSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         fields = (
-            'date_time', 'document_file_url', 'key_algorithm',
+            'date_time', 'document_file_url', 'id', 'key_algorithm',
             'key_creation_date', 'key_expiration_date', 'key_id',
             'key_length', 'key_type', 'key_user_id', 'key_url',
             'public_key_fingerprint', 'signature_id', 'url'
         )
         read_only_fields = (
-            'date_time', 'document_file_url', 'key_algorithm',
+            'date_time', 'document_file_url', 'id', 'key_algorithm',
             'key_creation_date', 'key_expiration_date', 'key_id',
             'key_length', 'key_type', 'key_user_id', 'key_url',
             'public_key_fingerprint', 'signature_id', 'url'

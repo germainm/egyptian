@@ -1,38 +1,35 @@
-{# appearance_app_template_nocache #}
 {% load i18n %}
 
+{% load appearance_tags %}
 {% load navigation_tags %}
 {% load views_tags %}
 
-<div class="pull-left">
-    <div class="btn-toolbar" role="toolbar">
-        <div class="btn-group">
-            <a class="btn btn-default btn-sm" href="{% views_get_list_mode_querystring %}" title="{% trans 'Toggle list display mode' %}">
-                {% views_get_list_mode_icon as list_mode_icon %}{{ list_mode_icon.render }}
-            </a>
-        </div>
+{% appearance_app_template_cache_disable %}
+
+
+
+{% if not hide_list_mode_toggle %}
+    <div class="btn-group btn-group-sm" role="group">
+        <a type="button" class="btn btn-secondary" href="{% views_get_list_mode_querystring %}" title="{% trans 'Toggle list display mode' %}">{% views_get_list_mode_icon as list_mode_icon %}{{ list_mode_icon.render }}</a>
     </div>
-</div>
+{% endif %}
 
 {% if object_list %}
     {% navigation_get_source_columns_sortable source=object_list.0 as source_columns %}
 
     {% if source_columns %}
-        <div class="pull-left">
-            <div class="btn-toolbar" role="toolbar">
-                <form action="" id="navigation-form-sort-field" method="get">
-                    <select class="form-control input-sm" name="sort-search">
-                        <option value="" disabled selected>{% trans 'Sort by column' %}</option>
-                        <option value="{% navigation_get_sort_field_querystring column=source_columns.0 single_column=True order='clear' %}">{% trans '--- Clear ---' %}</option>
-                        {% for source_column in source_columns|dictsort:'label' %}
-                            {% navigation_get_is_active_sort_field column=source_column as source_column_active %}
-                            <option value="{% navigation_get_sort_field_querystring column=source_column single_column=True order='ascending' %}" {% if source_column_active %}selected="selected"{% endif %}>{{ source_column.label }} {% trans '(ascending)' %}</option>
-                            {% navigation_get_is_active_sort_field column=source_column reverse=True as source_column_active %}
-                            <option value="{% navigation_get_sort_field_querystring column=source_column single_column=True order='descending' %}" {% if source_column_active %}selected="selected"{% endif %}>{{ source_column.label }} {% trans '(descending)' %}</option>
-                        {% endfor %}
-                    </select>
-                </form>
-            </div>
+        <div class="input-group input-group-sm w-auto">
+            
+            <select class="form-select navigation-sort-field-select" id="navigation-sort-field-select">
+                <option value="" disabled selected>{% trans 'Sort by column' %}</option>
+                <option value="{% navigation_get_sort_field_querystring column=source_columns.0 single_column=True order='clear' %}">{% trans '--- Clear ---' %}</option>
+                {% for source_column in source_columns|dictsort:'label' %}
+                    {% navigation_get_is_active_sort_field column=source_column as source_column_active %}
+                    <option value="{% navigation_get_sort_field_querystring column=source_column single_column=True order='ascending' %}" {% if source_column_active %}selected="selected"{% endif %}>{{ source_column.label }} {% trans '(ascending)' %}</option>
+                    {% navigation_get_is_active_sort_field column=source_column reverse=True as source_column_active %}
+                    <option value="{% navigation_get_sort_field_querystring column=source_column single_column=True order='descending' %}" {% if source_column_active %}selected="selected"{% endif %}>{{ source_column.label }} {% trans '(descending)' %}</option>
+                {% endfor %}
+            </select>
         </div>
     {% endif %}
 {% endif %}

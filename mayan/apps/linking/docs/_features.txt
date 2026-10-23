@@ -1,4 +1,0 @@
-- Configurable document grouping.
-
-  - Automatic linking of documents based on metadata values or document
-    properties.

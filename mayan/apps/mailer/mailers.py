@@ -4,9 +4,6 @@ from .classes import MailerBackendBaseEmail, MailerBackendCredentials
 
 
 class DjangoSMTP(MailerBackendCredentials):
-    """
-    Backend that wraps Django's SMTP backend.
-    """
     class_path = 'django.core.mail.backends.smtp.EmailBackend'
     label = _(message='Django SMTP backend')
 
@@ -92,9 +89,6 @@ class DjangoSMTP(MailerBackendCredentials):
 
 
 class DjangoFileBased(MailerBackendBaseEmail):
-    """
-    Mailing backend that wraps Django's file based email backend.
-    """
     class_path = 'django.core.mail.backends.filebased.EmailBackend'
     label = _(message='Django file based backend')
 

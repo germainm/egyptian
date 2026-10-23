@@ -14,14 +14,6 @@ def factory_condition_queryset_access(
     app_label, model_name, object_permission, callback=None,
     view_permission=None
 ):
-    """
-    Return a function that first checks to see if the user has the view
-    permission. If not, then filters the objects with the object permission
-    and return True if there is at least one item in the filtered queryset.
-    This is used to avoid showing a link that ends up in a view with an
-    empty results set because the user doesn't have access to any of the
-    objects in the queryset.
-    """
     def function_condition(context, resolved_object):
         AccessControlList = apps.get_model(
             app_label='acls', model_name='AccessControlList'
@@ -32,13 +24,9 @@ def factory_condition_queryset_access(
         try:
             request = context.request
         except AttributeError:
-            # Simple request extraction failed. Might not be a view context.
-            # Try alternate method.
             try:
                 request = Variable(var='request').resolve(context=context)
             except VariableDoesNotExist:
-                # There is no request variable, most probable a 500 in a test
-                # view. Don't return anything.
                 logger.warning(
                     'No request variable, aborting cascade condition.'
                 )
@@ -114,12 +102,9 @@ def get_content_type_kwargs_factory(
 def get_current_view_name(request):
     current_path = request.META['PATH_INFO']
 
-    # Get sources: view name, view objects.
     try:
         current_view_name = resolve(path=current_path).view_name
     except Resolver404:
-        # Can't figure out which view corresponds to this URL.
-        # Most likely it is an invalid URL.
         logger.warning(
             'Can\'t figure out which view corresponds to this '
             'URL: %s; aborting menu resolution.', current_path

@@ -1,7 +1,0 @@
-- User-defined document metadata.
-
-  - Several metadata fields can be matched to a document type as per technical,
-    legal or structural requirements such as the `Dublin core`_ or `ISO 23081`_
-    just to name a few.
-  - Metadata fields can have an initial value, which can be static or determined
-    by a template code snippet provided by the user.

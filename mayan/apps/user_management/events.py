@@ -20,7 +20,6 @@ event_user_edited = namespace.add_event_type(
     label=_(message='User edited'), name='user_edited'
 )
 
-# Deprecated events. These are now handled by the authentication app.
 event_user_logged_in = namespace.add_event_type(
     label=_(message='User logged in'), name='user_logged_in'
 )

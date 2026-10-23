@@ -5,31 +5,28 @@
 {% views_calculate_title as result %}
 
 {% if not non_html_title %}
-    <div style="display: flex;">
-        <button id="main-menu-button-open">
-            <span class="sr-only">{% trans 'Open main menu' %}</span>
-            <i aria-hidden="true" data-hidden="true" class="fa fa-bars"></i>
-        </button>
-{% endif %}
+    <div class="mayan-content-header d-flex align-items-start gap-3">
 
-{% if not non_html_title and result.title %}
-        <div>
-            <h3 id="content-title" title='{{ result.title_full }}'>
-{% endif %}
-
-{% if view_icon %}{{ view_icon.render }} &nbsp;{% endif %}<span id="appearance-title-text">{{ result.title }}</span>
-
-{% if not non_html_title and result.title %}
+    {% if result.title %}
+        <div class="flex-fill mayan-content-title-block">
+            <h3 class="mayan-h3 d-flex align-items-baseline" id="content-title" title='{{ result.title_full }}'>
+                {% if view_icon %}<span class="flex-shrink-0 me-2">{{ view_icon.render }}</span>{% endif %}<span id="mayan-appearance-title-text">{{ result.title }}</span>
             </h3>
             {% if subtitle %}
                 <p>
                     <small>{{ subtitle }}</small>
                 </p>
             {% endif %}
-{% endif %}
-
-{% if not non_html_title %}
         </div>
+    {% else %}
+        <div class="flex-fill">
+            {% if view_icon %}{{ view_icon.render }} &nbsp;{% endif %}<span id="mayan-appearance-title-text">{{ result.title }}</span>
+        </div>
+    {% endif %}
+
     </div>
     {% if title or subtitle %}<hr/>{% endif %}
+{% else %}
+    {% if view_icon %}{{ view_icon.render }} &nbsp;{% endif %}<span id="mayan-appearance-title-text">{{ result.title }}</span>
+
 {% endif %}

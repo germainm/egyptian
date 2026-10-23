@@ -46,6 +46,14 @@ class PropertyModelListView(SingleObjectListView):
     extra_context = {
         'hide_link': True,
         'hide_object': True,
+        'no_results_icon': icon_property_model_list,
+        'no_results_text': _(
+            message='Properties expose computed or descriptive attributes '
+            'of a model for use in other parts of the system.'
+        ),
+        'no_results_title': _(
+            message='No models with registered properties'
+        ),
         'title': _(message='Models with registered properties')
     }
     view_icon = icon_property_model_list

@@ -1,4 +1,10 @@
-<textarea class="appearance-overscroll-contain appearance-resize-vertical form-control templating-widget-code appearance-resize-persist appearance-form-control-copy" data-linked-id="id_template_preview" name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html"%}>
-{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+{% load i18n %}
 
-<pre class="appearance-resize-vertical appearance-overscroll-contain appearance-resize-persist" data-height-original="200px" id="id_template_preview"><code class="language-django templating-widget-code"></code></pre>
+<div class="templating-widget-code-container">
+    <button class="btn btn-primary btn-sm templating-widget-code-copy" title="{% translate 'Copy content to clipboard' %}" type="button">{% translate 'Copy' %}</button>
+
+    <pre aria-hidden="true" class="templating-widget-code-preview"><code class="language-django hljs templating-widget-code-preview-code"></code></pre>
+
+    <textarea class="appearance-overscroll-contain appearance-resize-persist form-control templating-widget-code" name="{{ widget.name }}" wrap="off"{% include "django/forms/widgets/attrs.html" %}>
+{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+</div>

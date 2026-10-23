@@ -1,0 +1,18 @@
+{% load humanize %}
+{% load tz %}
+
+{% load smart_settings_tags %}
+
+{% smart_setting 'APPEARANCE_DATE_TIME_RELATIVE_ENABLE' as date_time_relative_enable %}
+
+
+
+{% if value %}
+    {% if date_time_relative_enable %}
+        <span title="{{ value|localtime|date:'DATETIME_FORMAT' }}">{{ value|naturaltime }}</span>
+    {% else %}
+        {{ value|localtime|date:'DATETIME_FORMAT' }}
+    {% endif %}
+{% else %}
+    {{ column.empty_value|default:'' }}
+{% endif %}

@@ -3,7 +3,7 @@
 [program:mayan-edms-gunicorn]
 autorestart = %(ENV_MAYAN_SUPERVISOR_AUTORESTART)s
 autostart = true
-command = %(ENV_MAYAN_GUNICORN_BIN)s --bind 0.0.0.0:8000 --chdir %(ENV_MAYAN_INSTALL_DIR)s --env DJANGO_SETTINGS_MODULE=%(ENV_MAYAN_SETTINGS_MODULE)s --limit-request-line %(ENV_MAYAN_GUNICORN_LIMIT_REQUEST_LINE)s --max-requests %(ENV_MAYAN_GUNICORN_MAX_REQUESTS)s --max-requests-jitter %(ENV_MAYAN_GUNICORN_REQUESTS_JITTER)s %(ENV_MAYAN_GUNICORN_TEMPORARY_DIRECTORY)s --timeout %(ENV_MAYAN_GUNICORN_TIMEOUT)s --worker-class %(ENV_MAYAN_GUNICORN_WORKER_CLASS)s --workers %(ENV_MAYAN_GUNICORN_WORKERS)s mayan.wsgi
+command = %(ENV_MAYAN_GUNICORN_BIN)s --bind %(ENV_MAYAN_GUNICORN_BIND_ADDRESS)s --chdir %(ENV_MAYAN_INSTALL_DIR)s --env DJANGO_SETTINGS_MODULE=%(ENV_MAYAN_SETTINGS_MODULE)s --limit-request-line %(ENV_MAYAN_GUNICORN_LIMIT_REQUEST_LINE)s --log-level %(ENV_MAYAN_GUNICORN_LOG_LEVEL)s --max-requests %(ENV_MAYAN_GUNICORN_MAX_REQUESTS)s --max-requests-jitter %(ENV_MAYAN_GUNICORN_REQUESTS_JITTER)s --no-control-socket %(ENV_MAYAN_GUNICORN_TEMPORARY_DIRECTORY)s --timeout %(ENV_MAYAN_GUNICORN_TIMEOUT)s --worker-class %(ENV_MAYAN_GUNICORN_WORKER_CLASS)s --workers %(ENV_MAYAN_GUNICORN_WORKERS)s mayan.wsgi
 environment =
   DJANGO_SETTINGS_MODULE=%(ENV_MAYAN_SETTINGS_MODULE)s
 redirect_stderr = true
@@ -18,9 +18,9 @@ user = {{ OS_USERNAME }}
 [program:mayan-edms-{{ worker.name }}]
 autorestart = %(ENV_MAYAN_SUPERVISOR_AUTORESTART)s
 autostart = true
-command = nice -n {{ worker.nice_level }} %(ENV_COMMAND)s
+command = nice -n %(ENV_MAYAN_{{ worker.name|upper }}_NICE_LEVEL)s %(ENV_COMMAND)s
 environment =
-  COMMAND = "%(ENV_MAYAN_PYTHON_BIN_DIR)scelery -A mayan worker %(ENV_MAYAN_{{ worker.name|upper }}_CONCURRENCY)s --hostname=mayan-edms-{{ worker.name }}.%%h --loglevel=ERROR -Ofair --queues={% for queue in worker.queues %}{{ queue.name }}{% if not forloop.last %},{% endif %}{% endfor %} %(ENV_MAYAN_{{ worker.name|upper }}_MAX_MEMORY_PER_CHILD)s %(ENV_MAYAN_{{ worker.name|upper }}_MAX_TASKS_PER_CHILD)s",
+  COMMAND = "%(ENV_MAYAN_PYTHON_BIN_DIR)scelery -A mayan worker %(ENV_MAYAN_{{ worker.name|upper }}_CONCURRENCY)s --hostname=mayan-edms-{{ worker.name }}.%%h --loglevel=%(ENV_MAYAN_WORKER_LOG_LEVEL)s -Ofair --queues={% for queue in worker.queues %}{{ queue.name }}{% if not forloop.last %},{% endif %}{% endfor %} %(ENV_MAYAN_{{ worker.name|upper }}_MAX_MEMORY_PER_CHILD)s %(ENV_MAYAN_{{ worker.name|upper }}_MAX_TASKS_PER_CHILD)s",
   DJANGO_SETTINGS_MODULE=%(ENV_MAYAN_SETTINGS_MODULE)s
 killasgroup = true
 numprocs = 1
@@ -38,9 +38,9 @@ user = {{ OS_USERNAME }}
 [program:mayan-edms-celery-beat]
 autorestart = %(ENV_MAYAN_SUPERVISOR_AUTORESTART)s
 autostart = true
-command = nice -n 1 %(ENV_COMMAND)s
+command = nice -n %(ENV_MAYAN_BEAT_NICE_LEVEL)s %(ENV_COMMAND)s
 environment =
-  COMMAND = "%(ENV_MAYAN_PYTHON_BIN_DIR)scelery -A mayan beat --pidfile= -l ERROR",
+  COMMAND = "%(ENV_MAYAN_PYTHON_BIN_DIR)scelery -A mayan beat --pidfile= -l %(ENV_MAYAN_BEAT_LOG_LEVEL)s",
   DJANGO_SETTINGS_MODULE=%(ENV_MAYAN_SETTINGS_MODULE)s
 killasgroup = true
 numprocs = 1

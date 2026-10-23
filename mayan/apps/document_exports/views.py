@@ -34,7 +34,8 @@ class DocumentVersionExportView(MultipleObjectConfirmActionView):
             'message': _(
                 message='The process will be performed in the background. '
                 'The exported file will be available in the downloads area.'
-            )
+            ),
+            'submit_label': _(message='Export')
         }
 
         if self.object_list.count() == 1:

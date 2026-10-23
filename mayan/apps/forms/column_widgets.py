@@ -18,7 +18,7 @@ class TwoStateWidget(SourceColumnWidget):
 
 
 class ObjectLinkWidget(SourceColumnWidget):
-    template_string = '<a href="{{ url }}">{{ object_type }}{{ label }}</a>'
+    template_name = 'forms/object_link_widget.html'
 
     def get_extra_context(self):
         label = ''
@@ -38,12 +38,7 @@ class ObjectLinkWidget(SourceColumnWidget):
                 url = None
 
             if getattr(self.value, 'is_staff', None) or getattr(self.value, 'is_superuser', None):
-                # Don't display a anchor to for the user details view for
-                # super users and staff, the details view filters them.
-                # Staff and admin users are not manageable by the normal
-                # user views.
                 url = '#'
-                label = '{}{}'.format(object_type, label)
 
         return {
             'label': label, 'object_type': object_type,

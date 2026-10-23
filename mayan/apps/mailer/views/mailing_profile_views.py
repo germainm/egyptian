@@ -11,7 +11,9 @@ from mayan.apps.backends.views import (
 from mayan.apps.views.generics import (
     FormView, SingleObjectDeleteView, SingleObjectListView
 )
-from mayan.apps.views.view_mixins import ExternalObjectViewMixin
+from mayan.apps.views.view_mixins import (
+    ExternalObjectViewMixin, ViewMixinFormSaveAndTest
+)
 
 from ..classes import MailerBackend
 from ..forms import (
@@ -34,6 +36,7 @@ from ..permissions import (
 
 class MailingProfileBackendSelectionView(FormView):
     extra_context = {
+        'submit_label': _(message='Next'),
         'title': _(message='New mailing profile backend selection')
     }
     form_class = UserMailerBackendSelectionForm
@@ -94,8 +97,11 @@ class MailingProfileDeleteView(SingleObjectDeleteView):
         }
 
 
-class MailingProfileEditView(ViewSingleObjectDynamicFormModelBackendEdit):
+class MailingProfileEditView(
+    ViewMixinFormSaveAndTest, ViewSingleObjectDynamicFormModelBackendEdit
+):
     form_class = UserMailerSetupDynamicForm
+    form_save_and_test_label = _(message='Send test')
     model = UserMailer
     object_permission = permission_mailing_profile_edit
     pk_url_kwarg = 'mailing_profile_id'
@@ -109,8 +115,19 @@ class MailingProfileEditView(ViewSingleObjectDynamicFormModelBackendEdit):
     def get_form_extra_kwargs(self):
         return {'user': self.request.user}
 
+    def get_form_save_and_test_available(self):
+        return bool(self.request.user.email)
+
     def get_instance_extra_data(self):
         return {'_event_actor': self.request.user}
+
+    def view_test(self):
+        recipient = self.request.user.email
+        self.object.test(to=recipient, user=self.request.user)
+
+        messages.success(
+            message=_(message='Test email sent.'), request=self.request
+        )
 
 
 class MailingProfileListView(SingleObjectListView):

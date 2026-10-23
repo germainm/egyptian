@@ -6,6 +6,10 @@ namespace = EventTypeNamespace(
     label=_(message='Authentication'), name='authentication'
 )
 
+event_user_account_lockout_reset = namespace.add_event_type(
+    label=_(message='User account lockout reset'),
+    name='user_account_lockout_reset'
+)
 event_user_impersonation_ended = namespace.add_event_type(
     label=_(message='User impersonation ended'), name='user_impersonation_ended'
 )

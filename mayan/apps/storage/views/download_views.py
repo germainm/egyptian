@@ -21,9 +21,6 @@ class ViewBaseDownload(
 class ViewMultipleObjectDownload(
     RestrictedQuerysetViewMixin, MultipleObjectViewMixin, ViewBaseDownload
 ):
-    """
-    View that support receiving multiple objects via a pk_list query.
-    """
     def __init__(self, *args, **kwargs):
         result = super().__init__(*args, **kwargs)
 
@@ -67,7 +64,4 @@ class ViewSingleObjectDownload(
 class ViewSingleObjectBackendDownload(
     ViewMixinBackendDownload, ViewSingleObjectDownload
 ):
-    """
-    Combined view to perform downloads of ORM objects, filtered by access,
-    and using a download backend.
-    """
+    pass

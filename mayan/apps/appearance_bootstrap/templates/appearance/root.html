@@ -1,13 +1,17 @@
 {% load i18n %}
 
+{% load appearance_bootstrap_tags %}
 {% load appearance_tags %}
 {% load common_tags %}
 {% load navigation_tags %}
 
+{% appearance_bootstrap_color_mode_get as appearance_color_mode %}
+{% appearance_bootstrap_text_direction_get as appearance_text_direction %}
+
 {% spaceless %}
 
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{{ LANGUAGE_CODE }}" dir="{{ appearance_text_direction }}" data-bs-theme="{{ appearance_color_mode.name|default:'light' }}">
     <head>
         {% include 'appearance/partials/meta.html' %}
         <title>
@@ -28,42 +32,26 @@
             <div id="menu-topbar">
                 {% include 'appearance/menus/topbar.html' %}
             </div>
-            <div id="menu-main">
-                {% include 'appearance/menus/main.html' %}
+            <div aria-labelledby="menu-main-label" class="offcanvas-md offcanvas-start" id="menu-main" tabindex="-1">
+                <div class="border-bottom border-1 offcanvas-header text-bg-primary">
+                    <h5 class="offcanvas-title" id="menu-main-label">{% trans 'Main menu' %}</h5>
+                    <button aria-label="{% trans 'Close' %}" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#menu-main" type="button"></button>
+                </div>
+                <div class="offcanvas-body p-0">
+                    <div id="menu-main-content">
+                        {% include 'appearance/menus/main.html' %}
+                    </div>
+                </div>
             </div>
             <div id="appearance-main-viewport">
                 <div class="row zero-margin">
-                    <div class="col-xs-12">
+                    <div class="col-12">
                         <div id="ajax-header"></div>
                         <div id="ajax-content"></div>
                     </div>
                 </div>
             </div>
         {% endif %}
-
-        <div class="modal fade" id="modal-server-error" role="dialog" tabindex="-1" >
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h4 class="modal-title">{% trans 'Server error' %}</h4>
-                    </div>
-                    <div class="modal-body">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-default" data-dismiss="modal">{% trans 'Close' %}</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script id="template-error" type="text/x-template">
-            <div class="content">
-                <h2 class="title">{% blocktrans %}Server communication error{% endblocktrans %}</h2>
-                <div class="inner">
-                    <p>{% blocktrans %}Check you network connection and try again in a few moments.{% endblocktrans %}</p>
-                </div>
-            </div>
-        </script>
 
         {% appearance_app_templates template_name='foot' %}
     </body>

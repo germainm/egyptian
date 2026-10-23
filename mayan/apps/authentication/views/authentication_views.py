@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import (
     REDIRECT_FIELD_NAME, login as django_auth_login
 )
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.views import (
     LoginView, LogoutView, PasswordChangeDoneView, PasswordChangeView,
@@ -21,8 +22,6 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 
 from formtools.wizard.views import SessionWizardView, StepsHelper
-from stronghold.decorators import public
-from stronghold.views import StrongholdPublicMixin
 
 from mayan.apps.common.settings import setting_home_view
 from mayan.apps.forms import formsets
@@ -37,14 +36,15 @@ from mayan.apps.views.view_mixins import ViewIconMixin
 from ..classes import AuthenticationBackend
 from ..forms import AuthenticationFormBase
 from ..icons import icon_login, icon_password_change
-from ..literals import SESSION_MULTI_FACTOR_USER_ID_KEY
+from ..literals import (
+    SESSION_MULTI_FACTOR_USER_BACKEND_KEY, SESSION_MULTI_FACTOR_USER_ID_KEY
+)
 
 
 class MultiFactorAuthenticationView(RedirectURLMixin, SessionWizardView):
     redirect_field_name = REDIRECT_FIELD_NAME
     template_name = 'authentication/login.html'
 
-    # Login view methods.
     get_default_redirect_url = LoginView.get_default_redirect_url
     get_redirect_url = LoginView.get_redirect_url
     get_success_url = LoginView.get_success_url
@@ -57,9 +57,6 @@ class MultiFactorAuthenticationView(RedirectURLMixin, SessionWizardView):
 
     @staticmethod
     def form_list_property(self):
-        """
-        Return the processed form list after the view has initialized.
-        """
         self.authentication_backend = AuthenticationBackend.cls_get_instance()
         form_list = self.authentication_backend.get_form_list()
         computed_form_list = OrderedDict()
@@ -77,16 +74,11 @@ class MultiFactorAuthenticationView(RedirectURLMixin, SessionWizardView):
 
     @classonlymethod
     def as_view(cls, *args, **kwargs):
-        # `SessionWizardView` needs at least one form in order to be
-        # initialized as a view. Declare one empty form and then change the
-        # form list in the `.dispatch()` method.
         class EmptyForm(AuthenticationFormBase):
-            """Empty form"""
+            pass
 
         cls.form_list = [EmptyForm]
 
-        # Allow super to initialize and pass the `form_list` `len()` assert
-        # before replacing the `form_list` attribute with our property.
         result = super().as_view(*args, **kwargs)
 
         def null_setter(self, value):
@@ -106,7 +98,7 @@ class MultiFactorAuthenticationView(RedirectURLMixin, SessionWizardView):
     @method_decorator(sensitive_post_parameters())
     @method_decorator(csrf_protect)
     @method_decorator(never_cache)
-    @method_decorator(public)
+    @method_decorator(login_not_required)
     def dispatch(self, request, *args, **kwargs):
         steps = StepsHelper(self)
 
@@ -117,38 +109,42 @@ class MultiFactorAuthenticationView(RedirectURLMixin, SessionWizardView):
             if user_id:
                 return self.done()
             else:
-                return HttpResponseRedirect(
-                    redirect_to=resolve_url(
-                        to=settings.LOGIN_URL
-                    )
-                )
+                redirect_to = resolve_url(to=settings.LOGIN_URL)
+                return HttpResponseRedirect(redirect_to=redirect_to)
         else:
             return super().dispatch(request=request, *args, **kwargs)
 
     def done(self, form_list=None, **kwargs):
-        """
-        Perform the same function as Django's `LoginView.form_valid()`.
-        """
         kwargs = self.get_all_cleaned_data()
-        self.authentication_backend.process(
+        self.authentication_backend.do_process(
             form_list=form_list, kwargs=kwargs, request=self.request
         )
         user = self.authentication_backend.get_user(
             form_list=form_list, kwargs=kwargs, request=self.request
         )
 
-        django_auth_login(request=self.request, user=user)
-
-        return HttpResponseRedirect(
-            redirect_to=self.get_success_url()
+        backend = self.request.session.pop(
+            SESSION_MULTI_FACTOR_USER_BACKEND_KEY, None
         )
+        self.request.session.pop(SESSION_MULTI_FACTOR_USER_ID_KEY, None)
+
+        if not backend:
+            raise ValueError(
+                'Multi-factor login cannot complete: the first-factor '
+                'authentication backend was not recorded in the session.'
+            )
+
+        django_auth_login(backend=backend, request=self.request, user=user)
+
+        redirect_to = self.get_success_url()
+        return HttpResponseRedirect(redirect_to=redirect_to)
 
     def get_context_data(self, form, **kwargs):
         context = super().get_context_data(form=form, **kwargs)
 
-        context.update(
-            AuthenticationBackend.cls_get_instance().get_context_data()
-        )
+        authentication_backend = AuthenticationBackend.cls_get_instance()
+        authentication_backend_context = authentication_backend.get_context_data()
+        context.update(authentication_backend_context)
 
         wizard_step = self.form_list[self.steps.current]
 
@@ -181,7 +177,8 @@ class MultiFactorAuthenticationView(RedirectURLMixin, SessionWizardView):
         return kwargs
 
 
-class MayanLoginView(StrongholdPublicMixin, LoginView):
+@method_decorator(login_not_required, name='dispatch')
+class MayanLoginView(LoginView):
     extra_context = {
         'appearance_type': 'plain',
         'submit_icon': icon_login,
@@ -192,22 +189,31 @@ class MayanLoginView(StrongholdPublicMixin, LoginView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
-            AuthenticationBackend.cls_get_instance().get_context_data()
-        )
+        authentication_backend = AuthenticationBackend.cls_get_instance()
+        authentication_backend_context = authentication_backend.get_context_data()
+        context.update(authentication_backend_context)
+
         return context
 
     def get_form_class(self):
-        return AuthenticationBackend.cls_get_instance().get_login_form_class()
+        authentication_backend = AuthenticationBackend.cls_get_instance()
+        return authentication_backend.get_login_form_class()
 
     def form_valid(self, form):
         if not AuthenticationBackend.cls_get_instance().form_list:
-            AuthenticationBackend.cls_get_instance().process(
+            authentication_backend = AuthenticationBackend.cls_get_instance()
+            authentication_backend.do_process(
                 kwargs=form.cleaned_data, request=self.request
 
             )
             return super().form_valid(form=form)
         else:
+            user = form.get_user()
+
+            self.request.session[
+                SESSION_MULTI_FACTOR_USER_BACKEND_KEY
+            ] = user.backend
+
             self.request.session[
                 SESSION_MULTI_FACTOR_USER_ID_KEY
             ] = form.get_user().pk
@@ -228,24 +234,25 @@ class MayanLoginView(StrongholdPublicMixin, LoginView):
 
 
 class MayanLogoutView(LogoutView):
-    """No current change or overrides, left here for future expansion."""
+    pass
 
 
 class MayanPasswordChangeDoneView(PasswordChangeDoneView):
-    def dispatch(self, *args, **kwargs):
+    def dispatch(self, request, *args, **kwargs):
         messages.success(
             message=_(
                 message='Your password has been successfully changed.'
             ),
-            request=self.request
+            request=request
         )
         return redirect(
-            to=self.request.user.get_absolute_url()
+            to=request.user.get_absolute_url()
         )
 
 
 class MayanPasswordChangeView(ViewIconMixin, PasswordChangeView):
     extra_context = {
+        'submit_label': _(message='Change password'),
         'title': _(message='Current user password change')
     }
     success_url = reverse_lazy(
@@ -254,7 +261,7 @@ class MayanPasswordChangeView(ViewIconMixin, PasswordChangeView):
     template_name = 'appearance/form_container.html'
     view_icon = icon_password_change
 
-    def dispatch(self, *args, **kwargs):
+    def dispatch(self, request, *args, **kwargs):
         if self.request.user.user_options.block_password_change:
             messages.error(
                 message=_(
@@ -266,7 +273,7 @@ class MayanPasswordChangeView(ViewIconMixin, PasswordChangeView):
                 redirect_to=reverse(viewname=setting_home_view.view)
             )
 
-        return super().dispatch(*args, **kwargs)
+        return super().dispatch(request=request, *args, **kwargs)
 
 
 class UserSetPasswordView(MultipleObjectFormActionView):
@@ -283,26 +290,47 @@ class UserSetPasswordView(MultipleObjectFormActionView):
     view_icon = icon_password_change
 
     def dispatch(self, request, *args, **kwargs):
-        result = super().dispatch(request=request, *args, **kwargs)
+        queryset_requested = self.get_queryset_requested()
 
-        queryset = self.get_queryset(
-            source_queryset=get_all_users_queryset()
+        queryset_allowed = self.get_queryset()
+        pk_list_allowed = queryset_allowed.values('pk')
+
+        queryset_excluded = queryset_requested.exclude(
+            pk__in=pk_list_allowed
         )
 
-        queryset_staff_users = queryset.filter(is_staff=True)
-        queryset_super_users = queryset.filter(is_superuser=True)
+        if queryset_excluded.exists():
+            list_username = list(
+                queryset_excluded.values_list('username', flat=True)
+            )
+            text_username = ', '.join(list_username)
 
-        if queryset_staff_users.exists() or queryset_super_users.exists():
             messages.warning(
-                message=_(
-                    message='Changing the password of staff or super user '
-                    'accounts via the user interface is not allowed. '
-                    'Use administration tools to perform this '
-                    'operation.'
-                ), request=self.request
+                message=ngettext(
+                    singular='The password of the account %(usernames)s '
+                    'was not changed. Changing the password of staff or '
+                    'super user accounts via the user interface is not '
+                    'allowed. Use administration tools to perform this '
+                    'operation.',
+                    plural='The password of the accounts %(usernames)s '
+                    'was not changed. Changing the password of staff or '
+                    'super user accounts via the user interface is not '
+                    'allowed. Use administration tools to perform this '
+                    'operation.',
+                    number=queryset_excluded.count()
+                ) % {'usernames': text_username}, request=request
             )
 
-        return result
+            queryset_included = queryset_requested.filter(
+                pk__in=pk_list_allowed
+            )
+
+            if not queryset_included.exists():
+                return HttpResponseRedirect(
+                    redirect_to=self.get_previous_url()
+                )
+
+        return super().dispatch(request=request, *args, **kwargs)
 
     def get_extra_context(self):
         queryset = self.object_list
@@ -335,6 +363,30 @@ class UserSetPasswordView(MultipleObjectFormActionView):
             return result
         else:
             raise PermissionDenied
+
+    def get_pk_list_requested(self):
+        result = []
+
+        pk = self.kwargs.get(self.pk_url_kwarg)
+
+        if pk is not None:
+            result.append(pk)
+
+        pk_list = self.get_pk_list()
+
+        if pk_list is not None:
+            result.extend(pk_list)
+
+        return result
+
+    def get_queryset_requested(self):
+        pk_list_requested = self.get_pk_list_requested()
+
+        queryset_all_users = self.get_queryset(
+            source_queryset=get_all_users_queryset()
+        )
+
+        return queryset_all_users.filter(pk__in=pk_list_requested)
 
     def object_action(self, form, instance):
         try:

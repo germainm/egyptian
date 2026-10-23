@@ -1,0 +1,21 @@
+{% load icons_tags %}
+
+{% with 'lazy-load thin_border-thumbnail' as image_classes %}
+{% with '200px' as image_max_height %}
+
+    <span class="instance-image-widget {{ container_class }}">
+        <img
+            alt="{{ image_alt }}"
+            class="thin_border {{ image_classes }}"
+            data-src="{{ object_image_data.url }}"
+            style="{% if image_max_height %}max-height: {{ image_max_height }}; {% endif %}"
+         />
+        <span class="lazyload-spinner-container text-body"
+            style="height: {% if display_full_height %}100%{% else %}{{ display_height|default:150 }}px{% endif %}; display: block;"
+        >
+            {% icons_get_icon 'mayan.apps.converter.icons.icon_thumbnail_image_loading' extra_context__html_data__class='mayan-icon-2x' %}
+        </span>
+    </span>
+
+{% endwith %}
+{% endwith %}

@@ -6,6 +6,7 @@ from mayan.apps.common.menus import menu_tools
 from .settings import (
     setting_client_backend_arguments, setting_client_backend_enabled
 )
+from .urls import urlpatterns
 
 
 class ClientBackend(BaseBackend):
@@ -40,9 +41,6 @@ class ClientBackend(BaseBackend):
 
     @classmethod
     def register_url_patterns(cls):
-        # Hidden import.
-        from .urls import urlpatterns
-
         for backend_name in setting_client_backend_enabled.value:
             backend_instance = cls.get_backend_instance(name=backend_name)
 
@@ -53,12 +51,12 @@ class ClientBackend(BaseBackend):
                 )
             )
 
-            urlpatterns += (
+            urlpatterns.append(
                 re_path(
                     route=r'^{}'.format(top_url), view=include(
                         backend_instance.get_url_patterns()
                     )
-                ),
+                )
             )
 
     def __init__(self, **kwargs):

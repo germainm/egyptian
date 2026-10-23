@@ -106,16 +106,12 @@ class SourceBackendMixinEmail(
                 'email_{}'.format(internal_name)
             ] = value
 
-        # Messages are tree based, do nested processing of message parts until
-        # a message with no children is found, then work our way up.
         if message.is_multipart():
             for part in message.iter_parts():
                 yield from self._process_message_content(
                     message=part, source_metadata=_source_metadata
                 )
         else:
-            # Treat inlines as attachments, both are extracted and saved as
-            # documents.
             if message.is_attachment() or message.get_content_disposition() == 'inline':
                 content = message.get_content()
                 if len(content) != 0:
@@ -132,8 +128,6 @@ class SourceBackendMixinEmail(
                         ), 'source_metadata': _source_metadata
                     }
             else:
-                # If it is not an attachment then it should be a body message
-                # part.
                 if message.get_content_type() == 'text/html':
                     label = 'email_body.html'
                 else:

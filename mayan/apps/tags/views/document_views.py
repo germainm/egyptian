@@ -42,7 +42,9 @@ class TagAttachActionView(MultipleObjectFormActionView):
     view_icon = icon_document_tag_multiple_attach
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Attach')
+        }
 
         if self.object_list.count() == 1:
             context.update(
@@ -147,7 +149,9 @@ class TagRemoveActionView(MultipleObjectFormActionView):
     view_icon = icon_document_tag_multiple_remove
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Remove')
+        }
 
         if self.object_list.count() == 1:
             context.update(

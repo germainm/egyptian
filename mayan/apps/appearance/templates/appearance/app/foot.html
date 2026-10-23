@@ -1,15 +1,13 @@
 {% load i18n %}
 {% load static %}
 
+{% load navigation_tags %}
 {% load smart_settings_tags %}
 {% load views_tags %}
 
 <script src="{% static 'appearance/node_modules/jquery/dist/jquery.min.js' %}" type="text/javascript"></script>
-<script src="{% static 'appearance/packages/jquery.scrollview.js' %}" type="text/javascript"></script>
 <script src="{% static 'appearance/node_modules/@fancyapps/fancybox/dist/jquery.fancybox.min.js' %}" type="text/javascript"></script>
 <script src="{% static 'appearance/node_modules/select2/dist/js/select2.min.js' %}" type="text/javascript"></script>
-<script src="{% static 'appearance/node_modules/toastr/build/toastr.min.js' %}" type="text/javascript"></script>
-<script src="{% static 'appearance/node_modules/jquery-match-height/dist/jquery.matchHeight-min.js' %}" type="text/javascript"></script>
 <script src="{% static 'appearance/node_modules/jquery-form/dist/jquery.form.min.js' %}" type="text/javascript"></script>
 
 <script src="{% static 'appearance/js/mayan_app.js' %}" type="text/javascript"></script>
@@ -18,117 +16,36 @@
 <script src="{% url 'locales:javascript_catalog' 'mayan.apps.appearance' %}" type="text/javascript"></script>
 
 <script id="template-appearance-form-element-content-copy" type="text/x-template">
-    <div class="appearance-form-label-suffix">
-        <button type="button" class="btn btn-primary btn-xs appearance-btn-form-label-suffix appearance-btn-copy" data-original-title="{% trans 'Copy content to clipboard' %}">{% trans 'Copy' %}</button>
-    </div>
-</script>
-
-<script id="template-appearance-form-element-height-reset" type="text/x-template">
-    <div class="appearance-form-label-suffix">
-        <button type="button" class="btn btn-default btn-xs btn-outline appearance-btn-form-label-suffix appearance-btn-resize-reset" data-original-title="{% trans 'Reset input size height' %}">{% trans 'Reset' %}</button>
+    <div class="float-end">
+        <button type="button" class="btn btn-primary btn-sm py-0 appearance-btn-form-label-suffix appearance-btn-copy" data-bs-original-title="{% trans 'Copy content to clipboard' %}">{% trans 'Copy' %}</button>
     </div>
 </script>
 
 <script>
     'use strict';
 
-    {# Transfer variable from Django to javascript #}
-    const djangoDEBUG = {% if debug %}true{% else %}false{% endif %};
-
-    {% smart_setting "APPEARANCE_AJAX_REDIRECTION_CODE" as appearance_ajax_redirection_code %}
     {% smart_setting "APPEARANCE_MENU_POLLING_INTERVAL" as appearance_menu_polling_interval %}
     {% smart_setting "APPEARANCE_THROTTLING_MAXIMUM_REQUESTS" as appearance_throttling_maximum_requests %}
     {% smart_setting "APPEARANCE_THROTTLING_TIMEOUT" as appearance_throttling_timeout %}
     {% smart_setting "COMMON_HOME_VIEW" as common_home_view %}
+    {% trans "Page number must be a positive integer." as page_number_invalid_message %}
 
-    const app = new MayanApp({
-        ajaxMenusOptions: [
-            {
-                callback: function (options) {
-                    MayanApp.updateNavbarState();
-                },
-                interval: {% if appearance_menu_polling_interval %}{{ appearance_menu_polling_interval }}{% else %}null{% endif %},
-                menuSelector: '#menu-main',
-                name: 'menu_main',
-                url: '{% url "rest_api:template-detail" "menu_main" %}'
-            },
-            {
-                interval: {% if appearance_menu_polling_interval %}{{ appearance_menu_polling_interval }}{% else %}null{% endif %},
-                menuSelector: '#menu-topbar',
-                name: 'menu_topbar',
-                url: '{% url "rest_api:template-detail" "menu_topbar" %}'
-            },
-        ],
+    
+    
+    const appearanceAppConfig = {
+        debug: {% if debug %}true{% else %}false{% endif %},
+        headerNames: {% views_get_header_names %},
+        homeURL: '{% url common_home_view %}',
+        menuMainURL: '{% url "rest_api:template-detail" "menu_main" %}',
+        menuPollingInterval: {% if appearance_menu_polling_interval %}{{ appearance_menu_polling_interval }}{% else %}null{% endif %},
+        menuTopbarURL: '{% url "rest_api:template-detail" "menu_topbar" %}',
         messagePosition: '{% smart_setting "APPEARANCE_MESSAGE_POSITION" %}',
-        multiItemActionsPrimaryKey: 'id_list'
-    });
-
-    const partialNavigation = new PartialNavigation({
-        ajaxRequestTimeout: {{ appearance_throttling_timeout }},
-        ajaxThrottlingMessage: gettext('Too many pending requests. Additional requests will be blocked until a pending one is completed or after the cooling off period ends.'),
-        initialURL: '{% url common_home_view %}',
-        disabledAnchorClasses: ['disabled', 'pagination-disabled'],
-        excludeAnchorClasses: ['fancybox', 'new_window', 'non-ajax'],
-        redirectionCode: {{ appearance_ajax_redirection_code }},
-        maximumAjaxRequests: {{ appearance_throttling_maximum_requests }}
-    });
-
-    app.addAfterBaseLoadCallback({func: app.doToastrMessages, self: app});
-    app.addAfterBaseLoadCallback({func: app.resizeFullHeight, self: app});
-    app.addAfterBaseLoadCallback({func: app.setupSelect2, self: app});
-    app.addAfterBaseLoadCallback({func: app.setupScrollView, self: app});
-    app.addAfterBaseLoadCallback({func: app.setupListToolbar, self: app});
-
-    jQuery(document).ready(function() {
-        app.initialize();
-
-        app.partialNavigationApp.$ajaxContent.on('updated', function (event) {
-            const $this = $(this);
-            const $inputAappearanceSearchClearable = $this.find('.appearance-input-search-clearable input[type="search"]');
-            const $spanInputSearchClear = $inputAappearanceSearchClearable.next('.appearance-input-search-clear');
-
-            if ($inputAappearanceSearchClearable.val()) {
-                $spanInputSearchClear.show();
-            }
-        });
-
-        $('body').on('input', '.appearance-input-search-clearable input[type="search"]', function (event) {
-            const $this = $(this);
-            const $spanInputSearchClear = $this.next('.appearance-input-search-clear');
-
-            if ($this.val()) {
-                $spanInputSearchClear.show();
-
-            } else {
-                $spanInputSearchClear.hide();
-            }
-        });
-
-        $('body').on('click', '.appearance-input-search-clearable .appearance-input-search-clear', function (event) {
-            const $this = $(this);
-            const $inputSearch = $this.prev('input[type="search"]');
-
-            $inputSearch.val('').trigger('keyup').focus();
-            if ($inputSearch.data('submit-on-clear')) {
-                $(this).parents('form').submit();
-            }
-        });
-
-        {% views_get_paging_query_string page_number='' as paging_query_string %}
-
-        $('#ajax-content').on('change', '.appearance-pagination-page-select', function () {
-            const $this = $(this);
-            const pageNumber = parseInt($this.val());
-
-            if (Number.isInteger(pageNumber) && pageNumber > 0) {
-                partialNavigation.setLocation(`{{ paging_query_string }}${ pageNumber }`);
-            } else {
-                toastr['warning']('{% trans "Page number must be a positive integer." %}', '');
-            }
-        });
-    });
-
-    const appearanceSanitizeHTML = function (text) {
-      return $('<div>').text(text).html();
-    }
+        modalFragmentLinkClass: '{% navigation_get_modal_link_class %}',
+        pageNumberInvalidMessage: '{{ page_number_invalid_message|escapejs }}',
+        throttlingMaximumRequests: {{ appearance_throttling_maximum_requests }},
+        throttlingMessage: gettext('Too many pending requests. Additional requests will be blocked until a pending one is completed or after the cooling off period ends.'),
+        throttlingTimeout: {{ appearance_throttling_timeout }}
+    };
 </script>
+
+<script src="{% static 'appearance/js/appearance_app.js' %}" type="text/javascript"></script>

@@ -72,8 +72,10 @@ class DocumentListView(SingleObjectListView):
         }
 
     def get_source_queryset(self):
-        queryset = ModelQueryFields.get(model=Document).get_queryset()
-        return self.get_document_queryset().filter(pk__in=queryset)
+        model_query_fields = ModelQueryFields.get(model=Document)
+        return model_query_fields.get_queryset_apply(
+            queryset=self.get_document_queryset()
+        )
 
 
 class DocumentTypeChangeView(MultipleObjectFormActionView):
@@ -93,6 +95,7 @@ class DocumentTypeChangeView(MultipleObjectFormActionView):
 
     def get_extra_context(self):
         result = {
+            'submit_label': _(message='Change type'),
             'title': ngettext(
                 singular='Change the type of the selected document.',
                 plural='Change the type of the selected documents.',

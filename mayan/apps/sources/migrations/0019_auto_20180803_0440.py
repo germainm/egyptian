@@ -5,13 +5,10 @@ def code_make_labels_unique(apps, schema_editor):
     Source = apps.get_model(app_label='sources', model_name='Source')
 
     for source in Source.objects.using(alias=schema_editor.connection.alias).all():
-        # Look for sources with the same label.
         queryset_duplicates = Source.objects.using(
             alias=schema_editor.connection.alias
         ).filter(label=source.label).exclude(pk=source.pk)
         if queryset_duplicates.exists():
-            # If a duplicate is found, append the id to the original source
-            # label.
             source.label = '{}__{}'.format(source.label, source.pk)
             source.save()
 

@@ -141,7 +141,7 @@ class ResolvedSmartLinkSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         fields = (
-            'documents_url', 'label', 'smart_link_url', 'url'
+            'documents_url', 'id', 'label', 'smart_link_url', 'url'
         )
         model = ResolvedSmartLink
         read_only_fields = fields

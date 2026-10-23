@@ -42,7 +42,7 @@ class DocumentFileSourceMetadataList(
                 'any information about the creation of the document file.'
             ),
             'no_results_title': _(
-                message='No source metadata available for this document file.'
+                message='No source metadata available for this document file'
             ),
             'object': self.external_object,
             'title': _(
@@ -172,7 +172,7 @@ class DocumentFileUploadView(ExternalObjectViewMixin, UploadBaseView):
                     'document': self.external_object,
                     'source': self.source.label
                 },
-                'submit_label': _(message='Submit')
+                'submit_label': _(message='Upload')
             }
         )
         context.update(

@@ -50,21 +50,14 @@ class EnvironmentFileLoader:
         return result
 
     def _do_line_process(self, line):
-        """
-        >>> EnvironmentFileLoader()._do_line_process(line='A=1')
-        ('A', '1')
-        >>> EnvironmentFileLoader()._do_line_process(line='A="1"')
-        ('A', '"1"')
-        >>> EnvironmentFileLoader()._do_line_process(line='A=a==1')
-        ('A', 'a==1')
-        """
         key = None
         value = None
 
         line_clean = line.strip()
 
         if line_clean and not line_clean.startswith('#'):
-            key, value = line_clean.split('=', 1)
+            if '=' in line_clean:
+                key, value = line_clean.split('=', 1)
 
         return key, value
 
@@ -94,4 +87,16 @@ class EnvironmentFileLoader:
 def load_env_file(*args, **kwargs):
     instance = EnvironmentFileLoader(*args, **kwargs)
     result = instance.do_content_load()
+    return result
+
+
+def load_literals():
+    import mayan.literals
+
+    result = {}
+
+    for key, value in vars(mayan.literals).items():
+        if not key.startswith('_'):
+            result[key] = value
+
     return result

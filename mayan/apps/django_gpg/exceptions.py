@@ -1,41 +1,26 @@
 class GPGException(Exception):
-    """
-    Base app exception.
-    """
+    pass
 
 
 class DecryptionError(GPGException):
-    """
-    Raised when an error occurs while trying to decrypt and encrypted file.
-    """
+    pass
 
 
 class KeyFetchingError(GPGException):
-    """
-    Unable to receive key or key not found.
-    """
+    pass
 
 
 class KeyDoesNotExist(GPGException):
-    """
-    Raised when attempting to decrypt or verify a file, and then key used to
-    encrypt or sign the file is not found.
-    """
+    pass
 
 
 class NeedPassphrase(GPGException):
-    """
-    A passphrase is needed but none was provided.
-    """
+    pass
 
 
 class PassphraseError(GPGException):
-    """
-    Passphrase provided is incorrect.
-    """
+    pass
 
 
 class VerificationError(GPGException):
-    """
-    Raised when a file is not signed.
-    """
+    pass

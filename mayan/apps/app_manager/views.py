@@ -13,6 +13,13 @@ class AppListView(SingleObjectListView):
         return {
             'hide_link': True,
             'hide_object': True,
+            'no_results_icon': icon_app_list,
+            'no_results_text': _(
+                message='Apps are the pluggable components that provide the '
+                'features of the system. If none are shown the installation '
+                'is incomplete.'
+            ),
+            'no_results_title': _(message='No apps available'),
             'subtitle': _(message='Detected and active Mayan EDMS apps.'),
             'title': _(message='System apps')
         }

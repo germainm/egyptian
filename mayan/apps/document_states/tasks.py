@@ -122,8 +122,6 @@ def task_workflow_instance_do_check_escalation_all():
         app_label='document_states', model_name='WorkflowStateEscalation'
     )
 
-    # Filter workflow instances whose workflow template have at least
-    # one state with expiration enabled.
     queryset_workflow_templates = WorkflowStateEscalation.objects.values(
         'state__workflow'
     )

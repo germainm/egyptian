@@ -8,6 +8,7 @@ from mayan.apps.common.utils import get_related_field, resolve_attribute
 from mayan.apps.databases.utils import (
     help_text_for_field_recursive, label_for_field_recursive
 )
+from mayan.apps.views.http import RequestQuery
 from mayan.apps.views.icons import icon_sort_down, icon_sort_up
 from mayan.apps.views.literals import (
     TEXT_SORT_FIELD_PARAMETER, TEXT_SORT_FIELD_VARIABLE_NAME
@@ -30,34 +31,24 @@ class SourceColumn(TemplateObjectMixin):
     @classmethod
     def get_column_matches(cls, source):
         if source == [] or source == ():
-            # There are no objects to match and the object type is not
-            # a queryset where the model can be obtained from empty values.
-            # Short circuit and return empty columns.
             return ()
 
         columns = []
 
         try:
-            # Try it as a queryset.
             source.query
         except AttributeError:
             try:
-                # Try it as a list.
                 item = source[0]
             except TypeError:
-                # Neither a queryset nor a list.
                 try:
-                    # Try as a model instance or model.
                     model = source._meta.model
                 except AttributeError:
-                    # Not a model instance.
 
                     try:
                         super_class_list = source.__mro__[:-1]
                     except AttributeError:
-                        # Is not a class.
 
-                        # Try as subclass instance, check the class hierarchy.
                         for super_class in source.__class__.__mro__[:-1]:
                             columns.extend(
                                 cls._registry.get(
@@ -65,7 +56,6 @@ class SourceColumn(TemplateObjectMixin):
                                 )
                             )
                     else:
-                        # Try as a subclass.
                         for super_class in super_class_list:
                             columns.extend(
                                 cls._registry.get(
@@ -75,17 +65,12 @@ class SourceColumn(TemplateObjectMixin):
 
                     return columns
                 else:
-                    # Get model columns.
                     columns.extend(
                         cls._registry.get(
                             model, ()
                         )
                     )
 
-                    # Get proxy columns.
-                    # Remove the columns explicitly excluded.
-                    # Execute after the root model columns to allow a proxy
-                    # to override an existing column.
                     proxy_columns = cls._registry.get(
                         model._meta.proxy_for_model, ()
                     )
@@ -95,10 +80,8 @@ class SourceColumn(TemplateObjectMixin):
 
                     return columns
             else:
-                # It is a list.
                 return cls.get_column_matches(source=item)
         else:
-            # It is a queryset.
             model = source.model
 
             return cls.get_column_matches(source=model)
@@ -108,8 +91,6 @@ class SourceColumn(TemplateObjectMixin):
         cls, source, exclude_identifier=False, names=None,
         only_identifier=False
     ):
-        # Process columns as a set to avoid duplicate resolved column
-        # detection code.
         columns = cls.get_column_matches(source=source)
 
         if exclude_identifier:
@@ -117,13 +98,11 @@ class SourceColumn(TemplateObjectMixin):
                 column for column in columns if not column.is_identifier
             ]
         else:
-            # exclude_identifier and only_identifier and mutually exclusive.
             if only_identifier:
                 for column in columns:
                     if column.is_identifier:
                         return (column,)
 
-                # There is no column with the identifier marker.
                 return ()
 
         if names is not None:
@@ -155,10 +134,6 @@ class SourceColumn(TemplateObjectMixin):
         is_identifier=False, is_sortable=False, kwargs=None, label=None,
         name=None, order=None, sort_field=None, widget=None
     ):
-        """
-        name: optional unique identifier for this source column for the
-        specified source.
-        """
         self._label = label
         self._help_text = help_text
         self.source = source
@@ -203,17 +178,19 @@ class SourceColumn(TemplateObjectMixin):
 
     def _calculate_help_text(self):
         if not self._help_text:
-            if self.attribute:
+            field_name = self.attribute or self.sort_field
+
+            if field_name:
                 try:
                     attribute = resolve_attribute(
-                        obj=self.source, attribute=self.attribute
+                        obj=self.source, attribute=field_name
                     )
                     self._help_text = getattr(attribute, 'help_text')
                 except AttributeError:
                     try:
                         self._help_text = help_text_for_field_recursive(
                             model=self.source._meta.model,
-                            name=self.attribute
+                            name=field_name
                         )
                     except AttributeError:
                         self._help_text = None
@@ -252,12 +229,21 @@ class SourceColumn(TemplateObjectMixin):
         try:
             kwargs = self._kwargs(context)
         except TypeError:
-            # Is not a callable.
             kwargs = self._kwargs
 
-        return {
-            key: Variable(var=value).resolve(context=context) for key, value in kwargs.items()
-        }
+        result = {}
+
+        for key, value in kwargs.items():
+            if isinstance(value, str):
+                variable = Variable(var=value)
+
+                resolved_value = variable.resolve(context=context)
+
+                result[key] = resolved_value
+            else:
+                result[key] = value
+
+        return result
 
     def get_absolute_url(self, obj):
         if self.is_object_absolute_url:
@@ -303,8 +289,7 @@ class SourceColumn(TemplateObjectMixin):
     ):
         request = self.get_request(context=context)
 
-        # Get an mutable copy that can be modified.
-        querystring = request.GET.copy()
+        request_query = RequestQuery(request=request)
 
         sort_field = self.get_sort_field()
 
@@ -316,7 +301,6 @@ class SourceColumn(TemplateObjectMixin):
         )
 
         if single_column:
-            # Create a new list Remove all other fields from the list.
             if order == 'ascending':
                 previous_sort_fields = []
             elif order == 'descending':
@@ -340,11 +324,13 @@ class SourceColumn(TemplateObjectMixin):
             )
             previous_sort_fields.remove(ascending)
 
-        querystring[TEXT_SORT_FIELD_PARAMETER] = ','.join(previous_sort_fields)
-
-        return '?{}'.format(
-            querystring.urlencode()
+        request_query.do_update(
+            **{
+                TEXT_SORT_FIELD_PARAMETER: ','.join(previous_sort_fields)
+            }
         )
+
+        return request_query.to_query_string()
 
     def get_sort_icon(self, context):
         previous_sort_fields = self.get_previous_sort_fields(context=context)

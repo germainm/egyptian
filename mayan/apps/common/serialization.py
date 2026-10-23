@@ -19,7 +19,6 @@ def yaml_load(**kwargs):
     stream = kwargs['stream']
 
     if isinstance(stream, SafeString):
-        # Convert SafeStr to str.
         stream = stream.strip()
         kwargs['stream'] = stream
 

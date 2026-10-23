@@ -1,9 +1,13 @@
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
+
 from . import serializers
 
 
+@extend_schema_field(field=OpenApiTypes.OBJECT)
 class DynamicSerializerField(serializers.ReadOnlyField):
     serializers = {}
 

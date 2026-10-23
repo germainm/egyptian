@@ -94,6 +94,4 @@ class SourceBackendActionMixinUserInteractive(
 class SourceBackendActionMixinUserInteractiveNot(
     SourceBackendActionMixinUserBase
 ):
-    """
-    Same as `SourceBackendActionMixinUserBase` but subclassed for clarity.
-    """
+    pass

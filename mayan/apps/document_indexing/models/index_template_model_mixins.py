@@ -48,12 +48,9 @@ class IndexTemplateBusinessLogicMixin:
             app_label='document_indexing', model_name='IndexInstanceNode'
         )
 
-        try:
-            IndexInstanceNode.objects.filter(
-                index_template_node__index=self
-            ).delete()
-        except IndexInstanceNode.DoesNotExist:
-            """Empty index, ignore this exception."""
+        IndexInstanceNode.objects.filter(
+            index_template_node__index=self
+        ).delete()
 
     def get_document_types_names(self):
         return ', '.join(
@@ -64,17 +61,15 @@ class IndexTemplateBusinessLogicMixin:
 
     @property
     def index_template_root_node(self):
-        """
-        Return the root node for this index.
-        """
-        return self.index_template_nodes.get(parent=None)
+        try:
+            return self._index_template_root_node
+        except AttributeError:
+            self._index_template_root_node = self.index_template_nodes.get(
+                parent=None
+            )
+            return self._index_template_root_node
 
     def rebuild(self):
-        """
-        Delete and reconstruct the index by deleting of all its instance nodes
-        and recreating them for the documents whose types are associated with
-        this index
-        """
         IndexInstance = apps.get_model(
             app_label='document_indexing', model_name='IndexInstance'
         )
@@ -82,24 +77,18 @@ class IndexTemplateBusinessLogicMixin:
         if self.enabled:
             self.delete_index_instance_nodes()
 
-            # Create the new root index instance node.
             self.index_template_root_node.index_instance_nodes.create()
 
             index_instance = IndexInstance.objects.get(pk=self.pk)
-            index_instance.index_instance_root_node
-            # Re-index each document with a type associated with this index.
-            queryset = Document.objects.filter(
+            queryset = Document.valid.filter(
                 document_type__in=self.document_types.all()
             )
             for document in queryset:
-                # Evaluate each index template node for each document
-                # associated with this index.
                 index_instance.document_add(document=document)
 
     def reset(self):
         self.delete_index_instance_nodes()
 
-        # Create the new root index instance node.
         self.index_template_root_node.initialize_index_instance_root_node()
 
 
@@ -108,4 +97,8 @@ class IndexTemplateNodeBusinessLogicMixin:
         return self.index_instance_nodes.get(parent=None)
 
     def initialize_index_instance_root_node(self):
-        self.index_instance_nodes.get_or_create(parent=None)
+        index_instance_root_node, created = self.index_instance_nodes.get_or_create(
+            parent=None
+        )
+
+        return index_instance_root_node

@@ -55,7 +55,6 @@ class FilteredRelatedFieldMixin:
         elif self.source_queryset is not None:
             queryset = self.source_queryset
             if isinstance(queryset, (QuerySet, Manager)):
-                # Ensure queryset is re-evaluated whenever used.
                 queryset = queryset.all()
         else:
             method_name = self.source_queryset_method or 'get_{}_queryset'.format(

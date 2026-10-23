@@ -75,10 +75,6 @@ class KeyDownloadView(ViewSingleObjectDownload):
         target='object'
     )
     def get_download_file_object(self):
-        """
-        Passthrough code to ensure the download event
-        is triggered.
-        """
         return super().get_download_file_object()
 
     def get_download_filename(self):
@@ -158,6 +154,7 @@ class KeyQueryView(SimpleView):
         return {
             'form': self.get_form(),
             'form_action': reverse(viewname='django_gpg:key_query_results'),
+            'submit_label': _(message='Search'),
             'submit_method': 'GET',
             'title': _(message='Query key server')
         }
@@ -203,12 +200,12 @@ class PrivateKeyListView(SingleObjectListView):
                 context=RequestContext(request=self.request)
             ),
             'no_results_text': _(
-                message='Private keys are used to signed documents. '
+                message='Private keys are used to sign documents. '
                 'Private keys can only be uploaded by the user. '
                 'The view to upload private and public keys is the same.'
             ),
             'no_results_title': _(
-                message='There no private keys'
+                message='There are no private keys'
             ),
             'title': _(message='Private keys')
         }
@@ -233,7 +230,7 @@ class PublicKeyListView(SingleObjectListView):
                 'keys is the same.'
             ),
             'no_results_title': _(
-                message='There no public keys'
+                message='There are no public keys'
             ),
             'title': _(message='Public keys')
         }

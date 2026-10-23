@@ -1,3 +1,4 @@
+import json
 import logging
 
 from kombu import Exchange, Queue
@@ -13,6 +14,8 @@ from mayan.apps.common.exceptions import NonUniqueError
 from mayan.celery import app as celery_app
 
 from .literals import WORKER_DEFAULT_CONCURRENCY
+from .settings import setting_deduplication_backend_map
+from .task_deduplication_backends import TaskDeduplicationBackendNull
 
 logger = logging.getLogger(name=__name__)
 
@@ -37,17 +40,59 @@ class TaskType:
     def get(cls, name):
         return cls._registry[name]
 
-    def __init__(self, dotted_path, label, name=None, schedule=None):
+    def __init__(
+        self, dotted_path, label, deduplication_backend=None, name=None,
+        schedule=None
+    ):
+        self.deduplication_backend = deduplication_backend or TaskDeduplicationBackendNull
         self.dotted_path = dotted_path
         self.label = label
         self.name = name or dotted_path.split('.')[-1]
         self.schedule = schedule
         self.queue = None
         self.__class__._registry[self.dotted_path] = self
-        self.validate()
 
     def __str__(self):
         return str(self.label)
+
+    def do_deduplication_backend_override(self):
+        backend_map = setting_deduplication_backend_map.value or {}
+
+        dotted_path = backend_map.get(self.dotted_path)
+
+        if not dotted_path:
+            return
+
+        try:
+            deduplication_backend = import_string(dotted_path=dotted_path)
+        except ImportError as exception:
+            raise ImproperlyConfigured(
+                'Unable to import the deduplication strategy `{}` '
+                'requested for the task type `{}`; {}'.format(
+                    dotted_path, self.dotted_path, exception
+                )
+            ) from exception
+
+        self.deduplication_backend = deduplication_backend
+
+    def get_deduplication_backend_label(self):
+        return self.deduplication_backend.label
+
+    get_deduplication_backend_label.help_text = _(
+        message='Strategy deciding whether a request to perform this task '
+        'is dispatched or collapsed into a request already outstanding.'
+    )
+    get_deduplication_backend_label.short_description = _(
+        message='Deduplication'
+    )
+
+    def get_deduplication_key(self, args=None, kwargs=None):
+        data = {
+            'args': list(args or ()),
+            'kwargs': kwargs or {}
+        }
+
+        return json.dumps(default=str, obj=data, sort_keys=True)
 
     def get_dotted_path(self):
         return self.dotted_path
@@ -86,7 +131,10 @@ class TaskType:
     get_schedule.short_description = _(message='Schedule')
 
     def get_worker(self):
-        return self.queue.worker
+        if self.queue:
+            return self.queue.worker
+
+        return None
 
     get_worker.short_description = _(message='Worker')
 
@@ -127,6 +175,23 @@ class CeleryQueue(AppsModuleLoaderMixin):
 
     @classmethod
     def post_load_modules(cls):
+        for task_type in TaskType.all():
+            task_type.do_deduplication_backend_override()
+
+        deduplication_backend_list = []
+
+        for task_type in TaskType.all():
+            deduplication_backend = task_type.deduplication_backend
+
+            if deduplication_backend not in deduplication_backend_list:
+                deduplication_backend_list.append(deduplication_backend)
+
+        for deduplication_backend in deduplication_backend_list:
+            deduplication_backend.do_initialize()
+
+        for task_type in TaskType.all():
+            task_type.validate()
+
         CeleryQueue.update_celery()
 
         for task_name, task in celery_app.tasks.items():
@@ -238,13 +303,11 @@ class CeleryQueue(AppsModuleLoaderMixin):
             celery_app.conf.task_routes.pop(task_type.dotted_path, None)
 
             if task_type.schedule:
-                celery_app.conf.beat_schedule.pop(task_type.name)
+                celery_app.conf.beat_schedule.pop(task_type.name, None)
 
         self.__class__._registry.pop(self.name, None)
-        if self.name in self.worker._queues:
-            self.worker._queues.remove(self.name)
-
-        del self
+        if self in self.worker._queues:
+            self.worker._queues.remove(self)
 
     @property
     def verbose_name(self):
@@ -264,12 +327,23 @@ class Worker:
     def get(cls, name):
         return cls._registry[name]
 
+    @classmethod
+    def get_default(cls):
+        for worker in cls._registry.values():
+            if worker.default_worker:
+                return worker
+
+        raise ImproperlyConfigured(
+            'No worker has been flagged as the default worker.'
+        )
+
     def __init__(
-        self, name, description=None, maximum_memory_per_child=None,
-        maximum_tasks_per_child=None, concurrency=None, label=None,
-        nice_level=0
+        self, name, default_worker=False, description=None,
+        maximum_memory_per_child=None, maximum_tasks_per_child=None,
+        concurrency=None, label=None, nice_level=0
     ):
         self.concurrency = concurrency or WORKER_DEFAULT_CONCURRENCY
+        self.default_worker = default_worker
         self.description = description
         self._label = label
         self.maximum_memory_per_child = maximum_memory_per_child
@@ -300,7 +374,7 @@ class Worker:
     )
 
     def get_queue_count(self):
-        return len(self.queues)
+        return len(self._queues)
 
     get_queue_count.short_description = _(message='Queue count')
 

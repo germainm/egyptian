@@ -3,12 +3,25 @@ from pathlib import Path
 import sys
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 
+import mayan
+from mayan.apps.authentication.literals import (
+    DEFAULT_AUTHENTICATION_LOCKOUT_COOLOFF_TIME,
+    DEFAULT_AUTHENTICATION_LOCKOUT_ENABLED,
+    DEFAULT_AUTHENTICATION_LOCKOUT_FAILURE_LIMIT,
+    DEFAULT_AUTHENTICATION_LOCKOUT_PARAMETERS,
+    DEFAULT_AUTHENTICATION_LOCKOUT_RESET_ON_SUCCESS
+)
+from mayan.apps.common.settings_utils import do_extra_settings_function_apply
+from mayan.apps.rest_api.literals import API_VERSION
 from mayan.apps.smart_settings.literals import COMMAND_NAME_SETTINGS_REVERT
 from mayan.apps.smart_settings.utils import SettingNamespaceSingleton
 
-from ..literals import DEFAULT_SECRET_KEY, SECRET_KEY_FILENAME, SYSTEM_DIR
+from ..literals import (
+    DEFAULT_SECRET_KEY, SECRET_KEY_FILENAME, SYSTEM_DIR, UPLOAD_TEMPORARY_DIR
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,7 +35,7 @@ def get_databases_sqlite():
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': str(
-                Path(MEDIA_ROOT, 'db.sqlite3')  # NOQA: F821
+                Path(MEDIA_ROOT, 'db.sqlite3')
             )
         }
     }
@@ -38,15 +51,14 @@ try:
     SECRET_KEY = os.environ['MAYAN_SECRET_KEY']
 except KeyError:
     path_secret_key = Path(
-        MEDIA_ROOT, SYSTEM_DIR, SECRET_KEY_FILENAME  # NOQA: F821
+        MEDIA_ROOT, SYSTEM_DIR, SECRET_KEY_FILENAME
     )
     try:
-        with path_secret_key.open(mode='rb') as file_object:  # NOQA: F821
+        with path_secret_key.open(mode='rb') as file_object:
             SECRET_KEY = file_object.read().strip()
     except FileNotFoundError:
         SECRET_KEY = DEFAULT_SECRET_KEY
 
-# Caching
 
 CACHES = {
     'default': {
@@ -57,15 +69,19 @@ CACHES = {
     }
 }
 
-# Application definition
+
+AXES_COOLOFF_TIME = DEFAULT_AUTHENTICATION_LOCKOUT_COOLOFF_TIME
+AXES_ENABLED = DEFAULT_AUTHENTICATION_LOCKOUT_ENABLED
+AXES_FAILURE_LIMIT = DEFAULT_AUTHENTICATION_LOCKOUT_FAILURE_LIMIT
+AXES_LOCKOUT_PARAMETERS = DEFAULT_AUTHENTICATION_LOCKOUT_PARAMETERS
+AXES_LOCKOUT_TEMPLATE = 'authentication/account_locked.html'
+AXES_RESET_ON_SUCCESS = DEFAULT_AUTHENTICATION_LOCKOUT_RESET_ON_SUCCESS
+
 
 INSTALLED_APPS = (
-    # Placed at the top so it can preload all events defined by apps.
     'mayan.apps.events.apps.EventsApp',
-    # Placed at the top so it can override any template.
     'mayan.apps.appearance.apps.AppearanceApp',
     'mayan.apps.appearance_bootstrap.apps.AppearanceBootstrapApp',
-    # Django
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.humanize',
@@ -73,8 +89,8 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.forms',
     'django.contrib.staticfiles',
-    # 3rd party.
     'actstream',
+    'axes',
     'corsheaders',
     'django_celery_beat',
     'formtools',
@@ -83,21 +99,14 @@ INSTALLED_APPS = (
     'rest_framework',
     'rest_framework.authtoken',
     'solo',
-    'stronghold',
     'widget_tweaks',
-    # Base apps
-    # Moved to the top to ensure Mayan app logging is initialized and
-    # available as soon as possible.
     'mayan.apps.logging.apps.LoggingApp',
-    # Task manager goes to the top to ensure all queues are created before any
-    # other app tries to use them.
     'mayan.apps.task_manager.apps.TaskManagerApp',
     'mayan.apps.acls.apps.ACLsApp',
-    # User management app must go before authentication to ensure the Group
-    # and User models are properly setup using runtime methods.
     'mayan.apps.user_management.apps.UserManagementApp',
     'mayan.apps.app_manager.apps.AppManagerAppConfig',
     'mayan.apps.authentication.apps.AuthenticationApp',
+    'mayan.apps.authentication_attempts.apps.AuthenticationAttemptsApp',
     'mayan.apps.authentication_oidc.apps.AuthenticationOIDCApp',
     'mayan.apps.authentication_otp.apps.AuthenticationOTPApp',
     'mayan.apps.autoadmin.apps.AutoAdminAppConfig',
@@ -124,30 +133,24 @@ INSTALLED_APPS = (
     'mayan.apps.organizations.apps.OrganizationsApp',
     'mayan.apps.permissions.apps.PermissionsApp',
     'mayan.apps.platforms.apps.PlatformsApp',
-    'mayan.apps.platforms_docker.apps.PlatformsDockerApp',
-    'mayan.apps.platforms_forge.apps.PlatformsForgeApp',
-    'mayan.apps.platforms_gitlab.apps.PlatformsGitlabApp',
     'mayan.apps.platforms_sentry.apps.PlatformsSentryApp',
     'mayan.apps.quotas.apps.QuotasApp',
     'mayan.apps.rest_api.apps.RESTAPIApp',
+    'mayan.apps.server_side_events.apps.ServerSideEventsApp',
+    'mayan.apps.service_workers.apps.ServiceWorkersApp',
     'mayan.apps.smart_settings.apps.SmartSettingsApp',
     'mayan.apps.storage.apps.StorageApp',
     'mayan.apps.templating.apps.TemplatingApp',
     'mayan.apps.views.apps.ViewsApp',
-    # Obsolete apps. Need to remain to allow migrations to execute.
     'mayan.apps.announcements.apps.AnnouncementsApp',
     'mayan.apps.motd.apps.MOTDApp',
-    # Document apps.
-    # The documents app must be first since Django does not support signal
-    # priorities.
-    # https://docs.djangoproject.com/en/4.2/topics/signals/#listening-to-signals
-    # https://code.djangoproject.com/ticket/16547
     'mayan.apps.documents.apps.DocumentsApp',
     'mayan.apps.cabinets.apps.CabinetsApp',
     'mayan.apps.checkouts.apps.CheckoutsApp',
     'mayan.apps.document_comments.apps.DocumentCommentsApp',
     'mayan.apps.document_downloads.apps.DocumentDownloadsApp',
     'mayan.apps.document_exports.apps.DocumentExportsApp',
+    'mayan.apps.document_favorites.apps.DocumentFavoritesApp',
     'mayan.apps.document_indexing.apps.DocumentIndexingApp',
     'mayan.apps.document_parsing.apps.DocumentParsingApp',
     'mayan.apps.document_signatures.apps.DocumentSignaturesApp',
@@ -168,6 +171,7 @@ INSTALLED_APPS = (
     'mayan.apps.mirroring.apps.MirroringApp',
     'mayan.apps.ocr.apps.OCRApp',
     'mayan.apps.redactions.apps.RedactionsApp',
+    'mayan.apps.sequences.apps.SequencesApp',
     'mayan.apps.signature_captures.apps.SignatureCapturesApp',
     'mayan.apps.source_compressed.apps.SourceCompressedApp',
     'mayan.apps.source_interactive.apps.SourceInteractiveApp',
@@ -184,8 +188,8 @@ INSTALLED_APPS = (
     'mayan.apps.sources.apps.SourcesApp',
     'mayan.apps.tags.apps.TagsApp',
     'mayan.apps.web_links.apps.WebLinksApp',
-    # Placed after rest_api to allow template overriding.
-    'drf_yasg',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
 )
 
 MIDDLEWARE = (
@@ -202,9 +206,12 @@ MIDDLEWARE = (
     'mayan.apps.authentication.middleware.impersonate.ImpersonateMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'stronghold.middleware.LoginRequiredMiddleware',
-    'mayan.apps.views.middleware.ajax_redirect.AjaxRedirect'
+    'mayan.apps.authentication.middleware.login_required.LoginRequiredMiddleware',
+    'mayan.apps.views.middleware.ajax_redirect.AjaxRedirect',
+    'axes.middleware.AxesMiddleware'
 )
+
+MESSAGE_STORAGE = 'mayan.apps.server_side_events.messages.storages.server_side_events.ServerSideEventStorage'
 
 ROOT_URLCONF = 'mayan.urls'
 
@@ -230,25 +237,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'mayan.wsgi.application'
 
-# Password validation
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'
-    }
-]
-
-# Internationalization. Do not change these, doing so will break your
-# installation.
 
 LANGUAGE_CODE = 'en-us'
 
@@ -258,11 +246,9 @@ USE_I18N = True
 
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
 
 STATIC_URL = '/static/'
 
-# ------------ Custom settings section ----------
 
 LANGUAGES = (
     ('ar-eg', _(message='Arabic (Egypt)')),
@@ -325,13 +311,22 @@ MEDIA_URL = 'media/'
 SITE_ID = 1
 
 STATIC_ROOT = os.environ.get(
-    'MAYAN_STATIC_ROOT', Path(MEDIA_ROOT, 'static')  # NOQA: F821
+    'MAYAN_STATIC_ROOT', Path(MEDIA_ROOT, 'static')
 )
+
+
+FILE_UPLOAD_TEMP_DIR_DEFAULT = Path(MEDIA_ROOT, UPLOAD_TEMPORARY_DIR)
+FILE_UPLOAD_TEMP_DIR = os.environ.get(
+    'MAYAN_FILE_UPLOAD_TEMP_DIR',
+    FILE_UPLOAD_TEMP_DIR_DEFAULT
+)
+
+if 'MAYAN_FILE_UPLOAD_TEMP_DIR' not in os.environ:
+    if not FILE_UPLOAD_TEMP_DIR_DEFAULT.is_dir():
+        FILE_UPLOAD_TEMP_DIR = None
 
 MEDIA_URL = 'media/'
 
-# Silence warning and keep default for the time being.
-# https://docs.djangoproject.com/en/3.2/releases/3.2/#customizing-type-of-auto-created-primary-keys
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 STATICFILES_FINDERS = (
@@ -346,85 +341,83 @@ STORAGES['staticfiles'] = {
 
 TEST_RUNNER = 'mayan.apps.testing.runner.MayanTestRunner'
 
-# ---------- Django REST framework -----------
+LOGIN_REQUIRED_EXEMPT_URLS = ()
+
+SESSION_REFRESH_EXEMPT_URLS = ()
+
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        'mayan.apps.authentication_attempts.authentication_classes.LoginAttemptTokenAuthentication',
         'rest_framework.authentication.BasicAuthentication'
     ),
     'DEFAULT_PAGINATION_CLASS': 'mayan.apps.rest_api.pagination.MayanPageNumberPagination',
+    'DEFAULT_SCHEMA_CLASS': 'mayan.apps.rest_api.schemas.AutoSchema',
     'DEFAULT_THROTTLE_CLASSES': (
         'mayan.apps.rest_api.throttling.MayanAnonRateThrottle',
         'mayan.apps.rest_api.throttling.MayanUserRateThrottle'
     ),
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '5/second',
-        'user': '10/second'
-    },
     'EXCEPTION_HANDLER': 'mayan.apps.rest_api.exception_handlers.mayan_exception_handler'
 }
 
-# --------- Pagination --------
 
 PAGINATION_SETTINGS = {
     'PAGE_RANGE_DISPLAYED': 5,
     'MARGIN_PAGES_DISPLAYED': 2
 }
 
-# ----------- Celery ----------
 
 CELERY_ACCEPT_CONTENT = ('json',)
 CELERY_BEAT_SCHEDULE = {}
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers.DatabaseScheduler'
+CELERY_CONTROL_QUEUE_EXCLUSIVE = True
 CELERY_DISABLE_RATE_LIMITS = True
 CELERY_ENABLE_UTC = True
+CELERY_EVENT_QUEUE_EXCLUSIVE = True
+CELERY_RESULT_BACKEND_THREAD_SAFE = True
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TASK_ALWAYS_EAGER = False
-CELERY_TASK_CREATE_MISSING_QUEUES = True
-CELERY_TASK_DEFAULT_QUEUE = 'celery'
+CELERY_TASK_CREATE_MISSING_QUEUES = False
+CELERY_TASK_DEFAULT_QUEUE = 'default'
 CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_TASK_IGNORE_RESULT = True
 CELERY_TASK_QUEUES = []
 CELERY_TASK_ROUTES = {}
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
-# ------------ CORS ------------
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-# ------ Timezone --------
 
 TIMEZONE_COOKIE_NAME = 'django_timezone'
 TIMEZONE_SESSION_KEY = 'django_timezone'
 
-# ----- Stronghold -------
 
-STRONGHOLD_PUBLIC_URLS = (r'^/favicon\.ico$',)
-
-# ----- Swagger --------
-
-SWAGGER_SETTINGS = {
-    'DEFAULT_INFO': 'rest_api.schemas.openapi_info',
-    'DEFAULT_MODEL_DEPTH': 1,
-    'DOC_EXPANSION': 'None'
+SPECTACULAR_SETTINGS = {
+    'TITLE': format_lazy('{title} API', title=mayan.__title__),
+    'DESCRIPTION': mayan.__description__,
+    'VERSION': 'v{}'.format(API_VERSION),
+    'LICENSE': {
+        'name': mayan.__license__
+    },
+    'ENUM_NAME_OVERRIDES': {
+        'TimeDeltaUnitEnum': 'mayan.apps.common.literals.TIME_DELTA_UNIT_CHOICES'
+    },
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+    'SWAGGER_UI_SETTINGS': {
+        'docExpansion': 'none'
+    }
 }
 
-# ------ End -----
-
-BASE_INSTALLED_APPS = INSTALLED_APPS
-
-for app in INSTALLED_APPS:
-    if 'mayan.apps.{}'.format(app) in BASE_INSTALLED_APPS:
-        raise ImproperlyConfigured(
-            'Update the app references in the file config.yml as detailed '
-            'in https://docs.mayan-edms.com/releases/3.2.html#backward-incompatible-changes'
-        )
 
 repeated_apps = tuple(
-    set(COMMON_EXTRA_APPS_PRE).intersection(  # NOQA: F821
-        set(COMMON_EXTRA_APPS)  # NOQA: F821
+    set(COMMON_EXTRA_APPS_PRE).intersection(
+        set(COMMON_EXTRA_APPS)
     )
 )
 if repeated_apps:
@@ -438,31 +431,40 @@ if repeated_apps:
     )
 
 INSTALLED_APPS = tuple(
-    COMMON_EXTRA_APPS_PRE or ()  # NOQA: F821
+    COMMON_EXTRA_APPS_PRE or ()
 ) + INSTALLED_APPS
 
 INSTALLED_APPS = INSTALLED_APPS + tuple(
-    COMMON_EXTRA_APPS or ()  # NOQA: F821
+    COMMON_EXTRA_APPS or ()
 )
 
 INSTALLED_APPS = [
     APP for APP in INSTALLED_APPS if APP not in (
-        COMMON_DISABLED_APPS or ()  # NOQA: F821
+        COMMON_DISABLED_APPS or ()
     )
 ]
 
 if not DATABASES:
-    if DATABASE_ENGINE:  # NOQA: F821
+    if DATABASE_ENGINE:
         DATABASES = {
             'default': {
-                'ENGINE': DATABASE_ENGINE,  # NOQA: F821
-                'NAME': DATABASE_NAME,  # NOQA: F821
-                'USER': DATABASE_USER,  # NOQA: F821
-                'PASSWORD': DATABASE_PASSWORD,  # NOQA: F821
-                'HOST': DATABASE_HOST,  # NOQA: F821
-                'PORT': DATABASE_PORT,  # NOQA: F821
-                'CONN_MAX_AGE': DATABASE_CONN_MAX_AGE  # NOQA: F821
+                'ENGINE': DATABASE_ENGINE,
+                'NAME': DATABASE_NAME,
+                'USER': DATABASE_USER,
+                'PASSWORD': DATABASE_PASSWORD,
+                'HOST': DATABASE_HOST,
+                'PORT': DATABASE_PORT,
+                'CONN_MAX_AGE': DATABASE_CONN_MAX_AGE
             }
         }
     else:
         DATABASES = get_databases_sqlite()
+
+
+extra_settings_function_dotted_path_string = os.environ.get(
+    'MAYAN_EXTRA_SETTINGS_FUNCTION_LIST', ''
+)
+INSTALLED_APPS, MIDDLEWARE = do_extra_settings_function_apply(
+    installed_apps=INSTALLED_APPS, middleware=MIDDLEWARE,
+    dotted_path_string=extra_settings_function_dotted_path_string
+)

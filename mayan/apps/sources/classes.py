@@ -93,7 +93,4 @@ class DocumentCreateWizardStep(AppsModuleLoaderMixin):
     def step_post_upload_process(
         cls, document, query_string, source_id, user_id
     ):
-        """
-        Optional method executed when the wizard ends to allow the step to
-        perform its action.
-        """
+        pass

@@ -2,14 +2,33 @@ from django.utils.translation import gettext_lazy as _
 
 
 class DependencyEnvironment:
+    _registry = {}
+
+    @classmethod
+    def get(cls, name):
+        return cls._registry[name]
+
+    @classmethod
+    def get_all(cls):
+        environment_list = cls._registry.values()
+
+        return sorted(
+            environment_list, key=lambda environment: environment.name
+        )
+
     def __init__(self, label, name, help_text=None, mark_missing=False):
         self.label = label
         self.help_text = help_text
         self.name = name
         self.mark_missing = mark_missing
 
+        self.__class__._registry[name] = self
+
     def __str__(self):
         return str(self.label)
+
+    def get_requirements_filename(self):
+        return '{}.txt'.format(self.name)
 
 
 environment_build = DependencyEnvironment(
@@ -39,6 +58,15 @@ environment_documentation_override = DependencyEnvironment(
         'under this environment.'
     ), label=_(message='Documentation (override)'),
     name='documentation_override'
+)
+environment_linting = DependencyEnvironment(
+    help_text=_(
+        message='Environment used for running code linters and style checkers '
+        'to ensure code quality and formatting compliance. Dependencies in this '
+        'environment are not needed for normal production usage.'
+    ),
+    label=_(message='Linting'),
+    name='linting'
 )
 environment_production = DependencyEnvironment(
     help_text=_(

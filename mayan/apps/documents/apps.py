@@ -6,12 +6,14 @@ from mayan.apps.acls.permissions import (
     permission_acl_edit, permission_acl_view
 )
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import PROCESS_INITIAL_SETUP
+from mayan.apps.app_manager.runlevels import runlevel_bootstrap
 from mayan.apps.common.classes import MissingItem, ModelCopy
 from mayan.apps.common.menus import (
     menu_facet, menu_list_facet, menu_main, menu_multi_item, menu_object,
     menu_return, menu_secondary, menu_setup
 )
-from mayan.apps.common.signals import signal_post_initial_setup
 from mayan.apps.converter.classes import AppImageErrorImage
 from mayan.apps.converter.links import link_transformation_list
 from mayan.apps.converter.permissions import (
@@ -29,9 +31,10 @@ from mayan.apps.file_caching.permissions import (
 )
 from mayan.apps.forms import column_widgets
 from mayan.apps.logging.classes import ErrorLog, ErrorLogDomain
+from mayan.apps.navigation.column_widgets import SourceColumnDateTimeWidget
 from mayan.apps.navigation.source_columns import SourceColumn
 from mayan.apps.rest_api.fields import DynamicSerializerField
-from mayan.apps.templating.classes import AJAXTemplate, ModelTemplating
+from mayan.apps.templating.classes import ModelTemplating
 from mayan.apps.user_management.dashboards import dashboard_user
 
 from .classes import DocumentFileAction, DocumentVersionModification
@@ -40,12 +43,11 @@ from .dashboard_widgets import (
     DashboardWidgetDocumentFilePagesTotal, DashboardWidgetDocumentsInTrash,
     DashboardWidgetDocumentsNewThisMonth,
     DashboardWidgetDocumentsPagesNewThisMonth, DashboardWidgetDocumentsTotal,
-    DashboardWidgetDocumentsTypesTotal, DashboardWidgetUserFavoriteDocuments,
+    DashboardWidgetDocumentsTypesTotal,
     DashboardWidgetUserRecentlyAccessedDocuments,
     DashboardWidgetUserRecentlyCreatedDocuments
 )
 
-# Documents
 
 from .events import (
     event_document_created, event_document_edited, event_document_trashed,
@@ -53,14 +55,12 @@ from .events import (
     event_trashed_document_restored
 )
 
-# Document files
 
 from .events import (
     event_document_file_created, event_document_file_deleted,
     event_document_file_edited
 )
 
-# Document types
 
 from .events import (
     event_document_type_changed, event_document_type_edited,
@@ -69,7 +69,6 @@ from .events import (
     event_document_type_quick_label_edited
 )
 
-# Document versions
 
 from .events import (
     event_document_version_created, event_document_version_deleted,
@@ -77,14 +76,13 @@ from .events import (
     event_document_version_page_deleted, event_document_version_page_edited,
 )
 
-# All
 
 from .handlers import (
-    handler_create_default_document_type,
     handler_create_document_file_page_image_cache,
     handler_create_document_version_page_image_cache,
     handler_document_event_on_save
 )
+from .initializers import initializer_create_default_document_type
 from .links.document_file_links import (
     link_document_file_delete_multiple, link_document_file_delete_single,
     link_document_file_edit, link_document_file_introspect_multiple,
@@ -149,11 +147,6 @@ from .links.document_version_page_links import (
     link_document_version_page_view_reset, link_document_version_page_zoom_in,
     link_document_version_page_zoom_out
 )
-from .links.favorite_links import (
-    link_document_favorites_add_multiple, link_document_favorites_add_single,
-    link_document_favorites_list, link_document_favorites_remove_multiple,
-    link_document_favorites_remove_single
-)
 from .links.miscellaneous_links import link_decorations_list
 from .links.trashed_document_links import (
     link_document_trash_multiple, link_document_trash_single,
@@ -171,7 +164,6 @@ from .literals import (
 )
 from .menus import menu_documents
 
-# Documents
 
 from .permissions import (
     permission_document_change_type, permission_document_create,
@@ -180,7 +172,6 @@ from .permissions import (
     permission_document_view
 )
 
-# DocumentFile
 
 from .permissions import (
     permission_document_file_delete, permission_document_file_edit,
@@ -188,14 +179,12 @@ from .permissions import (
     permission_document_file_tools, permission_document_file_view
 )
 
-# DocumentType
 
 from .permissions import (
     permission_document_type_delete, permission_document_type_edit,
     permission_document_type_view
 )
 
-# DocumentVersion
 
 from .permissions import (
     permission_document_version_create, permission_document_version_delete,
@@ -203,7 +192,6 @@ from .permissions import (
     permission_document_version_view
 )
 
-# TrashedDocument
 
 from .permissions import (
     permission_trashed_document_delete, permission_trashed_document_restore
@@ -218,29 +206,6 @@ class DocumentsApp(MayanAppConfig):
     has_tests = True
     name = 'mayan.apps.documents'
     verbose_name = _(message='Documents')
-
-    def ready_document_favorites(self):
-        FavoriteDocument = self.get_model(model_name='FavoriteDocument')
-        FavoriteDocumentProxy = self.get_model(
-            model_name='FavoriteDocumentProxy'
-        )
-
-        ModelPermission.register_inheritance(
-            model=FavoriteDocument, related='document'
-        )
-
-        SourceColumn(
-            func=lambda context: context['object'].favorites.get(
-                user=context['request'].user
-            ).datetime_added, include_label=True, is_sortable=True,
-            label=_(message='Date and time added'), name='datetime_added',
-            sort_field='favorites__datetime_added',
-            source=FavoriteDocumentProxy
-        )
-
-        dashboard_user.add_widget(
-            order=3, widget=DashboardWidgetUserFavoriteDocuments
-        )
 
     def ready_document_files(self):
         AppImageErrorImage(
@@ -328,7 +293,6 @@ class DocumentsApp(MayanAppConfig):
             field_name='document_file'
         )
 
-        # DocumentFile
 
         SourceColumn(
             source=DocumentFile, attribute='filename', is_identifier=True,
@@ -360,7 +324,6 @@ class DocumentsApp(MayanAppConfig):
             is_sortable=True, sort_field='size', source=DocumentFile
         )
 
-        # DocumentFilePage
 
         SourceColumn(
             attribute='get_label', is_identifier=True,
@@ -372,7 +335,6 @@ class DocumentsApp(MayanAppConfig):
             widget=ThumbnailWidget
         )
 
-        # DocumentFile
 
         menu_list_facet.bind_links(
             links=(
@@ -406,7 +368,6 @@ class DocumentsApp(MayanAppConfig):
             ), sources=(DocumentFile,)
         )
 
-        # DocumentFilePages
 
         menu_facet.add_unsorted_source(source=DocumentFilePage)
         menu_facet.bind_links(
@@ -442,7 +403,7 @@ class DocumentsApp(MayanAppConfig):
 
         post_migrate.connect(
             dispatch_uid='documents_handler_create_document_file_page_image_cache',
-            receiver=handler_create_document_file_page_image_cache
+            receiver=handler_create_document_file_page_image_cache, sender=self
         )
 
     def ready_document_recently_accessed(self):
@@ -464,7 +425,8 @@ class DocumentsApp(MayanAppConfig):
             label=_(message='Access date and time'),
             name='datetime_accessed',
             sort_field='recent__datetime_accessed',
-            source=RecentlyAccessedDocumentProxy
+            source=RecentlyAccessedDocumentProxy,
+            widget=SourceColumnDateTimeWidget
         )
 
         dashboard_user.add_widget(
@@ -487,7 +449,7 @@ class DocumentsApp(MayanAppConfig):
         )
         SourceColumn(
             attribute='trashed_date_time', include_label=True, order=99,
-            source=TrashedDocument
+            source=TrashedDocument, widget=SourceColumnDateTimeWidget
         )
 
         dashboard_administrator.add_widget(
@@ -528,6 +490,13 @@ class DocumentsApp(MayanAppConfig):
 
         EventModelRegistry.register(model=DocumentType)
         EventModelRegistry.register(model=DocumentTypeFilename)
+
+        InitializationStep(
+            function=initializer_create_default_document_type,
+            label=_(message='Create the default document type'),
+            order=0, name='documents.create_default_document_type',
+            process=PROCESS_INITIAL_SETUP, runlevel=runlevel_bootstrap
+        )
 
         MissingItem(
             label=_(message='Create a document type'),
@@ -578,14 +547,12 @@ class DocumentsApp(MayanAppConfig):
             model=DocumentTypeFilename, related='document_type'
         )
 
-        # DocumentType
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
             source=DocumentType
         )
 
-        # DocumentTypeFilename
 
         SourceColumn(
             attribute='filename', is_identifier=True, is_sortable=True,
@@ -596,7 +563,6 @@ class DocumentsApp(MayanAppConfig):
             source=DocumentTypeFilename, widget=column_widgets.TwoStateWidget
         )
 
-        # DocumentType
 
         menu_list_facet.bind_links(
             links=(
@@ -625,7 +591,6 @@ class DocumentsApp(MayanAppConfig):
             )
         )
 
-        # DocumentTypeFilename
 
         menu_object.bind_links(
             links=(
@@ -644,11 +609,6 @@ class DocumentsApp(MayanAppConfig):
 
         menu_setup.bind_links(
             links=(link_document_type_setup,)
-        )
-
-        signal_post_initial_setup.connect(
-            dispatch_uid='documents_handler_create_default_document_type',
-            receiver=handler_create_default_document_type
         )
 
     def ready_document_versions(self):
@@ -729,7 +689,6 @@ class DocumentsApp(MayanAppConfig):
             model=DocumentVersion, variable_name='document_version'
         )
 
-        # DocumentVersion
 
         ModelPermission.register_inheritance(
             model=DocumentVersion, related='document'
@@ -738,7 +697,6 @@ class DocumentsApp(MayanAppConfig):
             model=DocumentVersion, related='document__document_type'
         )
 
-        # DocumentVersionPage
 
         ModelPermission.register_inheritance(
             model=DocumentVersionPage, related='document_version'
@@ -754,7 +712,6 @@ class DocumentsApp(MayanAppConfig):
             field_name='document'
         )
 
-        # DocumentVersion
 
         SourceColumn(
             source=DocumentVersion, attribute='get_label',
@@ -779,7 +736,6 @@ class DocumentsApp(MayanAppConfig):
             order=-7, source=DocumentVersion
         )
 
-        # DocumentVersionPage
 
         SourceColumn(
             attribute='get_label', is_identifier=True,
@@ -791,7 +747,6 @@ class DocumentsApp(MayanAppConfig):
             source=DocumentVersionPage, widget=ThumbnailWidget
         )
 
-        # DocumentVersion
 
         menu_list_facet.bind_links(
             links=(
@@ -826,7 +781,6 @@ class DocumentsApp(MayanAppConfig):
             ), sources=(DocumentVersion,)
         )
 
-        # DocumentVersionPage
 
         menu_facet.add_unsorted_source(source=DocumentVersionPage)
         menu_facet.bind_links(
@@ -870,15 +824,10 @@ class DocumentsApp(MayanAppConfig):
 
         post_migrate.connect(
             dispatch_uid='documents_handler_create_document_version_page_image_cache',
-            receiver=handler_create_document_version_page_image_cache
+            receiver=handler_create_document_version_page_image_cache, sender=self
         )
 
     def ready_documents(self):
-        AJAXTemplate(
-            name='invalid_document',
-            template_name='documents/invalid_document.html'
-        )
-
         Document = self.get_model(model_name='Document')
 
         DynamicSerializerField.add_serializer(
@@ -960,7 +909,7 @@ class DocumentsApp(MayanAppConfig):
 
         ModelTemplating(model=Document, variable_name='document')
 
-        model_query_fields_document = ModelQueryFields(model=Document)
+        model_query_fields_document = ModelQueryFields.get(model=Document)
         model_query_fields_document.add_prefetch_related_field(
             field_name='files'
         )
@@ -970,10 +919,14 @@ class DocumentsApp(MayanAppConfig):
         model_query_fields_document.add_select_related_field(
             field_name='document_type'
         )
+        model_query_fields_document.add_select_related_field(
+            field_name='version_active'
+        )
 
         SourceColumn(
             attribute='datetime_created', include_label=True,
-            is_sortable=True, name='datetime_created', source=Document
+            is_sortable=True, name='datetime_created', source=Document,
+            widget=SourceColumnDateTimeWidget
         )
         SourceColumn(
             attribute='get_label', is_object_absolute_url=True,
@@ -1009,20 +962,16 @@ class DocumentsApp(MayanAppConfig):
         )
         menu_multi_item.bind_links(
             links=(
-                link_document_favorites_add_multiple,
-                link_document_favorites_remove_multiple,
                 link_document_trash_multiple,
                 link_document_type_change_multiple
-            ), sources=(Document,)
+            ), position=2, sources=(Document,)
         )
         menu_object.bind_links(
             links=(
-                link_document_favorites_add_single,
-                link_document_favorites_remove_single,
                 link_document_properties_edit,
                 link_document_type_change_single,
                 link_document_trash_single
-            ), sources=(Document,)
+            ), position=2, sources=(Document,)
         )
         menu_secondary.bind_links(
             links=(link_document_version_create,),
@@ -1045,7 +994,6 @@ class DocumentsApp(MayanAppConfig):
         self.ready_document_trashed()
         self.ready_document_files()
         self.ready_document_versions()
-        self.ready_document_favorites()
         self.ready_document_recently_accessed()
         self.ready_document_recently_created()
 
@@ -1056,10 +1004,13 @@ class DocumentsApp(MayanAppConfig):
         menu_documents.bind_links(
             links=(
                 link_document_recently_accessed_list,
-                link_document_recently_created_list,
-                link_document_favorites_list, link_document_list,
-                link_trashed_document_list
-            )
+                link_document_recently_created_list
+            ), position=0
+        )
+        menu_documents.bind_links(
+            links=(
+                link_document_list, link_trashed_document_list
+            ), position=3
         )
 
         menu_main.bind_links(

@@ -45,6 +45,12 @@ class CacheListView(SingleObjectListView):
     def get_extra_context(self):
         return {
             'hide_object': True,
+            'no_results_icon': icon_cache_list,
+            'no_results_text': _(
+                message='File caches store generated content to speed up '
+                'access and avoid repeated processing.'
+            ),
+            'no_results_title': _(message='No file caches available'),
             'title': _(message='File caches list')
         }
 
@@ -83,6 +89,7 @@ class CachePartitionPurgeView(
     def get_extra_context(self):
         return {
             'object': self.external_object,
+            'submit_label': _(message='Purge'),
             'title': _(
                 message='Purge cache partitions of "%s"?'
             ) % self.external_object
@@ -122,6 +129,7 @@ class CachePurgeView(MultipleObjectConfirmActionView):
         queryset = self.object_list
 
         result = {
+            'submit_label': _(message='Purge'),
             'title': ngettext(
                 singular='Submit the selected cache for purging?',
                 plural='Submit the selected caches for purging?',

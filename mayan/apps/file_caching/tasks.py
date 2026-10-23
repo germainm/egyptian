@@ -25,7 +25,9 @@ def task_cache_partition_purge(
     cache_partition = CachePartition.objects.get(pk=cache_partition_id)
 
     if content_type_id and object_id:
-        content_type = ContentType.objects.get(pk=content_type_id)
+        content_type = ContentType.objects.get_for_id(
+            id=content_type_id
+        )
         content_object = content_type.get_object_for_this_type(pk=object_id)
     else:
         content_object = None
@@ -44,6 +46,19 @@ def task_cache_partition_purge(
         raise self.retry(exc=exception)
     else:
         logger.debug('Finished cache partition id %s purge', cache_partition)
+
+
+@app.task(ignore_result=True)
+def task_cache_prune(cache_id):
+    Cache = apps.get_model(
+        app_label='file_caching', model_name='Cache'
+    )
+
+    cache = Cache.objects.get(pk=cache_id)
+
+    logger.debug('Starting cache id %s prune', cache)
+    cache.prune()
+    logger.debug('Finished cache id %s prune', cache)
 
 
 @app.task(bind=True, ignore_result=True)

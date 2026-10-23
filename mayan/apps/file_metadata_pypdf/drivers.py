@@ -12,5 +12,13 @@ class FileMetadataDriverPyPDF(FileMetadataDriver):
     mime_type_list = ('application/pdf',)
 
     def _process(self, document_file):
-        with PdfReader(stream=document_file.file) as reader:
-            return reader.metadata
+        with document_file.open() as file_object:
+            with PdfReader(stream=file_object) as reader:
+                metadata = reader.metadata
+
+                if metadata is None:
+                    return {}
+
+                return {
+                    key: metadata[key] for key in metadata
+                }

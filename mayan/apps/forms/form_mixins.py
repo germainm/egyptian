@@ -10,7 +10,6 @@ class FormMixinFilteredFieldsReload:
         super().__init__(*args, **kwargs)
 
     def do_fields_reload(self):
-        # Updated filtered fields.
         field_reload_attributes = self.get_field_reload_attributes()
 
         for field_name in self.fields:
@@ -80,9 +79,6 @@ class FormMixinDynamicFields(FormMixinFilteredFieldsReload):
 
     @property
     def media(self):
-        """
-        Append the media of the dynamic fields to the normal fields' media.
-        """
         media = super().media
         media += django_forms.Media(
             **self.schema.get(

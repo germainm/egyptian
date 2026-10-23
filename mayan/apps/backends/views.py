@@ -1,26 +1,15 @@
-from django.http import Http404
-
 from mayan.apps.views.generics import (
     SingleObjectDynamicFormCreateView, SingleObjectDynamicFormEditView
 )
 
-from .view_mixins import ViewMixinDynamicFormBackendClass
+from .view_mixins import ViewMixinDynamicFormBackendClass, ViewMixinURLBackend
 
 
 class ViewSingleObjectDynamicFormModelBackendCreate(
-    ViewMixinDynamicFormBackendClass, SingleObjectDynamicFormCreateView
+    ViewMixinDynamicFormBackendClass, ViewMixinURLBackend,
+    SingleObjectDynamicFormCreateView
 ):
-    def get_backend_class(self):
-        try:
-            return self.backend_class.get(
-                name=self.kwargs['backend_path']
-            )
-        except KeyError:
-            raise Http404(
-                '{} class not found'.format(
-                    self.kwargs['backend_path']
-                )
-            )
+    pass
 
 
 class ViewSingleObjectDynamicFormModelBackendEdit(

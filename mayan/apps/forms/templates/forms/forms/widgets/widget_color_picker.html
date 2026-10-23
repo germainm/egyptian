@@ -1,21 +1,21 @@
+{% load i18n %}
+
 {% load icons_tags %}
 
+{% icons_get_icon 'mayan.apps.forms.icons.icon_color_auto' as icon_color_auto %}
 {% icons_get_icon 'mayan.apps.forms.icons.icon_color_random' as icon_color_random %}
 
-<div class="input-group">
+<div class="input-group forms-widget-color-picker">
     {% include "django/forms/widgets/input.html" %}
-    <div class="input-group-addon views-widget-color-random">{{ icon_color_random }}</div>
+
+    {% if widget.auto_color_source_name %}
+        
+        
+        
+        <input class="forms-widget-color-picker-state" name="{{ widget.auto_color_state_name }}" type="hidden" value="{{ widget.auto_color_enabled_text }}" />
+
+        <button aria-pressed="{{ widget.auto_color_enabled_text }}" class="btn btn-outline-secondary forms-widget-color-picker-auto{% if widget.auto_color_enabled %} active{% endif %}" title="{% translate 'Calculate the color from the text typed' %}" type="button">{{ icon_color_auto }}</button>
+    {% endif %}
+
+    <button class="btn btn-outline-secondary forms-widget-color-picker-random" title="{% translate 'Select a random color' %}" type="button">{{ icon_color_random }}</button>
 </div>
-
-<script>
-    'use strict';
-
-    jQuery(document).ready(function() {
-        $('.views-widget-color-random').click(function (event) {
-            let randomColor = Math.floor(
-                Math.random() * 16777215
-            ).toString(16);
-            $(this).parent().children('input').val('#' + randomColor);
-        });
-    });
-</script>

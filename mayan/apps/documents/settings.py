@@ -1,10 +1,12 @@
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.converter.thumbnail_click_behaviors import (
+    ThumbnailClickBehaviorBackend
+)
 from mayan.apps.smart_settings.setting_clusters import setting_cluster
 
 from .literals import (
     DEFAULT_DOCUMENTS_DISPLAY_HEIGHT, DEFAULT_DOCUMENTS_DISPLAY_WIDTH,
-    DEFAULT_DOCUMENTS_FAVORITE_COUNT,
     DEFAULT_DOCUMENTS_FILE_PAGE_IMAGE_CACHE_MAXIMUM_SIZE,
     DEFAULT_DOCUMENTS_FILE_PAGE_IMAGE_CACHE_STORAGE_BACKEND,
     DEFAULT_DOCUMENTS_FILE_PAGE_IMAGE_CACHE_STORAGE_BACKEND_ARGUMENTS,
@@ -16,6 +18,7 @@ from .literals import (
     DEFAULT_DOCUMENTS_RECENTLY_ACCESSED_COUNT,
     DEFAULT_DOCUMENTS_RECENTLY_CREATED_COUNT, DEFAULT_DOCUMENTS_ROTATION_STEP,
     DEFAULT_DOCUMENTS_STUBS_DELETE_TASK_INTERVAL,
+    DEFAULT_DOCUMENTS_THUMBNAIL_CLICK_BEHAVIOR,
     DEFAULT_DOCUMENTS_THUMBNAIL_HEIGHT, DEFAULT_DOCUMENTS_THUMBNAIL_WIDTH,
     DEFAULT_DOCUMENTS_TRASH_PERIOD_CHECK_TASK_INTERVAL,
     DEFAULT_DOCUMENTS_TRASHED_DELETE_PERIODS_CHECK_TASK_INTERVAL,
@@ -30,6 +33,7 @@ from .setting_callbacks import (
     callback_update_document_file_page_image_cache_size,
     callback_update_document_version_page_image_cache_size
 )
+from .setting_data_types import setting_value_to_optional_int
 from .setting_migrations import DocumentsSettingMigration
 
 setting_namespace = setting_cluster.do_namespace_add(
@@ -38,7 +42,8 @@ setting_namespace = setting_cluster.do_namespace_add(
 )
 
 setting_display_height = setting_namespace.do_setting_add(
-    data_type=int, default=DEFAULT_DOCUMENTS_DISPLAY_HEIGHT,
+    data_type=setting_value_to_optional_int,
+    default=DEFAULT_DOCUMENTS_DISPLAY_HEIGHT,
     global_name='DOCUMENTS_DISPLAY_HEIGHT', help_text=_(
         message='Optional height in pixels of the document page image used '
         'for interactive display. Leave empty to calculate the height from '
@@ -93,12 +98,6 @@ setting_document_file_page_image_cache_storage_backend_arguments = setting_names
         '`DOCUMENTS_FILE_PAGE_IMAGE_CACHE_STORAGE_BACKEND`.'
     )
 )
-setting_favorite_count = setting_namespace.do_setting_add(
-    data_type=int, default=DEFAULT_DOCUMENTS_FAVORITE_COUNT,
-    global_name='DOCUMENTS_FAVORITE_COUNT', help_text=_(
-        message='Maximum number of favorite documents to remember per user.'
-    )
-)
 setting_hash_block_size = setting_namespace.do_setting_add(
     data_type=int, default=DEFAULT_DOCUMENTS_HASH_BLOCK_SIZE,
     global_name='DOCUMENTS_HASH_BLOCK_SIZE', help_text=_(
@@ -144,7 +143,8 @@ setting_document_version_page_image_cache_storage_backend_arguments = setting_na
     ),
 )
 setting_preview_height = setting_namespace.do_setting_add(
-    data_type=int, default=DEFAULT_DOCUMENTS_PREVIEW_HEIGHT,
+    data_type=setting_value_to_optional_int,
+    default=DEFAULT_DOCUMENTS_PREVIEW_HEIGHT,
     global_name='DOCUMENTS_PREVIEW_HEIGHT',
     help_text=_(
         message='Optional height in pixels of the document preview image. '
@@ -162,7 +162,8 @@ setting_preview_width = setting_namespace.do_setting_add(
     )
 )
 setting_print_height = setting_namespace.do_setting_add(
-    data_type=int, default=DEFAULT_DOCUMENTS_PRINT_HEIGHT,
+    data_type=setting_value_to_optional_int,
+    default=DEFAULT_DOCUMENTS_PRINT_HEIGHT,
     global_name='DOCUMENTS_PRINT_HEIGHT',
     help_text=_(
         message='Optional height in pixels of the document page image '
@@ -225,15 +226,28 @@ setting_task_trashed_document_delete_periods_check_interval = setting_namespace.
     )
 )
 setting_thumbnail_height = setting_namespace.do_setting_add(
-    data_type=int, default=DEFAULT_DOCUMENTS_THUMBNAIL_HEIGHT,
+    data_type=setting_value_to_optional_int,
+    default=DEFAULT_DOCUMENTS_THUMBNAIL_HEIGHT,
     global_name='DOCUMENTS_THUMBNAIL_HEIGHT', help_text=_(
-        message='Height in pixels of the document thumbnail image.'
+        message='Optional height in pixels of the document thumbnail image. '
+        'Leave empty to calculate the height from `DOCUMENTS_THUMBNAIL_WIDTH` '
+        'while preserving the aspect ratio.'
     )
 )
 setting_thumbnail_width = setting_namespace.do_setting_add(
     data_type=int, default=DEFAULT_DOCUMENTS_THUMBNAIL_WIDTH,
     global_name='DOCUMENTS_THUMBNAIL_WIDTH', help_text=_(
         message='Width in pixels of the document thumbnail image.'
+    )
+)
+setting_thumbnail_click_behavior = setting_namespace.do_setting_add(
+    choices=ThumbnailClickBehaviorBackend.get_setting_choices,
+    default=DEFAULT_DOCUMENTS_THUMBNAIL_CLICK_BEHAVIOR,
+    global_name='DOCUMENTS_THUMBNAIL_CLICK_BEHAVIOR', help_text=_(
+        message='Behavior triggered when a document thumbnail is clicked. '
+        'The `image_preview` behavior shows the enlarged image; the '
+        '`route_to_document` behavior opens the document. Additional '
+        'behaviors registered by other apps are also available.'
     )
 )
 setting_thumbnail_list_width = setting_namespace.do_setting_add(

@@ -30,9 +30,6 @@ def to_language(promise, language):
 
 
 def get_timezone_option_list():
-    """
-    Compatibility function.
-    """
     return common_timezones
 
 

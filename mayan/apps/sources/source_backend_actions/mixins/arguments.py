@@ -11,7 +11,6 @@ from .argument_help_texts import (
 )
 from .literals import DEFAULT_IMMEDIATE_MODE
 
-# Document
 
 argument_document = SourceBackendActionInterfaceArgument(
     help_text=argument_help_text_document
@@ -35,7 +34,6 @@ argument_document_id_optional = SourceBackendActionInterfaceArgument(
     default=None, help_text=argument_help_text_document, required=False
 )
 
-# Document file
 
 argument_document_file_action_name = SourceBackendActionInterfaceArgument(
     default=DEFAULT_DOCUMENT_FILE_ACTION_NAME,
@@ -50,7 +48,6 @@ argument_document_file_filename = SourceBackendActionInterfaceArgument(
     required=False
 )
 
-# Document type
 
 argument_document_type = SourceBackendActionInterfaceArgument(
     help_text=Document.description.field.help_text
@@ -59,7 +56,6 @@ argument_document_type_id = SourceBackendActionInterfaceArgument(
     help_text=_(message='ID of the document type.')
 )
 
-# Immediate mode
 
 argument_immediate_mode_optional = SourceBackendActionInterfaceArgument(
     default=DEFAULT_IMMEDIATE_MODE,
@@ -69,7 +65,6 @@ argument_immediate_mode_required = SourceBackendActionInterfaceArgument(
     help_text=argument_help_text_immediate_mode
 )
 
-# User
 
 argument_user = SourceBackendActionInterfaceArgument(
     default=None, help_text=_(

@@ -19,5 +19,8 @@ class TagFormWidget(forms.SelectMultiple):
         )
 
         result['attrs']['data-color'] = value.instance.color
+        result['attrs']['data-color-contrast'] = (
+            value.instance.get_color_contrast()
+        )
 
         return result

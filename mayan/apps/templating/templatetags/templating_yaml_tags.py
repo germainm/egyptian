@@ -12,7 +12,6 @@ def tag_yaml_dump(value):
     Converts the given value into a YAML-formatted string.
     """
 
-    # Convert value from SafeString to normal string.
     data = value.strip()
 
     result = yaml_dump(data=data).strip()

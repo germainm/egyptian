@@ -22,12 +22,6 @@ from .model_mixins import CabinetBusinessLogicMixin
 
 
 class Cabinet(CabinetBusinessLogicMixin, ExtraDataModelMixin, MPTTModel):
-    """
-    Model to store a hierarchical tree of document containers. Each container
-    can store an unlimited number of documents using an M2M field. Only
-    the top level container is can have an ACL. All child container's
-    access is delegated to their corresponding root container.
-    """
     _ordering_fields = ('label',)
 
     parent = TreeForeignKey(
@@ -47,8 +41,6 @@ class Cabinet(CabinetBusinessLogicMixin, ExtraDataModelMixin, MPTTModel):
         order_insertion_by = ('label',)
 
     class Meta:
-        # unique_together doesn't work if there is a FK
-        # https://code.djangoproject.com/ticket/1751
         unique_together = ('parent', 'label')
         verbose_name = _(message='Cabinet')
         verbose_name_plural = _(message='Cabinets')
@@ -113,12 +105,6 @@ class Cabinet(CabinetBusinessLogicMixin, ExtraDataModelMixin, MPTTModel):
         return super().save(*args, **kwargs)
 
     def validate_unique(self, exclude=None):
-        """
-        Explicit validation of uniqueness of parent+label as the provided
-        unique_together check in Meta is not working for all 100% cases
-        when there is a FK in the unique_together tuple
-        https://code.djangoproject.com/ticket/1751
-        """
         with transaction.atomic():
             if connection.vendor == 'oracle':
                 queryset = Cabinet.objects.filter(
@@ -149,11 +135,6 @@ class Cabinet(CabinetBusinessLogicMixin, ExtraDataModelMixin, MPTTModel):
 
 
 class CabinetSearchResult(Cabinet):
-    """
-    Represent a cabinet's search result. This model is a proxy model from
-    Cabinet and is used as an alias to map columns to it without having to
-    map them to the base Cabinet model.
-    """
     class Meta:
         proxy = True
         verbose_name = _(message='Cabinet')
@@ -161,11 +142,6 @@ class CabinetSearchResult(Cabinet):
 
 
 class DocumentCabinet(Cabinet):
-    """
-    Represent a document's cabinet. This Model is a proxy model from Cabinet
-    and is used as an alias to map columns to it without having to map them
-    to the base Cabinet model.
-    """
     class Meta:
         proxy = True
         verbose_name = _(message='Document cabinet')

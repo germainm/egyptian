@@ -94,7 +94,6 @@ class APIDocumentFileDetailView(
         return document.files.all()
 
 
-# Document file page
 
 
 class APIDocumentFilePageDetailView(

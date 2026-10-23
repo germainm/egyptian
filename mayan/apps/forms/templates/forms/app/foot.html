@@ -3,16 +3,36 @@
 {% load icons_tags %}
 {% load smart_settings_tags %}
 
+{% smart_setting "FORMS_DROPZONE_PARALLEL_UPLOADS" as setting_forms_dropzone_parallel_uploads %}
 {% smart_setting "FORMS_SHOW_DROPZONE_SUBMIT_BUTTON" as setting_forms_show_dropzone_submit_button %}
 
 <script src="{% static 'mayan_forms/node_modules/dropzone/dist/dropzone.js' %}" type="text/javascript"></script>
 
+<script src="{% static 'mayan_forms/js/mayan_form_widget_initializer.js' %}" type="text/javascript"></script>
+
+<script src="{% static 'mayan_forms/js/mayan_color.js' %}" type="text/javascript"></script>
+<script src="{% static 'mayan_forms/js/mayan_color_picker.js' %}" type="text/javascript"></script>
+
+<script>
+    'use strict';
+
+    /*
+     * The color widgets of a form are given their behavior when the form
+     * arrives, by whichever route it arrives. Which routes those are is
+     * decided by `MayanFormWidgetInitializer` and not here.
+     */
+
+    MayanFormWidgetInitializer.doInitializerAdd(function () {
+        MayanColorPicker.doInitializeAll();
+    });
+</script>
+
 <script src="{% url 'locales:javascript_catalog' 'mayan.apps.forms' %}" type="text/javascript"></script>
 
-{% icons_get_icon "mayan.apps.forms.icons.icon_dropzone_fail" extra_context__html_data__class="text-danger" as icon_dropzone_fail %}
-{% icons_get_icon "mayan.apps.forms.icons.icon_dropzone_file" as icon_dropzone_file %}
-{% icons_get_icon "mayan.apps.forms.icons.icon_dropzone_ok" extra_context__html_data__class="text-success" as icon_dropzone_ok %}
-{% icons_get_icon "mayan.apps.forms.icons.icon_dropzone_upload" as icon_dropzone_upload %}
+{% icons_get_icon 'mayan.apps.forms.icons.icon_dropzone_fail' extra_context__html_data__class="text-danger" as icon_dropzone_fail %}
+{% icons_get_icon 'mayan.apps.forms.icons.icon_dropzone_file' extra_context__html_data__class='mayan-icon-10x' as icon_dropzone_file %}
+{% icons_get_icon 'mayan.apps.forms.icons.icon_dropzone_ok' extra_context__html_data__class='text-success' as icon_dropzone_ok %}
+{% icons_get_icon 'mayan.apps.forms.icons.icon_dropzone_upload' as icon_dropzone_upload %}
 
 <script>
     'use strict';
@@ -23,21 +43,142 @@
     const messageFallbackMessage = gettext('Your browser does not support drag and drop file uploads.');
     const messageFallbackText = gettext('Please use the fallback form below to upload your files.');
     const messageRemoveFile = gettext('Clear');
-    const messageResponseError = gettext('Server responded with {{statusCode}} code.');
+    const messageResponseError = gettext('Server responded with {% templatetag openvariable %}statusCode{% templatetag closevariable %} code.');
     const paramName = 'source-file'
+
+    // Upper bound for the text displayed under a file preview. The preview
+    // column is a few characters wide, so a message longer than this pushes
+    // the whole preview row taller than the file icons. The untruncated text
+    // stays available as the element title.
+    const errorMessageMaximumLength = 150;
 
     Dropzone.autoDiscover = false;
 
-    $('#ajax-content').on('updated', function (event) {
+    /*
+     * Last resort message for a response that carries no readable text of
+     * its own, such as an empty body or a structured error without a
+     * message.
+     */
+    function getStatusCodeMessage (xhr) {
+        const statusCode = xhr ? xhr.status : 0;
+
+        return messageResponseError.replace(
+            '{% templatetag openvariable %}statusCode{% templatetag closevariable %}',
+            statusCode
+        );
+    }
+
+    /*
+     * Join the text of a list of elements into a single line, ignoring the
+     * elements that were not found and the ones that are empty.
+     *
+     * `textContent` concatenates the text of block level children without a
+     * separator, so collect the text of each element separately instead of
+     * reading it from a common ancestor.
+     */
+    function getElementListText (elementList) {
+        const textList = [];
+
+        elementList.forEach(
+            function (element) {
+                if (element) {
+                    const text = element.textContent.replace(
+                        /\s+/g, ' '
+                    ).trim();
+
+                    if (text) {
+                        textList.push(text);
+                    }
+                }
+            }
+        );
+
+        return textList.join(' ');
+    }
+
+    /*
+     * Extract the readable part of an HTML error document.
+     *
+     * Mayan's own error pages carry the message in the heading and the lead
+     * paragraph of the error panel; the rest of the panel is guidance meant
+     * to be read on a full page and is too long for a file preview. Error
+     * documents produced by the layers in front of Mayan (Django's built in
+     * error views and debug page, the web server, a reverse proxy) have no
+     * such panel, so fall back to their heading or title.
+     */
+    function getDocumentErrorMessage (responseText) {
+        const errorDocument = new DOMParser().parseFromString(
+            responseText, 'text/html'
+        );
+        const panelElement = errorDocument.querySelector(
+            '.appearance-view-error'
+        );
+
+        if (panelElement) {
+            const headingElement = panelElement.querySelector('h1, h2, h3');
+            const paragraphElement = panelElement.querySelector('p');
+
+            const panelText = getElementListText(
+                [headingElement, paragraphElement]
+            );
+
+            if (panelText) {
+                return panelText;
+            }
+        }
+
+        const headingElement = errorDocument.querySelector('h1');
+        const titleElement = errorDocument.querySelector('title');
+
+        return getElementListText(
+            [headingElement || titleElement]
+        );
+    }
+
+    /*
+     * Reduce the value Dropzone reports for a failed upload to a single
+     * readable line.
+     *
+     * Dropzone passes either the parsed body of a JSON response, the raw
+     * body of any other response, or one of its own client side messages.
+     * Only Mayan's own AJAX error responses are JSON. Every other layer that
+     * can reject an upload answers with an HTML document, and displaying it
+     * unchanged fills the preview with markup.
+     */
+    function getErrorMessage (response, xhr) {
+        let errorMessage = '';
+
+        if (response && typeof response === 'object') {
+            errorMessage = response.error || '';
+        } else if (typeof response === 'string') {
+            if (response.indexOf('<') === -1) {
+                // Dropzone's own messages and short plain text responses are
+                // already readable.
+                errorMessage = response.replace(/\s+/g, ' ').trim();
+            } else {
+                errorMessage = getDocumentErrorMessage(response);
+            }
+        }
+
+        if (!errorMessage) {
+            errorMessage = getStatusCodeMessage(xhr);
+        }
+
+        return errorMessage;
+    }
+
+    MayanFormWidgetInitializer.doInitializerAdd(function () {
         const $dropzone = $('.dropzone');
         const $dropzoneForm = $dropzone.parents('form')[0];
-        const $fileField = $('#id_' + paramName);
-        const previewTemplate = document.querySelector('#previewTemplate').innerHTML;
 
         if ($dropzoneForm) {
-            // Hide the forms file field and its div parent.
-            $fileField.addClass('hidden');
-            $fileField.parent().addClass('hidden');
+            const $fileField = $('#id_' + paramName);
+            const previewTemplate = document.querySelector('#previewTemplate').innerHTML;
+
+            // Hide the forms file field and its div parent. BS5 dropped the
+            // BS3 .hidden helper in favour of .d-none.
+            $fileField.addClass('d-none');
+            $fileField.parent().addClass('d-none');
 
             $dropzone.not('.dz-clickable').dropzone({
                 addRemoveLinks: true,
@@ -51,6 +192,54 @@
                 dictResponseError: messageResponseError,
                 init: function() {
                     const dropzoneInstance = this;
+
+                    /*
+                     * Dropzone emits this event from a loop that also emits
+                     * `complete` and then advances the upload queue, and its
+                     * emitter does not isolate the listeners. An exception
+                     * raised here would leave the file marked as incomplete
+                     * and the remaining queued files unprocessed, so the
+                     * whole listener is guarded.
+                     */
+                    dropzoneInstance.on('error', function(file, response, xhr) {
+                        let errorMessage;
+
+                        try {
+                            errorMessage = getErrorMessage(response, xhr);
+                        } catch (exception) {
+                            errorMessage = getStatusCodeMessage(xhr);
+                        }
+
+                        try {
+                            if (!file.previewElement) {
+                                return;
+                            }
+
+                            let displayMessage = errorMessage;
+
+                            if (errorMessage.length > errorMessageMaximumLength) {
+                                const truncatedMessage = errorMessage.substring(
+                                    0, errorMessageMaximumLength
+                                );
+
+                                displayMessage = truncatedMessage + '…';
+                            }
+
+                            const $errorMessage = $(file.previewElement).find(
+                                '[data-dz-errormessage]'
+                            );
+
+                            // The untruncated message stays reachable as the
+                            // element title.
+                            $errorMessage.attr('title', errorMessage);
+                            $errorMessage.text(displayMessage);
+                        } catch (exception) {
+                            console.error(
+                                'Error displaying the upload error message:',
+                                exception
+                            );
+                        }
+                    });
 
                     dropzoneInstance.on('sending', function(file, xhr, formData) {
                         const $dropzone = $(this.element);
@@ -69,7 +258,7 @@
 
                     {% if setting_forms_show_dropzone_submit_button %}
                         dropzoneInstance.options.autoProcessQueue=false;
-                        dropzoneInstance.element.closest('form').querySelector('button[type=submit').addEventListener('click', function(event) {
+                        dropzoneInstance.element.closest('form').querySelector('button[type="submit"]').addEventListener('click', function(event) {
                             event.preventDefault();
                             event.stopPropagation();
                             dropzoneInstance.processQueue();
@@ -77,6 +266,7 @@
                     {% endif %}
                 },
                 maxFilesize: null,
+                parallelUploads: {{ setting_forms_dropzone_parallel_uploads }},
                 paramName: paramName,
                 previewTemplate: previewTemplate,
                 timeout: 1200000,
@@ -84,6 +274,9 @@
             });
         }
     });
+
+    // Every widget has registered by this point.
+    MayanFormWidgetInitializer.doBind();
 </script>
 
 <script type="text/x-template" id="previewTemplate">
@@ -95,10 +288,8 @@
             <img data-dz-thumbnail />
         </div>
 
-        <div class="dz-progress">
-            <span class="dz-upload" data-dz-uploadprogress>
-                <div class="progress-bar progress-bar-success progress-bar-striped active" role="progressbar"></div>
-            </span>
+        <div class="dz-progress progress">
+            <div class="progress-bar bg-success" data-dz-uploadprogress role="progressbar"></div>
         </div>
 
         <div class="dz-success-mark">

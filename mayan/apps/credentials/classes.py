@@ -28,6 +28,5 @@ class CredentialBackend(DynamicFormModelBackend):
         return backend_data
 
 
-# Null backend must be defined here to avoid automatic import.
 class CredentialBackendNull(CredentialBackend):
     label = _(message='Null backend')

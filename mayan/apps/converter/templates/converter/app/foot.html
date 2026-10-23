@@ -1,9 +1,15 @@
+{% load converter_tags %}
+{% load icons_tags %}
 {% load static %}
 
 <script src="{% static 'converter/js/mayan_image.js' %}" type="text/javascript"></script>
 
+
+{% converter_app_image_error_catch_all as app_image_error_catch_all %}
+<script id="mayan-image-error-template" type="text/template">{% spaceless %}{% if app_image_error_catch_all %}{% include app_image_error_catch_all.template_name %}{% else %}<span class="lazyload-error-container text-body"><i class="fa-solid fa-triangle-exclamation mayan-icon-2x"></i></span>{% endif %}{% endspaceless %}</script>
+
 <script>
     jQuery(document).ready(function() {
-        MayanImage.setup(app);
+        MayanImage.setup(app, {% converter_image_carousel_config %});
     });
 </script>

@@ -68,7 +68,6 @@ class SourceBusinessLogicMixin:
 
     @property
     def actions(self):
-        # Used by the REST API serializer.
         return self.get_action_list()
 
     def fullname(self):

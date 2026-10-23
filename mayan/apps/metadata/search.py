@@ -6,7 +6,6 @@ from mayan.apps.dynamic_search.search_models import SearchModel
 
 from .permissions import permission_metadata_type_view
 
-# Document
 
 search_model_document.add_model_field(
     field='metadata__metadata_type__name', label=_(message='Metadata type')
@@ -15,7 +14,6 @@ search_model_document.add_model_field(
     field='metadata__value', label=_(message='Metadata value')
 )
 
-# Document metadata
 
 search_model_document_metadata = SearchModel(
     app_label='metadata', label=_(message='Document metadata'),
@@ -42,7 +40,6 @@ search_model_document_metadata.add_model_field(
 search_model_document_metadata.add_model_field(field='metadata_type__name')
 search_model_document_metadata.add_model_field(field='value')
 
-# Metadata type
 
 search_model_metadata_type = SearchModel(
     app_label='metadata', model_name='MetadataType',

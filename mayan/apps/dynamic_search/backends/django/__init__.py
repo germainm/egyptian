@@ -1,2 +1,2 @@
-from .backend import DjangoSearchBackend  # NOQA
-from .backend_query_types import *  # NOQA
+from .backend import DjangoSearchBackend
+from .backend_query_types import *

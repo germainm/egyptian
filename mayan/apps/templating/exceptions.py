@@ -1,10 +1,6 @@
 class TemplatingError(Exception):
-    """
-    Base exception for all templating app exceptions.
-    """
+    pass
 
 
 class DangerousTagError(TemplatingError):
-    """
-    Raised when a template tries to execute a dangerous tag.
-    """
+    pass

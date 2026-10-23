@@ -7,12 +7,14 @@ from mayan.apps.acls.permissions import (
     permission_acl_edit, permission_acl_view
 )
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import PROCESS_UPGRADE
+from mayan.apps.app_manager.runlevels import runlevel_maintenance
 from mayan.apps.common.classes import ModelCopy
 from mayan.apps.common.menus import (
     menu_list_facet, menu_multi_item, menu_object, menu_related, menu_return,
     menu_secondary, menu_setup
 )
-from mayan.apps.common.signals import signal_perform_upgrade
 from mayan.apps.dashboards.dashboards import dashboard_administrator
 from mayan.apps.events.classes import EventModelRegistry, ModelEventType
 from mayan.apps.navigation.source_columns import SourceColumn
@@ -22,7 +24,8 @@ from mayan.apps.user_management.links import link_group_list
 from .classes import Permission
 from .dashboard_widgets import DashboardWidgetRoleTotal
 from .events import event_role_created, event_role_edited
-from .handlers import handler_permission_initialize, handler_purge_permissions
+from .handlers import handler_permission_initialize
+from .initializers import initializer_purge_permissions
 from .links import (
     link_group_role_list, link_role_create, link_role_delete_single,
     link_role_delete_multiple, link_role_edit, link_role_group_list,
@@ -64,6 +67,13 @@ class PermissionsApp(MayanAppConfig):
             model=StoredPermission, bind_subscription_link=False
         )
 
+        InitializationStep(
+            function=initializer_purge_permissions,
+            label=_(message='Purge obsolete permissions'),
+            name='permissions.purge_permissions', process=PROCESS_UPGRADE,
+            runlevel=runlevel_maintenance
+        )
+
         ModelCopy(
             bind_link=True, model=Role, register_permission=True
         ).add_fields(
@@ -89,8 +99,6 @@ class PermissionsApp(MayanAppConfig):
             )
         )
 
-        # Initialize the permissions at the ready method for subsequent
-        # restarts.
         Permission.load_modules()
 
         SourceColumn(
@@ -110,7 +118,6 @@ class PermissionsApp(MayanAppConfig):
             widget=DashboardWidgetRoleTotal, order=99
         )
 
-        # Group
 
         menu_list_facet.bind_links(
             links=(link_group_role_list,), sources=(Group,)
@@ -124,7 +131,6 @@ class PermissionsApp(MayanAppConfig):
             )
         )
 
-        # Role
 
         menu_list_facet.bind_links(
             links=(
@@ -165,14 +171,8 @@ class PermissionsApp(MayanAppConfig):
             links=(link_role_setup,)
         )
 
-        # Initialize the permissions post migrate of this app for new
-        # installations
         post_migrate.connect(
             dispatch_uid='permissions_handler_permission_initialize',
             receiver=handler_permission_initialize,
             sender=self
-        )
-        signal_perform_upgrade.connect(
-            dispatch_uid='permissions_handler_purge_permissions',
-            receiver=handler_purge_permissions
         )

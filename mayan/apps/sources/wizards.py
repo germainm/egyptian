@@ -24,11 +24,8 @@ class DocumentCreateWizard(ViewIconMixin, wizards.SessionWizardView):
 
     @classonlymethod
     def as_view(cls, *args, **kwargs):
-        # SessionWizardView needs at least one form in order to be
-        # initialized as a view. Declare one empty form and then change the
-        # form list in the .dispatch() method.
         class EmptyForm(forms.Form):
-            """Empty form."""
+            pass
 
         cls.form_list = [EmptyForm]
         return super().as_view(*args, **kwargs)
@@ -94,12 +91,14 @@ class DocumentCreateWizard(ViewIconMixin, wizards.SessionWizardView):
 
         context['form_button_overrides'] = (
             {
+                'css_classes': 'btn-secondary',
                 'icon': icon_wizard_step_first,
                 'label': _(message='First'),
                 'name_override': 'wizard_goto_step',
                 'value': self.steps.first
             },
             {
+                'css_classes': 'btn-secondary',
                 'icon': icon_wizard_step_previous,
                 'label': _(message='Previous'),
                 'name_override': 'wizard_goto_step',
@@ -149,8 +148,6 @@ class DocumentCreateWizard(ViewIconMixin, wizards.SessionWizardView):
         url = furl(
             reverse(viewname='sources:document_upload')
         )
-        # Use equal and not .update() to get the same result as using
-        # urlencode(doseq=True).
         url.args = query_dict
 
         return HttpResponseRedirect(

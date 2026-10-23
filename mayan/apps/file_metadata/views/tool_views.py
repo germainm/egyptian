@@ -21,7 +21,7 @@ class FileMetadataDriverListView(SingleObjectListView):
                 'in code only.'
             ),
             'no_results_title': _(
-                message='No file metadata drivers available.'
+                message='No file metadata drivers available'
             ),
             'subtitle': _(
                 message='File metadata drivers enabled and detected.'

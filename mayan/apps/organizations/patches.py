@@ -5,6 +5,9 @@ from .settings import setting_organization_installation_url
 
 
 def patch_HttpRequest():
+    if getattr(HttpRequest, '_organizations_patched', False):
+        return
+
     class MockClass:
         @cached_property
         def _patched_current_scheme_host(self):
@@ -17,3 +20,4 @@ def patch_HttpRequest():
 
     HttpRequest._current_scheme_host = MockClass._patched_current_scheme_host
     HttpRequest._original_current_scheme_host = _original_current_scheme_host
+    HttpRequest._organizations_patched = True

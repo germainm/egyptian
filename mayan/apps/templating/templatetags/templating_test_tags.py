@@ -7,9 +7,6 @@ register = Library()
 
 if settings.TESTING:
     from ..tests.literals import TEST_TEMPLATE_TAG_RESULT
-    # Hidden import.
-    # Required to allow production package to work when tests are
-    # removed.
 
     @register.filter(name='dangerous_filter')
     @templating_dangerous_tag()

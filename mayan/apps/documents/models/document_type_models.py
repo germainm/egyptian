@@ -32,10 +32,6 @@ __all__ = ('DocumentType', 'DocumentTypeFilename')
 class DocumentType(
     DocumentTypeBusinessLogicMixin, ExtraDataModelMixin, models.Model
 ):
-    """
-    Define document types or classes to which a specific set of
-    properties can be attached.
-    """
     _ordering_fields = ('label',)
 
     label = models.CharField(
@@ -59,7 +55,6 @@ class DocumentType(
         )
     )
 
-    # Retention policies
 
     trash_time_period = models.PositiveIntegerField(
         blank=True, help_text=_(
@@ -142,10 +137,6 @@ class DocumentType(
 
 
 class DocumentTypeFilename(ExtraDataModelMixin, models.Model):
-    """
-    List of labels available to a specific document type for the
-    quick rename functionality.
-    """
     _ordering_fields = ('filename', 'enabled')
 
     document_type = models.ForeignKey(

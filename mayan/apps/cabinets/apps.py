@@ -77,8 +77,6 @@ class CabinetsApp(MayanAppConfig):
             model_name='DocumentVersionPageSearchResult'
         )
 
-        # Add explicit order_by as DocumentCabinet ordering Meta option has no
-        # effect.
         Document.add_to_class(
             name='get_cabinets', value=method_document_get_cabinets
         )
@@ -137,7 +135,7 @@ class CabinetsApp(MayanAppConfig):
             )
         )
 
-        model_query_fields_document = ModelQueryFields(model=Document)
+        model_query_fields_document = ModelQueryFields.get(model=Document)
         model_query_fields_document.add_prefetch_related_field(
             field_name='cabinets'
         )
@@ -154,8 +152,8 @@ class CabinetsApp(MayanAppConfig):
         )
 
         SourceColumn(
-            attribute='label', is_identifier=True, is_sortable=True,
-            source=Cabinet
+            attribute='label', is_identifier=True,
+            is_object_absolute_url=True, is_sortable=True, source=Cabinet
         )
 
         SourceColumn(
@@ -239,7 +237,6 @@ class CabinetsApp(MayanAppConfig):
             )
         )
 
-        # Index update
 
         post_save.connect(
             dispatch_uid='cabinets_handler_index_document',

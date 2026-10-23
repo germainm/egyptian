@@ -1,1 +1,0 @@
-TEST_SOURCE_BACKEND_PATH_COMPRESSED = 'mayan.apps.source_compressed.tests.source_backends.SourceBackendTestCompressed'

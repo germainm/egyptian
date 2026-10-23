@@ -12,9 +12,6 @@ class ViewMixinDynamicConfigurationFormClass:
         FormDriverArguments = self.object.stored_driver.driver_class.get_form_class()
 
         if not FormDriverArguments:
-            # Driver does not specify a form and does not have
-            # a template either. Create a dynamic form based on the argument
-            # list.
             obj = self.object
 
             argument_values_from_settings = obj.stored_driver.driver_class.get_argument_values_from_settings()
@@ -43,7 +40,6 @@ class ViewMixinDynamicConfigurationFormClass:
             FormDriverArguments,
             FormDocumentTypeFileMetadataDriverConfiguration
         ):
-            """Model form merged with the specific transformation fields."""
             view = self
 
         return FormDriverArgumentsMerged

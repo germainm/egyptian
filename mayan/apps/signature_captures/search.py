@@ -5,7 +5,6 @@ from mayan.apps.dynamic_search.search_models import SearchModel
 
 from .permissions import permission_signature_capture_view
 
-#  Document
 
 search_model_document.add_model_field(
     field='signature_captures__text', label=_(message='Signature capture text')
@@ -23,7 +22,6 @@ search_model_document.add_model_field(
     label=_(message='Signature capture user username')
 )
 
-# Signature capture
 
 search_model_signature_capture = SearchModel(
     app_label='signature_captures', model_name='SignatureCapture',

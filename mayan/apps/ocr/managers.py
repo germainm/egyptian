@@ -44,12 +44,15 @@ class DocumentVersionPageOCRContentManager(models.Manager):
             app_label='ocr', model_name='DocumentVersionPageOCRContent'
         )
 
+        backend_instance = OCRBackendBase.get_instance()
+
         lock_name = document_version_page.get_lock_name(user=user)
+
+        lock_timeout = setting_image_generation_timeout.value * 2 + backend_instance.get_task_time_limit()
 
         try:
             document_version_page_lock = LockingBackend.get_backend().acquire_lock(
-                name=lock_name,
-                timeout=setting_image_generation_timeout.value * 2
+                name=lock_name, timeout=lock_timeout
             )
         except Exception as exception:
             logger.error(
@@ -65,7 +68,6 @@ class DocumentVersionPageOCRContentManager(models.Manager):
 
                 with document_version_page.cache_partition.get_file(filename=cache_filename).open() as file_object:
                     try:
-                        backend_instance = OCRBackendBase.get_instance()
                         ocr_content = backend_instance.execute(
                             file_object=file_object,
                             language=document_version_page.document_version.document.language

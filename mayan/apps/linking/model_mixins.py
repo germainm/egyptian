@@ -30,10 +30,6 @@ class SmartLinkBusinessLogicMixin:
             )
 
     def get_dynamic_label(self, document):
-        """
-        If the smart links was created using a template label instead of a
-        static label, resolve the template and return the result.
-        """
         if self.dynamic_label:
             try:
                 template = Template(template_string=self.dynamic_label)
@@ -42,18 +38,12 @@ class SmartLinkBusinessLogicMixin:
                 )
             except Exception as exception:
                 return _(
-                    message='Error generating dynamic label; %s' % str(
-                        exception
-                    )
-                )
+                    message='Error generating dynamic label; %s'
+                ) % exception
         else:
             return None
 
     def get_linked_documents_for(self, document):
-        """
-        Execute the corresponding smart links conditions for the document
-        provided and return the resulting document queryset.
-        """
         if document.document_type.pk not in self.document_types.values_list('pk', flat=True):
             raise Exception(
                 _(

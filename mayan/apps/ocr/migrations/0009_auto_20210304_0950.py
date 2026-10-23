@@ -3,12 +3,6 @@ import django.db.models.deletion
 
 
 def code_remap_document_version_pages_ocr_content(apps, schema_editor):
-    """
-    The document_page_id field is pointing to the document file page.
-    This migration will remap that to point it for the corresponding
-    document version page that is connected to the original document file
-    page.
-    """
     cursor_primary = schema_editor.connection.create_cursor(
         name='merged_content_page_id'
     )
@@ -19,7 +13,7 @@ def code_remap_document_version_pages_ocr_content(apps, schema_editor):
             {ocr_documentpageocrcontent}.{content},
             {documents_documentversionpage}.{id}
         FROM {ocr_documentpageocrcontent}
-        LEFT OUTER JOIN
+        INNER JOIN
             {documents_documentversionpage} ON (
                 {documents_documentversionpage}.{object_id} = {ocr_documentpageocrcontent}.{document_page_id}
             )

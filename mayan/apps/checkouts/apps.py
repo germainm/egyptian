@@ -9,6 +9,7 @@ from mayan.apps.common.menus import (
 from mayan.apps.dashboards.dashboards import dashboard_administrator
 from mayan.apps.databases.classes import ModelQueryFields
 from mayan.apps.events.classes import ModelEventType
+from mayan.apps.navigation.column_widgets import SourceColumnDateTimeWidget
 from mayan.apps.navigation.source_columns import SourceColumn
 
 from .dashboard_widgets import DashboardWidgetTotalCheckouts
@@ -87,9 +88,9 @@ class CheckoutsApp(MayanAppConfig):
             model=DocumentCheckout, related='document'
         )
 
-        model_query_fields_document = ModelQueryFields(model=Document)
+        model_query_fields_document = ModelQueryFields.get(model=Document)
         model_query_fields_document.add_select_related_field(
-            field_name='documentcheckout'
+            field_name='checkout'
         )
 
         SourceColumn(
@@ -98,11 +99,12 @@ class CheckoutsApp(MayanAppConfig):
         )
         SourceColumn(
             attribute='get_checkout_datetime', include_label=True, order=99,
-            source=CheckedOutDocument
+            source=CheckedOutDocument, widget=SourceColumnDateTimeWidget
         )
         SourceColumn(
             attribute='get_checkout_expiration', include_label=True,
-            order=99, source=CheckedOutDocument
+            order=99, source=CheckedOutDocument,
+            widget=SourceColumnDateTimeWidget
         )
 
         dashboard_administrator.add_widget(

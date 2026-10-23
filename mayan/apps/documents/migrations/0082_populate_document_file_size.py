@@ -6,11 +6,6 @@ from mayan.apps.databases.literals import (
 
 
 def code_document_file_size_update(apps, schema_editor):
-    """
-    Only update the document files that where set to the exact maximum field
-    value in migration 0080. Set the actual size of the stored file now that
-    the field allows bigger values.
-    """
     DocumentFile = apps.get_model(
         app_label='documents', model_name='DocumentFile'
     )

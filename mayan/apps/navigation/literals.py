@@ -1,1 +1,3 @@
 DEFAULT_HTTP_METHOD = 'get'
+
+TEXT_HTML_CLASS_MODAL_LINK = 'mayan-link-modal'

@@ -58,35 +58,28 @@ def code_set_active_versions(apps, schema_editor):
     cursor_main = schema_editor.connection.create_cursor(name='cursor_main')
     cursor_document_version = schema_editor.connection.cursor()
 
-    # Select the latest version for each document by date.
     queryset_documents = Document.objects.only('id').annotate(
         latest_version_timestamp=Max('versions__timestamp')
     )
 
-    # Exclude documents with no latest version.
     queryset_documents = queryset_documents.exclude(
         latest_version_timestamp=None
     )
 
-    # Create a new unique version identifier.
     queryset_documents = queryset_documents.annotate(
         version_identifier=Concat(
             'id', 'latest_version_timestamp', output_field=models.CharField()
         )
     )
 
-    # Get all document versions and add a new unique version identifier.
     queryset_document_versions = DocumentVersion.objects.only('id').annotate(
         version_identifier=Concat(
             'document_id', 'timestamp', output_field=models.CharField()
         )
     )
 
-    # Set all version as not active.
     DocumentVersion.objects.update(active=False)
 
-    # Workaround MySQL: (1093, "You can't specify target table
-    # 'documents_documentversion' for update in FROM clause")
     queryset_document_versions = queryset_document_versions.filter(
         version_identifier__in=queryset_documents.values('version_identifier')
     ).values('id')

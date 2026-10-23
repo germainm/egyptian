@@ -13,9 +13,6 @@ from .managers import (
 
 
 class DocumentFilePageContent(models.Model):
-    """
-    This model store's the parsed content of a document page.
-    """
     document_file_page = models.OneToOneField(
         on_delete=models.CASCADE, related_name='content', to=DocumentFilePage,
         verbose_name=_(message='Document file page')
@@ -38,9 +35,6 @@ class DocumentFilePageContent(models.Model):
 
 
 class DocumentTypeSettings(models.Model):
-    """
-    This model stores the parsing settings for a document type.
-    """
     document_type = models.OneToOneField(
         on_delete=models.CASCADE, related_name='parsing_settings',
         to=DocumentType, unique=True, verbose_name=_(message='Document type')

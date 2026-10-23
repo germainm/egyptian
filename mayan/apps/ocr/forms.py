@@ -1,6 +1,7 @@
+from django.template.loader import render_to_string
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
-from django.utils.translation import gettext_lazy as _, gettext
+from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.forms import form_fields, form_widgets, forms
 
@@ -11,10 +12,7 @@ class DocumentVersionPageOCRContentDetailForm(forms.Form):
     contents = form_fields.CharField(
         label=_(message='Contents'),
         widget=form_widgets.TextAreaDiv(
-            attrs={
-                'class': 'full-height',
-                'data-height-difference': 360
-            }
+            attrs={}
         )
     )
 
@@ -42,10 +40,7 @@ class DocumentVersionPageOCRContentEditForm(forms.ModelForm):
     content = form_fields.CharField(
         label=_(message='Contents'),
         widget=form_widgets.Textarea(
-            attrs={
-                'class': 'full-height',
-                'data-height-difference': 360
-            }
+            attrs={'class': 'scrollable'}
         )
     )
 
@@ -55,17 +50,10 @@ class DocumentVersionPageOCRContentEditForm(forms.ModelForm):
 
 
 class DocumentVersionOCRContentForm(forms.Form):
-    """
-    Form that concatenates all of a document pages' text content into a
-    single textarea widget
-    """
     contents = form_fields.CharField(
         label=_(message='Contents'),
         widget=form_widgets.TextAreaDiv(
-            attrs={
-                'class': 'full-height',
-                'data-height-difference': 360
-            }
+            attrs={}
         )
     )
 
@@ -87,16 +75,16 @@ class DocumentVersionOCRContentForm(forms.Form):
                 Not critical, just ignore and proceed to next page.
                 """
             else:
-                content.append(
-                    conditional_escape(
-                        text=str(page_content)
-                    )
+                text_escaped = conditional_escape(
+                    text=str(page_content)
                 )
+                content.append(text_escaped)
+
+                context = {'page_number': page.page_number}
                 content.append(
-                    '\n\n\n<hr/><div class="document-page-content-divider">- %s -</div><hr/>\n\n\n' % (
-                        gettext(
-                            'Page %(page_number)d'
-                        ) % {'page_number': page.page_number}
+                    render_to_string(
+                        context=context,
+                        template_name='ocr/forms/widgets/page_content_divider.html'
                     )
                 )
 

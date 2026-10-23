@@ -88,7 +88,6 @@ class SourceBackendMixinStoredFileLocationFilesystem:
             self.kwargs['folder_path']
         )
 
-        # Force testing the path and raise errors for the log.
         path.lstat()
         if not path.is_dir():
             raise SourceException(

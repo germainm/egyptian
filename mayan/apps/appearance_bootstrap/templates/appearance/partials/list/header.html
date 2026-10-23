@@ -6,7 +6,7 @@
 {% load common_tags %}
 {% load navigation_tags %}
 
-<h4>
+<h4 class="mayan-h4">
     {% if page_obj %}
         {% if page_obj.paginator.num_pages != 1 %}
             {% blocktrans with page_obj.start_index|intcomma as start and page_obj.end_index|intcomma as end and page_obj.paginator.object_list|appearance_object_list_count|intcomma as total and page_obj.number|intcomma as page_number and page_obj.paginator.num_pages|intcomma as total_pages %}Total ({{ start }} - {{ end }} out of {{ total }}) (Page {{ page_number }} of {{ total_pages }}){% endblocktrans %}
@@ -23,6 +23,4 @@
     {% navigation_resolve_menu name='multi item' sort_results=True source=object_list.0 as links_multi_menus_results %}
 {% endif %}
 
-<div class="clearfix">
-    {% include 'appearance/partials/list/toolbar.html' %}
-</div>
+{% include 'appearance/partials/list/toolbar.html' %}

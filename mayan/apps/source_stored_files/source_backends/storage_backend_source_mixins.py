@@ -93,7 +93,6 @@ class SourceBackendMixinStoredFileLocationStorageBackend(
             template_arguments.render(context=context)
         )
 
-        # Typecast `SafeString` to `str`.
         arguments = arguments.strip()
 
         try:
@@ -139,9 +138,6 @@ class SourceBackendMixinStoredFileLocationStorageBackend(
         storage_backend_instance = self.get_storage_backend_instance()
 
         try:
-            # Specify '' with no argument name for compatibility. Django
-            # requires a `path` argument while boto3 requires a `name`
-            # argument.
             folders, entries = storage_backend_instance.listdir('')
 
             for entry in entries:

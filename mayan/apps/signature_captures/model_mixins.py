@@ -33,16 +33,19 @@ class SignatureCaptureBusinessLogicMixin:
         )
         return partition
 
+    def get_image_cache_filename(
+        self, maximum_layer_order=None, transformation_instance_list=None,
+        user=None
+    ):
+        return '{}'.format(
+            self.get_hash()
+        )
+
     def generate_image(
         self, maximum_layer_order=None, transformation_instance_list=None,
         user=None
     ):
-        # The parameters 'maximum_layer_order',
-        # `transformation_instance_list`, `user` are not used, but added
-        # to retain interface compatibility.
-        cache_filename = '{}'.format(
-            self.get_hash()
-        )
+        cache_filename = self.get_image_cache_filename()
 
         try:
             self.cache_partition.get_file(filename=cache_filename)

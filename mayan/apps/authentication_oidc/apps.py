@@ -11,15 +11,14 @@ class AuthenticationOIDCApp(MayanAppConfig):
     app_namespace = 'authentication_oidc'
     app_url = ''
     has_rest_api = False
-    has_static_media = True
-    has_tests = False
+    has_tests = True
     name = 'mayan.apps.authentication_oidc'
     verbose_name = _(message='Authentication OIDC')
 
     def ready(self):
         super().ready()
 
-        settings.STRONGHOLD_PUBLIC_URLS += (r'^/oidc.*',)
+        settings.LOGIN_REQUIRED_EXEMPT_URLS += (r'^/oidc.*',)
 
         menu_user.bind_links(
             links=(

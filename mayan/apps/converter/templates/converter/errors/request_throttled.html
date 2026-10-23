@@ -1,0 +1,11 @@
+{% load i18n %}
+
+{% load icons_tags %}
+
+{% spaceless %}
+<div class="text-center">
+    <div class="mayan-icon-4x" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{% blocktranslate %}The image was not retrieved because the server is receiving too many requests. {{ details }}{% endblocktranslate %}">
+        {% icons_get_icon 'mayan.apps.converter.icons.icon_error_request_throttled' %}
+    </div>
+</div>
+{% endspaceless %}

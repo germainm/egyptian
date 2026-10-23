@@ -1,7 +1,10 @@
 from mayan.apps.converter.transformations import TransformationResize
 from mayan.apps.navigation.column_widgets import SourceColumnWidget
 
-from .settings import setting_thumbnail_height, setting_thumbnail_width
+from .settings import (
+    setting_thumbnail_click_behavior, setting_thumbnail_height,
+    setting_thumbnail_width
+)
 
 
 class SourceColumnWidgetDocumentLink(SourceColumnWidget):
@@ -40,9 +43,9 @@ class ThumbnailWidget(SourceColumnWidget):
         transformation_instance_list = (transformation_resize,)
 
         return {
-            # Disable the clickable link if the document is in the trash.
             'disable_title_link': self.disable_condition(),
             'gallery_name': 'document_list',
             'instance': self.document,
+            'thumbnail_click_behavior': setting_thumbnail_click_behavior.value,
             'transformation_instance_list': transformation_instance_list
         }

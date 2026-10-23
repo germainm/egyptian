@@ -1,33 +1,40 @@
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.views.generics import SimpleView, SingleObjectListView
+from mayan.apps.views.view_mixins import ExternalObjectViewMixin
 
-from .classes import Dashboard
 from .icons import icon_dashboard_detail, icon_dashboard_list
+from .models import StoredDashboard
+from .permissions import permission_dashboard_view
 
 
-class DashboardListView(SingleObjectListView):
-    extra_context = {
-        'hide_object': True,
-        'title': _(message='Dashboards')
-    }
-    view_icon = icon_dashboard_list
-
-    def get_source_queryset(self):
-        return Dashboard.get_all()
-
-
-class DashboardDetailView(SimpleView):
-    template_name = 'appearance/content_container.html'
+class DashboardDetailView(ExternalObjectViewMixin, SimpleView):
+    external_object_permission = permission_dashboard_view
+    external_object_pk_url_kwarg = 'dashboard_id'
+    external_object_queryset = StoredDashboard.objects.all()
+    template_name = 'dashboards/dashboard_detail.html'
     view_icon = icon_dashboard_detail
 
     def get_extra_context(self):
-        dashboard = Dashboard.get(
-            name=self.kwargs['dashboard_name']
-        )
-
         return {
-            'content': dashboard.render(request=self.request),
-            'object': dashboard,
+            'object': self.external_object,
             'title': _(message='Dashboard detail')
+        }
+
+
+class DashboardListView(SingleObjectListView):
+    model = StoredDashboard
+    object_permission = permission_dashboard_view
+    view_icon = icon_dashboard_list
+
+    def get_extra_context(self):
+        return {
+            'hide_object': True,
+            'no_results_icon': icon_dashboard_list,
+            'no_results_text': _(
+                message='Dashboards group related widgets to show a quick '
+                'summary of specific workflows or system activities.'
+            ),
+            'no_results_title': _(message='No dashboards available'),
+            'title': _(message='Dashboards')
         }

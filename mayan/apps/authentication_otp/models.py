@@ -9,9 +9,6 @@ from .events import event_otp_disabled, event_otp_enabled
 
 
 class UserOTPData(models.Model):
-    """
-    This model stores OTP configurations for a user account.
-    """
     user = models.OneToOneField(
         on_delete=models.CASCADE, related_name='otp_data',
         to=settings.AUTH_USER_MODEL, unique=True, verbose_name=_(message='User')

@@ -7,14 +7,7 @@
 {% smart_setting "COMMON_PROJECT_TITLE" as common_project_title %}
 
 {% spaceless %}
-    <div aria-multiselectable="true" class="panel-group" id="accordion-sidebar" role="tablist">
-        <div class="panel-heading" id="menu-main-button-close" role="tab">
-            <h4 class="panel-title">
-                <a class="disabled" href="">
-                    <i class="fa fa-angle-double-left"></i>
-                </a>
-            </h4>
-        </div>
+    <div class="accordion" id="accordion-sidebar">
         {% navigation_resolve_menu name='main' as main_menus_results %}
         {% for main_menu_results in main_menus_results %}
             {% for link_group in main_menu_results.link_groups %}
@@ -22,22 +15,16 @@
                     {% with 'active' as li_class_active %}
                     {% with ' ' as link_classes %}
                         {% if link|common_get_type == "<class 'mayan.apps.navigation.menus.Menu'>" %}
-                            <div class="panel panel-default">
-                                <div class="panel-heading" id="heading-{{ link.name }}" role="tab" >
-                                    <h4 class="panel-title">
-                                        <a aria-controls="collapse-{{ link.name }}" aria-expanded="false" class="non-ajax collapsed" data-parent="#accordion-sidebar" data-toggle="collapse" href="#accordion-body-{{ forloop.counter }}" role="button">
-                                            <div class="pull-left">
-                                                {% navigation_link_get_icon link=link as link_icon %}
-                                                {% if link_icon %}{{ link_icon.render }}{% endif %}
-                                                {{ link.label }}
-                                            </div>
-                                            <div class="accordion-indicator pull-right"><span class="caret"></span></div>
-                                            <div class="clearfix"></div>
-                                        </a>
-                                    </h4>
-                                </div>
-                                <div aria-labelledby="heading-{{ link.name }}" class="panel-collapse collapse" id="accordion-body-{{ forloop.counter }}" role="tabpanel">
-                                    <div class="panel-body">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-{{ link.name }}">
+                                    <button aria-controls="accordion-body-{{ forloop.counter }}" aria-expanded="false" class="accordion-button collapsed gap-1 non-ajax" data-bs-target="#accordion-body-{{ forloop.counter }}" data-bs-toggle="collapse" type="button">
+                                        {% navigation_link_get_icon link=link as link_icon %}
+                                        {% if link_icon %}{{ link_icon.render }}{% endif %}
+                                        {{ link.label }}
+                                    </button>
+                                </h2>
+                                <div aria-labelledby="heading-{{ link.name }}" class="accordion-collapse collapse" data-bs-parent="#accordion-sidebar" id="accordion-body-{{ forloop.counter }}">
+                                    <div class="accordion-body">
                                         <ul class="list-unstyled">
                                             {% navigation_resolve_menu name=link.name as sub_menus_results %}
                                             {% for sub_menu_results in sub_menus_results %}
@@ -58,14 +45,12 @@
                                 </div>
                             </div>
                         {% else %}
-                            <div class="panel panel-default">
-                                <div class="panel-heading" role="tab">
-                                    <h4 class="panel-title">
-                                        {% with 'a-main-menu-accordion-link' as link_classes %}
-                                            {% include 'navigation/generic_link_instance.html' %}
-                                        {% endwith %}
-                                    </h4>
-                                </div>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    {% with 'a-main-menu-accordion-link' as link_classes %}
+                                        {% include 'navigation/generic_link_instance.html' %}
+                                    {% endwith %}
+                                </h2>
                             </div>
                         {% endif %}
                     {% endwith %}
@@ -74,14 +59,13 @@
             {% endfor %}
         {% endfor %}
 
-        <div class="footer navbar-fixed-bottom text-center" id="main-menu-footer">
-            <hr>
+        <div class="footer fixed-bottom text-center" id="main-menu-footer">
             <span class="text-center">
                 {% if common_project_title %}<p>{{ common_project_title }}</p>{% endif %}
-                <p id="main-menu-footer-copyright"><a class="new_window" href="{% common_project_information '__website__' %}">{% common_project_information '__title__' %}</a></p>
+                <p class="m-0"><a class="new_window" href="{% common_project_information '__website__' %}">{% common_project_information '__title__' %}</a></p>
                 <p>{% common_project_information '__copyright__' %}</p>
             </span>
         </div>
 
-    </div>
+        </div>
 {% endspaceless %}

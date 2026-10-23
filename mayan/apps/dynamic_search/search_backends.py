@@ -1,4 +1,3 @@
-import functools
 import logging
 
 from django.apps import apps
@@ -8,9 +7,12 @@ from django.utils.module_loading import import_string
 from mayan.apps.common.utils import (
     ResolverPipelineModelAttribute, flatten_list, get_class_full_name
 )
-
 from .exceptions import DynamicSearchModelException, DynamicSearchQueryError
-from .literals import MESSAGE_FEATURE_NO_STATUS
+from .literals import (
+    MESSAGE_FEATURE_NO_STATUS, MESSAGE_STATUS_COLUMN_OBJECT_COUNT,
+    MESSAGE_STATUS_COLUMN_SEARCH_MODEL, MESSAGE_STATUS_COUNT_UNAVAILABLE,
+    MESSAGE_STATUS_TITLE_TEMPLATE
+)
 from .search_interpreters import SearchInterpreter
 from .search_models import SearchModel
 from .settings import (
@@ -22,8 +24,10 @@ logger = logging.getLogger(name=__name__)
 
 class SearchBackend:
     _initialized = False
+    _resolved_field_type_map_cache = {}
     feature_reindex = False
     field_type_mapping = None
+    label = None
 
     @staticmethod
     def _disable():
@@ -48,41 +52,54 @@ class SearchBackend:
                 )
 
             for related_model, path in search_model.get_related_models():
+                search_model_full_class_name = get_class_full_name(klass=search_model.model)
+                related_model_full_class_name = get_class_full_name(klass=related_model)
+
+                dispatch_uid = 'search_handler_index_related_instance_{}_{}'.format(
+                    search_model_full_class_name,
+                    related_model_full_class_name
+                )
                 post_save.disconnect(
-                    dispatch_uid='search_handler_index_related_instance_{}_{}'.format(
-                        get_class_full_name(klass=search_model.model),
-                        get_class_full_name(klass=related_model)
-                    ), sender=related_model
+                    dispatch_uid=dispatch_uid, sender=related_model
+                )
+
+                dispatch_uid = 'search_handler_index_related_instance_delete_{}_{}'.format(
+                    search_model_full_class_name,
+                    related_model_full_class_name
                 )
                 pre_delete.disconnect(
-                    dispatch_uid='search_handler_index_related_instance_delete_{}_{}'.format(
-                        get_class_full_name(klass=search_model.model),
-                        get_class_full_name(klass=related_model)
-                    ), sender=related_model
+                    dispatch_uid=dispatch_uid, sender=related_model
                 )
 
         for through_model, data in SearchModel.get_through_models().items():
+            class_full_name = get_class_full_name(klass=through_model)
+            dispatch_uid = 'search_handler_index_related_instance_m2m_{}'.format(
+                class_full_name
+            )
             m2m_changed.disconnect(
-                dispatch_uid='search_handler_index_related_instance_m2m_{}'.format(
-                    get_class_full_name(klass=through_model),
-                ), sender=through_model
+                dispatch_uid=dispatch_uid, sender=through_model
             )
 
     @staticmethod
     def _enable():
-        # Hidden import.
         from .handlers import (
-            handler_deindex_instance,
+            handler_deindex_instance, handler_factory_index_instance,
             handler_factory_index_related_instance_delete,
             handler_factory_index_related_instance_m2m,
-            handler_factory_index_related_instance_save,
-            handler_index_instance
+            handler_factory_index_related_instance_save
         )
 
         for search_model in SearchModel.all():
+            own_save_field_name_set = search_model.get_own_save_field_name_set()
+
+            receiver_index_instance = handler_factory_index_instance(
+                field_name_set=own_save_field_name_set
+            )
+
             post_save.connect(
                 dispatch_uid='search_handler_index_instance',
-                receiver=handler_index_instance, sender=search_model.model
+                receiver=receiver_index_instance,
+                sender=search_model.model, weak=False
             )
             pre_delete.connect(
                 dispatch_uid='search_handler_deindex_instance',
@@ -93,7 +110,8 @@ class SearchBackend:
             for proxy in search_model.proxies:
                 post_save.connect(
                     dispatch_uid='search_handler_index_instance',
-                    receiver=handler_index_instance, sender=proxy
+                    receiver=receiver_index_instance, sender=proxy,
+                    weak=False
                 )
                 pre_delete.connect(
                     dispatch_uid='search_handler_deindex_instance',
@@ -101,24 +119,37 @@ class SearchBackend:
                     sender=proxy, weak=False
                 )
 
+            related_model_save_field_name_map = search_model.get_related_model_save_field_name_map()
+
             for related_model, path in search_model.get_related_models():
+                search_model_full_class_name = get_class_full_name(klass=search_model.model)
+                related_model_full_class_name = get_class_full_name(klass=related_model)
+
+                dispatch_uid = 'search_handler_index_related_instance_{}_{}'.format(
+                    search_model_full_class_name,
+                    related_model_full_class_name
+                )
+                field_name_set = related_model_save_field_name_map.get(
+                    related_model
+                )
+                receiver = handler_factory_index_related_instance_save(
+                    field_name_set=field_name_set, reverse_field_path=path
+                )
                 post_save.connect(
-                    dispatch_uid='search_handler_index_related_instance_{}_{}'.format(
-                        get_class_full_name(klass=search_model.model),
-                        get_class_full_name(klass=related_model)
-                    ),
-                    receiver=handler_factory_index_related_instance_save(
-                        reverse_field_path=path
-                    ), sender=related_model, weak=False
+                    dispatch_uid=dispatch_uid, receiver=receiver,
+                    sender=related_model, weak=False
+                )
+
+                dispatch_uid = 'search_handler_index_related_instance_delete_{}_{}'.format(
+                    search_model_full_class_name,
+                    related_model_full_class_name
+                )
+                receiver = handler_factory_index_related_instance_delete(
+                    reverse_field_path=path
                 )
                 pre_delete.connect(
-                    dispatch_uid='search_handler_index_related_instance_delete_{}_{}'.format(
-                        get_class_full_name(klass=search_model.model),
-                        get_class_full_name(klass=related_model)
-                    ),
-                    receiver=handler_factory_index_related_instance_delete(
-                        reverse_field_path=path
-                    ), sender=related_model, weak=False
+                    dispatch_uid=dispatch_uid, receiver=receiver,
+                    sender=related_model, weak=False
                 )
 
         through_models = SearchModel.get_through_models()
@@ -159,7 +190,6 @@ class SearchBackend:
     def index_related_instance_m2m(
         action, instance, model, pk_set, search_model_related_paths
     ):
-        # Hidden import
         from .tasks import task_index_instance
 
         if action in ('post_add', 'pre_remove'):
@@ -184,13 +214,15 @@ class SearchBackend:
                     attribute=instance_path, obj=instance
                 )
 
-                try:
+                """
+                `pk_set` holds primary keys of `model`, so restricting by
+                it is only meaningful when the path resolved to objects of
+                `model`. A manager and a queryset both carry the model
+                they return; anything else, a single instance or a list,
+                carries nothing and is left alone.
+                """
+                if getattr(result, 'model', None) is model:
                     result = result.filter(pk__in=pk_set)
-                except AttributeError:
-                    """
-                    Result is not a queryset. Exception can be safely
-                    ignored.
-                    """
 
                 entries = flatten_list(value=result)
 
@@ -245,18 +277,16 @@ class SearchBackend:
         raise NotImplementedError
 
     def deindex_instance(self, instance):
-        """
-        Optional method to remove an model instance from the search index.
-        """
+        pass
 
     def do_native_type_conversion(self, value):
         return value
 
     def do_query_type_verify(self, query_type, search_field):
-        query_type_list = search_field.get_backend_field_query_type_list(
+        query_type_set = search_field.get_backend_field_query_type_set(
             search_backend=self
         )
-        if query_type not in query_type_list:
+        if query_type not in query_type_set:
             raise DynamicSearchQueryError(
                 'The backend `{search_backend}` does not support queries '
                 'of type `{query_type}` for the field named '
@@ -269,31 +299,36 @@ class SearchBackend:
     def get_field_type_mapping(self):
         return self.field_type_mapping or {}
 
-    @functools.cache
     def get_resolved_field_type_map(self, search_model):
-        """
-        Return a dictionary that maps the search model search field class
-        to the search engine's field class.
-        """
-        result = {}
+        cache = SearchBackend._resolved_field_type_map_cache
+        cache_key = (self.__class__, search_model)
 
-        field_type_mapping = self.get_field_type_mapping()
+        try:
+            return cache[cache_key]
+        except KeyError:
+            result = {}
 
-        for search_field in search_model.search_fields:
-            try:
-                backend_field_type_dictionary = field_type_mapping[
-                    search_field.field_class
-                ]
-            except KeyError:
-                raise DynamicSearchModelException(
-                    'Unknown field type `{}` for model `{}`'.format(
-                        search_field.field_name, search_model.full_name
+            field_type_mapping = self.get_field_type_mapping()
+
+            for search_field in search_model.search_fields:
+                try:
+                    backend_field_type_dictionary = field_type_mapping[
+                        search_field.field_class
+                    ]
+                except KeyError:
+                    raise DynamicSearchModelException(
+                        'Unknown field type `{}` for model `{}`'.format(
+                            search_field.field_name, search_model.full_name
+                        )
                     )
-                )
-            else:
-                result[search_field.field_name] = backend_field_type_dictionary
+                else:
+                    result[
+                        search_field.field_name
+                    ] = backend_field_type_dictionary
 
-        return result
+            cache[cache_key] = result
+
+            return result
 
     def get_search_field_backend_field_type(self, search_field):
         return self.get_resolved_field_type_map(
@@ -301,43 +336,92 @@ class SearchBackend:
         )[search_field.field_name]['field']
 
     def get_status(self):
-        """
-        Backend specific method to provide status and statistics information.
-        """
         if not hasattr(self, '_get_status'):
             return MESSAGE_FEATURE_NO_STATUS
-        else:
-            return self._get_status()
+
+        status_entry_list = self._get_status()
+
+        backend_label = self.label or self.__class__.__name__
+
+        title = MESSAGE_STATUS_TITLE_TEMPLATE % {'label': backend_label}
+
+        heading_search_model = str(MESSAGE_STATUS_COLUMN_SEARCH_MODEL)
+        heading_object_count = str(MESSAGE_STATUS_COLUMN_OBJECT_COUNT)
+
+        row_list = []
+        for status_entry in status_entry_list:
+            search_model = status_entry['search_model']
+            object_count = status_entry['object_count']
+
+            if object_count is None:
+                object_count_text = str(MESSAGE_STATUS_COUNT_UNAVAILABLE)
+            else:
+                object_count_text = str(object_count)
+
+            search_model_text = str(search_model.label)
+
+            row_list.append(
+                (search_model_text, object_count_text)
+            )
+
+        search_model_text_list = [row[0] for row in row_list]
+        search_model_text_list.append(heading_search_model)
+        search_model_column_width = max(
+            len(text) for text in search_model_text_list
+        )
+
+        object_count_text_list = [row[1] for row in row_list]
+        object_count_text_list.append(heading_object_count)
+        object_count_column_width = max(
+            len(text) for text in object_count_text_list
+        )
+
+        line_list = []
+
+        line_list.append(title)
+        line_list.append(
+            '=' * len(title)
+        )
+        line_list.append('')
+
+        header_line = '{}  {}'.format(
+            heading_search_model.ljust(search_model_column_width),
+            heading_object_count.rjust(object_count_column_width)
+        )
+        line_list.append(header_line)
+
+        separator_line = '{}  {}'.format(
+            '-' * search_model_column_width,
+            '-' * object_count_column_width
+        )
+        line_list.append(separator_line)
+
+        for search_model_text, object_count_text in row_list:
+            data_line = '{}  {}'.format(
+                search_model_text.ljust(search_model_column_width),
+                object_count_text.rjust(object_count_column_width)
+            )
+            line_list.append(data_line)
+
+        return '\n'.join(line_list)
 
     def index_instance(self, instance, exclude_model=None, exclude_kwargs=None):
-        """
-        Optional method to add or update an model instance to the search
-        index.
-        """
+        pass
 
     def index_instances(self, search_model, id_list=None):
-        """
-        Optional method to add or update all instance of a model.
-        """
+        pass
 
     def initialize(self):
         self._initialize()
 
     def _initialize(self):
-        """
-        Optional method to setup the backend. Executed once on every boot up.
-        """
+        pass
 
     def refresh(self):
-        """
-        Forces all indexes to update and present an actual view of the
-        search backend's objects and their values.
-        """
+        pass
 
     def reset(self, search_model=None):
-        """
-        Optional method to clear all search indices.
-        """
+        pass
 
     def search(
         self, query, search_model, user, store_resultset=False, queryset=None
@@ -355,7 +439,8 @@ class SearchBackend:
 
         id_list = search_interpreter.do_resolve(search_backend=self)
 
-        queryset = queryset or search_model.get_queryset()
+        if queryset is None:
+            queryset = search_model.get_queryset()
 
         queryset = queryset.filter(pk__in=id_list)
 
@@ -381,17 +466,10 @@ class SearchBackend:
         return (saved_resultset, queryset)
 
     def tear_down(self):
-        """
-        Optional method to clean up and/or destroy search backend structures
-        like indices.
-        """
+        pass
 
     def test_mode_stop(self):
-        """
-        Optional method to cleanup after the tests end.
-        """
+        pass
 
     def upgrade(self):
-        """
-        Optional method to upgrade the search backend persistent structures.
-        """
+        pass

@@ -148,8 +148,6 @@ class SourceBackendActionMixinDocumentUploadBase:
         result = super()._background_task(**kwargs)
 
         if result:
-            # Make this optional in case another mixin interrupted the MRO,
-            # And called a background task.
             server_upload_entry_list = result.get(
                 'server_upload_entry_list', ()
             )
@@ -187,15 +185,10 @@ class SourceBackendActionMixinDocumentUploadInteractive(
     SourceBackendActionMixinUserInteractive,
     SourceBackendActionMixinDocumentUploadBase
 ):
-    """
-    Mixin for a complete action that uploads documents.
-    """
+    pass
 
 
 class SourceBackendActionMixinDocumentUploadInteractiveNot(
     SourceBackendActionMixinDocumentUploadBase
 ):
-    """
-    Same as `SourceBackendActionMixinDocumentUploadBase` but subclassed for
-    clarity.
-    """
+    pass

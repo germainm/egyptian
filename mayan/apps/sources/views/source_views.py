@@ -16,11 +16,16 @@ from mayan.apps.backends.views import (
 from mayan.apps.documents.permissions import (
     permission_document_create, permission_document_file_new
 )
+from mayan.apps.source_periodic.source_backends.mixins import (
+    SourceBackendMixinPeriodic
+)
 from mayan.apps.views.generics import (
     ConfirmView, FormView, MultipleObjectConfirmActionView,
     SingleObjectDeleteView, SingleObjectListView
 )
-from mayan.apps.views.view_mixins import ExternalObjectViewMixin
+from mayan.apps.views.view_mixins import (
+    ExternalObjectViewMixin, ViewMixinFormSaveAndTest
+)
 
 from ..exceptions import SourceActionException
 from ..forms import SourceBackendSelectionForm, SourceBackendSetupDynamicForm
@@ -176,6 +181,7 @@ class SourceActionView(
 
 class SourceBackendSelectionView(FormView):
     extra_context = {
+        'submit_label': _(message='Next'),
         'title': _(message='New source backend selection')
     }
     form_class = SourceBackendSelectionForm
@@ -234,8 +240,11 @@ class SourceDeleteView(SingleObjectDeleteView):
         }
 
 
-class SourceEditView(ViewSingleObjectDynamicFormModelBackendEdit):
+class SourceEditView(
+    ViewMixinFormSaveAndTest, ViewSingleObjectDynamicFormModelBackendEdit
+):
     form_class = SourceBackendSetupDynamicForm
+    form_save_and_test_label = _(message='Test connection')
     model = Source
     object_permission = permission_sources_edit
     pk_url_kwarg = 'source_id'
@@ -252,8 +261,29 @@ class SourceEditView(ViewSingleObjectDynamicFormModelBackendEdit):
     def get_form_extra_kwargs(self):
         return {'user': self.request.user}
 
+    def get_form_save_and_test_available(self):
+        backend_class = self.object.get_backend_class()
+        return issubclass(backend_class, SourceBackendMixinPeriodic)
+
     def get_instance_extra_data(self):
         return {'_event_actor': self.request.user}
+
+    def view_test(self):
+        task_source_backend_action_execute.apply_async(
+            kwargs={
+                'action_interface_kwargs': {'dry_run': True},
+                'action_name': 'document_upload',
+                'source_id': self.object.id,
+                'user_id': self.request.user.pk
+            }
+        )
+
+        messages.success(
+            message=_(
+                message='Source test queued. Check for newly created '
+                'documents or for error log entries.'
+            ), request=self.request
+        )
 
 
 class SourceListView(SingleObjectListView):
@@ -281,10 +311,6 @@ class SourceListView(SingleObjectListView):
 
 
 class SourceTestView(ExternalObjectViewMixin, ConfirmView):
-    """
-    Trigger the task_source_backend_action_execute task for a given source to
-    test/debug their configuration irrespective of the schedule task setup.
-    """
     external_object_permission = permission_sources_edit
     external_object_pk_url_kwarg = 'source_id'
     external_object_class = Source

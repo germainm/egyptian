@@ -1,7 +1,7 @@
+from django.utils.translation import gettext_lazy as _
+
 from rest_framework.exceptions import ValidationError
 from rest_framework.reverse import reverse
-
-from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.rest_api import serializers
 from mayan.apps.user_management.serializers import UserSerializer
@@ -10,9 +10,7 @@ from .models import SavedResultset
 
 
 class DummySearchResultModelSerializer(serializers.Serializer):
-    """
-    Empty serializer for Swagger views.
-    """
+    pass
 
 
 class SavedResultsetSerializer(serializers.HyperlinkedModelSerializer):

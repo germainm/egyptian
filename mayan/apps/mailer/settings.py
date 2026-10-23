@@ -6,9 +6,11 @@ from .literals import (
     DEFAULT_DOCUMENT_BODY_TEMPLATE, DEFAULT_DOCUMENT_SUBJECT_TEMPLATE,
     DEFAULT_LINK_BODY_TEMPLATE, DEFAULT_LINK_SUBJECT_TEMPLATE
 )
+from .setting_migrations import MailerSettingMigration
 
 setting_namespace = setting_cluster.do_namespace_add(
-    label=_(message='Mailing'), name='mailer'
+    label=_(message='Mailing'), migration_class=MailerSettingMigration,
+    name='mailer', version='0002'
 )
 
 setting_attachment_subject_template = setting_namespace.do_setting_add(

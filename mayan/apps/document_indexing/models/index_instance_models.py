@@ -16,11 +16,6 @@ from .index_template_models import IndexTemplate, IndexTemplateNode
 
 
 class IndexInstance(IndexInstanceBusinessLogicMixin, IndexTemplate):
-    """
-    Model that represents an evaluated index. This is an index whose nodes
-    have been evaluated against a series of documents. If is a proxy model
-    at the moment.
-    """
     objects = IndexInstanceManager()
 
     class Meta:
@@ -42,12 +37,6 @@ class IndexInstance(IndexInstanceBusinessLogicMixin, IndexTemplate):
 
 
 class IndexInstanceNode(IndexInstanceNodeBusinessLogicMixin, MPTTModel):
-    """
-    This model represent one instance node from a index template node. That is
-    a node template that has been evaluated against a document and the result
-    from that evaluation is this node's stored values. Instances of this
-    model also point to the original node template.
-    """
     _ordering_fields = ('value',)
 
     parent = TreeForeignKey(
@@ -84,11 +73,6 @@ class IndexInstanceNode(IndexInstanceNodeBusinessLogicMixin, MPTTModel):
 
 
 class DocumentIndexInstanceNode(IndexInstanceNode):
-    """
-    Proxy model of node instance. It is used to represent the node instance
-    in which a document is currently located. It is used to aid in column
-    registration. The inherited methods of this model should not be used.
-    """
     objects = DocumentIndexInstanceNodeManager()
 
     class Meta:

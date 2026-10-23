@@ -6,45 +6,51 @@ from mayan.apps.smart_settings.utils import smart_yaml_load
 
 
 class SourcesSettingMigration(SettingNamespaceMigration):
-    """
-    0001 to 0002: Backend arguments are no longer quoted but YAML valid too.
-                  Changed in version 3.3.
-    0002 to 0003: New settings for source cache storage.
-                  SOURCES_STAGING_FILE_CACHE_STORAGE_BACKEND,
-                  SOURCES_STAGING_FILE_CACHE_STORAGE_BACKEND_ARGUMENTS are
-                  now SOURCES_CACHE_STORAGE_BACKEND and
-                  SOURCES_CACHE_STORAGE_BACKEND_ARGUMENTS
-
-    """
     def sources_staging_file_cache_storage_backend_arguments_0001(self, value):
         return smart_yaml_load(value=value)
 
     def sources_cache_storage_backend_0002(self, value):
-        # Get the setting by its new global name.
         setting = setting_cluster.get_setting(
             global_name='SOURCES_CACHE_STORAGE_BACKEND'
         )
-        # Load the value from the setting's old global name.
-        try:
-            value, domain_dict = setting_cluster.get_domains_value(
-                key='SOURCES_STAGING_FILE_CACHE_STORAGE_BACKEND'
-            )
-        except KeyError:
-            return setting.default
-        else:
-            return value
+
+        return self.get_value_renamed(
+            global_name=setting.global_name,
+            global_name_old='SOURCES_STAGING_FILE_CACHE_STORAGE_BACKEND',
+            value=value, value_fallback=setting.default
+        )
 
     def sources_cache_storage_backend_arguments_0002(self, value):
-        # Get the setting by its new global name.
         setting = setting_cluster.get_setting(
             global_name='SOURCES_CACHE_STORAGE_BACKEND_ARGUMENTS'
         )
-        # Load the value from the setting's old global name.
-        try:
-            value, domain_dict = setting_cluster.get_domains_value(
-                key='SOURCES_STAGING_FILE_CACHE_STORAGE_BACKEND_ARGUMENTS'
-            )
-        except KeyError:
-            return setting.default
-        else:
+
+        return self.get_value_renamed(
+            global_name=setting.global_name,
+            global_name_old='SOURCES_STAGING_FILE_CACHE_STORAGE_BACKEND_ARGUMENTS',
+            value=value, value_fallback=setting.default
+        )
+
+    def sources_backend_arguments_0003(self, value):
+        if not isinstance(value, dict):
             return value
+
+        try:
+            keyword_arguments = value[
+                'mayan.apps.sources.source_backends.SourceBackendSANEScanner'
+            ]
+        except KeyError:
+            return value
+
+        value_migrated = value.copy()
+
+        del value_migrated[
+            'mayan.apps.sources.source_backends.SourceBackendSANEScanner'
+        ]
+
+        value_migrated.setdefault(
+            'mayan.apps.source_sane_scanners.source_backends.SourceBackendSANEScanner',
+            keyword_arguments
+        )
+
+        return value_migrated

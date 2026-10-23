@@ -15,13 +15,9 @@ def check_for_sqlite():
 
 
 def check_queryset(view, queryset):
-    """
-    Validate that a view queryset is usable.
-    """
     try:
         queryset.query
     except AttributeError:
-        # Check if it is an iterable.
         try:
             iter(queryset)
         except TypeError as exception:
@@ -34,6 +30,25 @@ def check_queryset(view, queryset):
             return queryset
     else:
         return queryset
+
+
+def set_field_help_text(field, help_text):
+    help_text_frozen = field.help_text
+    field.help_text = help_text
+
+    deconstruct_original = field.deconstruct
+
+    def deconstruct():
+        name, path, args, kwargs = deconstruct_original()
+
+        if help_text_frozen:
+            kwargs['help_text'] = help_text_frozen
+        else:
+            kwargs.pop('help_text', None)
+
+        return name, path, args, kwargs
+
+    field.deconstruct = deconstruct
 
 
 def instance_list_to_queryset(instance_list):
@@ -91,12 +106,6 @@ def label_for_field_recursive(model, name):
 
 @cache
 def get_model_attribute_recursive(attribute, model):
-    """
-    Walk over the double underscore (__) separated path to the last
-    field. Returns the field name and the corresponding model class.
-    Used to introspect the label or short_description of a model's
-    attribute.
-    """
     last_model = model
 
     for part in attribute.split(LOOKUP_SEP):

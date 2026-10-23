@@ -20,7 +20,6 @@ from .permissions import (
     permission_smart_link_edit, permission_smart_link_view
 )
 
-# Document
 
 link_document_smart_link_instance_list = Link(
     args='resolved_object.pk',
@@ -29,7 +28,6 @@ link_document_smart_link_instance_list = Link(
     view='linking:document_smart_link_instance_list'
 )
 
-# Document type
 
 link_document_type_smart_links = Link(
     args='resolved_object.pk', icon=icon_document_type_smart_links,
@@ -37,7 +35,6 @@ link_document_type_smart_links = Link(
     view='linking:document_type_smart_links'
 )
 
-# Smart link
 
 link_smart_link_create = Link(
     icon=icon_smart_link_create,
@@ -77,7 +74,6 @@ link_smart_link_setup = Link(
     view='linking:smart_link_list'
 )
 
-# Smart link condition
 
 link_smart_link_condition_create = Link(
     args='object.pk', icon=icon_smart_link_condition_create,

@@ -1,3 +1,5 @@
+import json
+
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.backends.forms import FormDynamicModelBackend
@@ -17,7 +19,8 @@ class WorkflowTemplateStateActionDynamicForm(FormDynamicModelBackend):
         model = WorkflowStateAction
         widgets = {'backend_data': form_widgets.HiddenInput}
 
-    def __init__(self, request, user=None, *args, **kwargs):
+    def __init__(self, backend_class, request, user=None, *args, **kwargs):
+        self.backend_class = backend_class
         self.request = request
         self.user = user
         result = super().__init__(*args, **kwargs)
@@ -29,6 +32,23 @@ class WorkflowTemplateStateActionDynamicForm(FormDynamicModelBackend):
         )
 
         return result
+
+    def clean(self):
+        data = super().clean()
+
+        if self.errors:
+            return data
+
+        backend_data = json.loads(
+            s=data['backend_data']
+        )
+
+        self.backend_class.clean(
+            form_data=backend_data, instance=self.instance,
+            request=self.request
+        )
+
+        return data
 
 
 class WorkflowTemplateStateActionSelectionForm(forms.Form):

@@ -1,7 +1,7 @@
 import hashlib
 import json
 import logging
-import os
+from pathlib import Path
 import threading
 import time
 import uuid
@@ -12,7 +12,7 @@ from django.utils.encoding import force_bytes
 
 from mayan.apps.storage.settings import setting_temporary_directory
 
-from ..exceptions import LockError
+from ..exceptions import LockBackendError, LockError
 
 from .base import LockingBackend
 
@@ -29,22 +29,56 @@ class FileLock(LockingBackend):
     @classmethod
     def _initialize(cls):
         string = force_bytes(s=settings.SECRET_KEY)
-        hexdigest = hashlib.sha256(string=string).hexdigest()
+        hash_object = hashlib.sha256(string=string)
+        hexdigest = hash_object.hexdigest()
 
-        cls.lock_file = os.path.join(
+        cls.path_lock_file = Path(
             setting_temporary_directory.value, hexdigest
         )
-        open(file=cls.lock_file, mode='a').close()
-        logger.debug('lock_file: %s', cls.lock_file)
+        cls.path_lock_file.touch()
+
+        logger.debug('path_lock_file: %s', cls.path_lock_file)
+
+    @classmethod
+    def _file_locks_load(cls, file_object):
+        file_object.seek(0)
+
+        data = file_object.read()
+
+        if not data:
+            return {}
+
+        try:
+            return json.loads(s=data)
+        except ValueError:
+            logger.error(
+                'Lock file: %s, is corrupted. Discarding its contents.',
+                cls.path_lock_file
+            )
+            return {}
+
+    @classmethod
+    def _file_locks_save(cls, file_locks, file_object):
+        file_object.seek(0)
+        file_object.truncate()
+        string = json.dumps(obj=file_locks)
+        file_object.write(string)
+
+    @classmethod
+    def _file_object_lock(cls, file_object):
+        if not locks.lock(f=file_object, flags=locks.LOCK_EX):
+            raise LockBackendError(
+                'Unable to lock the lock file: {}. The filesystem does not '
+                'support locking. Locking between processes is not '
+                'guaranteed.'.format(cls.path_lock_file)
+            )
 
     @classmethod
     def _purge_locks(cls):
-        lock.acquire()
-        with open(file=cls.lock_file, mode='r+') as file_object:
-            locks.lock(f=file_object, flags=locks.LOCK_EX)
-            file_object.seek(0)
-            file_object.truncate()
-            lock.release()
+        with lock:
+            with cls.path_lock_file.open(mode='r+') as file_object:
+                cls._file_object_lock(file_object=file_object)
+                cls._file_locks_save(file_locks={}, file_object=file_object)
 
     def _get_lock_dictionary(self):
         if self.timeout:
@@ -67,59 +101,54 @@ class FileLock(LockingBackend):
             uuid.uuid4()
         )
 
-        lock.acquire()
-        with open(file=self.__class__.lock_file, mode='r+') as file_object:
-            locks.lock(f=file_object, flags=locks.LOCK_EX)
+        cls = self.__class__
 
-            data = file_object.read()
+        with lock:
+            with cls.path_lock_file.open(mode='r+') as file_object:
+                cls._file_object_lock(file_object=file_object)
 
-            if data:
-                file_locks = json.loads(s=data)
-            else:
-                file_locks = {}
+                file_locks = cls._file_locks_load(file_object=file_object)
 
-            if name in file_locks:
-                # Someone already got this lock, check to see if it is expired.
-                if file_locks[name]['expiration'] and time.time() > file_locks[name]['expiration']:
-                    # It expires and has expired, we re-acquired it.
-                    file_locks[name] = self._get_lock_dictionary()
+                now = time.time()
+
+                file_locks = {
+                    key: value for key, value in file_locks.items() if not value['expiration'] or now <= value['expiration'] or key == name
+                }
+
+                if name in file_locks:
+                    if file_locks[name]['expiration'] and now > file_locks[name]['expiration']:
+                        file_locks[name] = self._get_lock_dictionary()
+                    else:
+                        cls._file_locks_save(
+                            file_locks=file_locks, file_object=file_object
+                        )
+                        raise LockError(
+                            'Unable to acquire lock `{}`'.format(name)
+                        )
                 else:
-                    lock.release()
-                    raise LockError
-            else:
-                file_locks[name] = self._get_lock_dictionary()
+                    file_locks[name] = self._get_lock_dictionary()
 
-            file_object.seek(0)
-            file_object.truncate()
-            file_object.write(
-                json.dumps(obj=file_locks)
-            )
-            lock.release()
+                cls._file_locks_save(
+                    file_locks=file_locks, file_object=file_object
+                )
 
     def _release(self):
-        lock.acquire()
-        with open(file=self.__class__.lock_file, mode='r+') as file_object:
-            locks.lock(f=file_object, flags=locks.LOCK_EX)
-            try:
-                file_locks = json.loads(
-                    s=file_object.read()
-                )
-            except EOFError:
-                file_locks = {}
+        cls = self.__class__
 
-            if self.name in file_locks:
-                if file_locks[self.name]['uuid'] == self.uuid:
-                    file_locks.pop(self.name)
+        with lock:
+            with cls.path_lock_file.open(mode='r+') as file_object:
+                cls._file_object_lock(file_object=file_object)
+
+                file_locks = cls._file_locks_load(file_object=file_object)
+
+                if self.name in file_locks:
+                    if file_locks[self.name]['uuid'] == self.uuid:
+                        file_locks.pop(self.name)
+                    else:
+                        """Lock expired and someone else acquired it."""
                 else:
-                    # Lock expired and someone else acquired it
-                    pass
-            else:
-                # Lock expired and someone else released it
-                pass
+                    """Lock expired and someone else released it."""
 
-            file_object.seek(0)
-            file_object.truncate()
-            file_object.write(
-                json.dumps(obj=file_locks)
-            )
-            lock.release()
+                cls._file_locks_save(
+                    file_locks=file_locks, file_object=file_object
+                )

@@ -130,8 +130,6 @@ class SourceBackendActionMixinFileStoredImage:
 
             def process_interface_context(self):
                 super().process_interface_context()
-                # The request returns a list even though this is a single
-                # value variable.
                 self.action_kwargs['encoded_filename'] = self.context['encoded_filename'][0]
 
                 query_dict = self.context['request'].GET
@@ -170,11 +168,7 @@ class SourceBackendActionMixinFileStoredList:
                 self.interface_result = self.action_data
 
         class RESTAPI(SourceBackendActionInterfaceRequestRESTAPI):
-            """
-            Empty interface to enable it for the action.
-            """
             def process_action_data(self):
-                # Typecast generator to list to allow List API test to pass.
                 self.action_data = list(self.action_data)
                 super().process_action_data()
 
@@ -204,11 +198,8 @@ class SourceBackendActionMixinFileStoredBase:
 
                 self.action_kwargs['file_cleanup'] = self.context['file_cleanup']
 
-    # Default `file_cleanup` needed by email sources.
     def _background_task(self, file_identifier, file_cleanup=None, **kwargs):
         result = super()._background_task(**kwargs)
-        # Source returned a None `file_identifier` which means that the
-        # source file list is empty to short circuit a quick exit.
         if file_identifier is None:
             result['server_upload_entry_list'] = ()
             return result
@@ -266,7 +257,6 @@ class SourceBackendActionMixinFileStoredBase:
 
         return result
 
-    # Default `file_cleanup` needed by email sources.
     def get_task_kwargs(self, file_identifier, file_cleanup=None, **kwargs):
         result = super().get_task_kwargs(**kwargs)
 

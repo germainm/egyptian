@@ -32,29 +32,17 @@ class CabinetBusinessLogicMixin:
         return queryset_documents_filtered.count()
 
     def get_document_count(self, user):
-        """
-        Return numeric count of the total documents in a cabinet. The count
-        is filtered by access.
-        """
         return self.get_documents(
             permission=permission_document_view, user=user
         ).count()
 
     def get_documents(self, permission, user):
-        """
-        Provide a queryset of the documents in a cabinet. The queryset is
-        filtered by access.
-        """
         return AccessControlList.objects.restrict_queryset(
             permission=permission, queryset=self._get_documents(),
             user=user
         )
 
     def get_full_path(self):
-        """
-        Returns a string that represents the path to the cabinet. The
-        path string starts from the root cabinet.
-        """
         result = []
         for node in self.get_ancestors(include_self=True):
             result.append(node.label)

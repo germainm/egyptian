@@ -1,13 +1,17 @@
 {% load i18n %}
 
+{% load appearance_tags %}
 {% load fundraiser_tags %}
 
-{# appearance_app_template_nocache #}
+{% appearance_app_template_cache_disable %}
 
 {% fundraiser_message_fetch path='/locations/about/' as message %}
 
-{% if message %}
-    <div class="well">
+
+
+
+{% if message.body %}
+    <div class="card card-body border-0 mb-1">
         {{ message.body }}
     </div>
 {% endif %}

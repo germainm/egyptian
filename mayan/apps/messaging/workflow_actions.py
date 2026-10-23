@@ -30,8 +30,8 @@ class WorkflowActionMessageSend(WorkflowAction):
                 'required': True
             }
         },
-        'role_name_list': {
-            'label': _(message='Role name list'),
+        'role_label_list': {
+            'label': _(message='Role label list'),
             'class': 'mayan.apps.templating.fields.ModelTemplateField',
             'kwargs': {
                 'initial_help_text': _(
@@ -49,11 +49,9 @@ class WorkflowActionMessageSend(WorkflowAction):
             'class': 'mayan.apps.templating.fields.ModelTemplateField',
             'kwargs': {
                 'initial_help_text': _(
-                    _(
-                        message='Comma separated list of usernames that will '
-                        'receive the message. Can be a static value or '
-                        'a template.'
-                    ),
+                    message='Comma separated list of usernames that will '
+                    'receive the message. Can be a static value or '
+                    'a template.'
                 ),
                 'model': WorkflowInstance,
                 'model_variable': 'workflow_instance',
@@ -65,10 +63,8 @@ class WorkflowActionMessageSend(WorkflowAction):
             'class': 'mayan.apps.templating.fields.ModelTemplateField',
             'kwargs': {
                 'initial_help_text': _(
-                    _(
-                        message='Subject of the message to be sent. Can be a '
-                        'static value or a template.'
-                    )
+                    message='Subject of the message to be sent. Can be a '
+                    'static value or a template.'
                 ),
                 'model': WorkflowInstance,
                 'model_variable': 'workflow_instance',
@@ -80,10 +76,8 @@ class WorkflowActionMessageSend(WorkflowAction):
             'class': 'mayan.apps.templating.fields.ModelTemplateField',
             'kwargs': {
                 'initial_help_text': _(
-                    _(
-                        message='The actual text to send. Can be a static '
-                        'value or a template.'
-                    )
+                    message='The actual text to send. Can be a static '
+                    'value or a template.'
                 ),
                 'model': WorkflowInstance,
                 'model_variable': 'workflow_instance',
@@ -101,7 +95,7 @@ class WorkflowActionMessageSend(WorkflowAction):
             (
                 _(message='Recipients'), {
                     'fields': (
-                        'group_name_list', 'role_name_list', 'username_list'
+                        'group_name_list', 'role_label_list', 'username_list'
                     )
                 },
             ), (
@@ -116,7 +110,6 @@ class WorkflowActionMessageSend(WorkflowAction):
         final_username_list = []
         queryset_users = get_user_queryset()
 
-        # Group name list.
 
         group_name_list = self.render_field(
             field_name='group_name_list', context=context
@@ -131,7 +124,6 @@ class WorkflowActionMessageSend(WorkflowAction):
                 queyset_group_users.values_list('username', flat=True)
             )
 
-        # Role label list.
 
         role_label_list = self.render_field(
             field_name='role_label_list', context=context
@@ -146,7 +138,6 @@ class WorkflowActionMessageSend(WorkflowAction):
                 queyset_role_users.values_list('username', flat=True)
             )
 
-        # Username list.
 
         username_list = self.render_field(
             field_name='username_list', context=context

@@ -10,6 +10,6 @@ BinaryDependency(
     help_text=_(
         message='Utility from the poppler-utils package used to extract '
         'content from PDF files.'
-    ), label='PDF to text', module=__name__, name='pdftotext',
+    ), label=_(message='PDF to text'), module=__name__, name='pdftotext',
     path=setting_pdftotext_path.value
 )

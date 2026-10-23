@@ -1,17 +1,4 @@
-import uuid
-
-from django.db import connection, migrations, models
-
-
-def code_change_uuid_field_type(apps, schema_editor):
-    if not schema_editor.connection.vendor == 'oracle':
-        # Skip this migration for Oracle
-        # GitHub issue #251
-        migrations.AlterField(
-            model_name='document',
-            name='uuid',
-            field=models.UUIDField(default=uuid.uuid4, editable=False)
-        )
+from django.db import connection, migrations
 
 
 class Migration(migrations.Migration):
@@ -19,16 +6,15 @@ class Migration(migrations.Migration):
         ('documents', '0031_convert_uuid')
     ]
 
-    operations = [
-        migrations.RunPython(code=code_change_uuid_field_type)
-    ]
+    operations = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         if connection.vendor == 'postgresql':
-            self.operations.insert(
-                0, migrations.RunSQL(
-                    'ALTER TABLE documents_document ALTER COLUMN uuid SET DATA TYPE UUID USING uuid::uuid;'
+            self.operations = [
+                migrations.RunSQL(
+                    sql='ALTER TABLE documents_document ALTER COLUMN uuid SET DATA TYPE UUID USING uuid::uuid;',
+                    reverse_sql=migrations.RunSQL.noop
                 )
-            )
+            ]

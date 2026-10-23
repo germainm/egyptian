@@ -315,9 +315,6 @@ class HTTPAction(BackendMixinCredentialsOptional, WorkflowAction):
         return fieldsets
 
     def render_field_load(self, field_name, context):
-        """
-        Method to perform a template render and subsequent JSON load.
-        """
         render_result = self.render_field(
             field_name=field_name, context=context
         ) or '{}'

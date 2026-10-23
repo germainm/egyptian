@@ -1,1 +1,1 @@
-from django.forms.formsets import *  # NOQA
+from django.forms.formsets import *

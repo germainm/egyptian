@@ -53,7 +53,9 @@ class DocumentTrashView(MultipleObjectConfirmActionView):
     view_icon = icon_document_trash_multiple
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Move to trash')
+        }
 
         if self.object_list.count() == 1:
             context['object'] = self.object_list.first()
@@ -61,10 +63,6 @@ class DocumentTrashView(MultipleObjectConfirmActionView):
         return context
 
     def get_post_action_redirect(self):
-        # Return to the previous view after moving the document to trash
-        # unless the move happened from the document view, in which case
-        # redirecting back to the document is not possible because it is
-        # now a trashed document and not accessible.
         if 'document_id' in self.kwargs:
             return reverse(viewname=setting_home_view.value)
         else:
@@ -186,7 +184,9 @@ class TrashedDocumentRestoreView(MultipleObjectConfirmActionView):
     view_icon = icon_trashed_document_restore_multiple
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Restore')
+        }
 
         if self.object_list.count() == 1:
             context['object'] = self.object_list.first()

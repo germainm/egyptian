@@ -5,6 +5,9 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.common.class_mixins import AppsModuleLoaderMixin
+from mayan.apps.views.template_cache_sources import (
+    TemplateCacheSourceMixin, TemplateCacheSourceRegistry
+)
 
 from .exceptions import SettingsDomainError
 from .literals import SMART_SETTINGS_NAMESPACES_NAME
@@ -62,10 +65,6 @@ class MixinSettingClusterDoers:
         for domain in self.get_domain_list():
             domain.do_ready(data=data)
 
-        # Clear the content type cache to avoid the event system from trying
-        # to use the same ID that was cached when the setting post edit
-        # functions executed. This is because the settings execute before
-        # the apps objects are created.
         ContentType.objects.clear_cache()
 
         setting_list = self.get_setting_list()
@@ -93,21 +92,21 @@ class MixinSettingClusterDoers:
             domain.do_key_revert(key=setting.global_name)
 
     def do_setting_value_pending_set(self, setting, value):
-        domain_list = self.get_domain_list()
+        if value == setting.value:
+            self.do_setting_revert(setting=setting)
+        else:
+            domain_list = self.get_domain_list()
 
-        for domain in domain_list:
-            domain.do_key_update_value_pending(
-                key=setting.global_name, value=value
-            )
+            for domain in domain_list:
+                domain.do_key_update_value_pending(
+                    key=setting.global_name, value=value
+                )
 
 
 class MixinSettingClusterGetters:
     def get_data(self, filter_term=None, namespace_name=None):
         result = {}
 
-        # If a namespace is specified, filter the list by that
-        # namespace otherwise return always True to include all
-        # (or not None == True).
         if namespace_name:
             namespace_list = (
                 self.get_namespace(name=namespace_name),
@@ -116,9 +115,11 @@ class MixinSettingClusterGetters:
             namespace_list = self.get_namespace_list()
             result[SMART_SETTINGS_NAMESPACES_NAME] = self.namespace_metadata
 
+        value_pending_map = self.get_setting_value_pending_map()
+
         for namespace in namespace_list:
             namespace_data = namespace.get_settings_as_data(
-                filter_term=filter_term
+                filter_term=filter_term, value_pending_map=value_pending_map
             )
 
             result.update(namespace_data)
@@ -195,11 +196,31 @@ class MixinSettingClusterGetters:
             raise KeyError
 
     def get_is_changed(self):
+        value_pending_map = self.get_setting_value_pending_map()
+
         for setting in self.get_setting_list():
-            if setting.get_has_value_new():
-                return True
+            try:
+                value_pending = value_pending_map[setting.global_name]
+            except KeyError:
+                """
+                No pending value. `get_value_pending` returns the value in
+                use for this case, which never differs from itself.
+                """
+            else:
+                if value_pending != setting.value:
+                    return True
 
         return False
+
+    def get_setting_value_pending_map(self):
+        result = {}
+
+        for domain in self.get_domain_list():
+            result.update(
+                domain.get_key_value_pending_map()
+            )
+
+        return result
 
     def get_namespace(self, name):
         return self.namespace_dict[name]
@@ -226,17 +247,19 @@ class MixinSettingClusterGetters:
 
     def get_namespace_metadata(self, namespace):
         domain_list = self.get_domain_list()
-        value = {}
+        namespace_metadata_map = {}
 
         for domain in domain_list:
             try:
-                value = self.get_domain_value(
+                namespace_metadata_map = self.get_domain_value(
                     domain=domain, key=SMART_SETTINGS_NAMESPACES_NAME
                 )
             except KeyError:
                 """Ignore and continue."""
 
-        return value
+        return namespace_metadata_map.get(
+            namespace.name, {}
+        )
 
     def get_namespace_version_list(self, namespace):
         metadata = self.get_namespace_metadata(namespace=namespace)
@@ -275,7 +298,7 @@ class MixinSettingClusterGetters:
 
 class SettingCluster(
     MixinSettingClusterDoers, MixinSettingClusterGetters,
-    AppsModuleLoaderMixin
+    AppsModuleLoaderMixin, TemplateCacheSourceMixin
 ):
     _loader_module_name = 'settings'
 
@@ -285,6 +308,8 @@ class SettingCluster(
         self.namespace_dict = {}
         self.namespace_metadata = {}
         self.setting_dict = {}
+
+        TemplateCacheSourceRegistry.register(source=self)
 
     def __str__(self):
         return self.name

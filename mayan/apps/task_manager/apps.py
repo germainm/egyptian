@@ -7,16 +7,18 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import PROCESS_UPGRADE
+from mayan.apps.app_manager.runlevels import runlevel_maintenance
 from mayan.apps.common.menus import (
     menu_list_facet, menu_tools, menu_related, menu_return
 )
-from mayan.apps.common.signals import signal_perform_upgrade
 from mayan.apps.forms import column_widgets
 from mayan.apps.navigation.source_columns import SourceColumn
 from mayan.celery import app as celery_app
 
 from .classes import CeleryQueue, TaskType, Task, Worker
-from .handlers import handler_perform_upgrade
+from .initializers import initializer_perform_upgrade
 from .links import (
     link_queue_task_type_list, link_task_type_list, link_worker_list,
     link_worker_queue_list
@@ -117,7 +119,6 @@ class TaskManagerApp(MayanAppConfig):
                 )
             )
 
-        # CeleryQueue
 
         SourceColumn(
             attribute='label', is_identifier=True, label=_(message='Label'),
@@ -146,7 +147,6 @@ class TaskManagerApp(MayanAppConfig):
             source=CeleryQueue
         )
 
-        # Task type
 
         SourceColumn(attribute='get_label', source=TaskType)
         SourceColumn(
@@ -157,6 +157,10 @@ class TaskManagerApp(MayanAppConfig):
             attribute='get_schedule', include_label=True, source=TaskType
         )
         SourceColumn(
+            attribute='get_deduplication_backend_label', include_label=True,
+            source=TaskType
+        )
+        SourceColumn(
             attribute='get_queue', include_label=True,
             source=TaskType, widget=column_widgets.ObjectLinkWidget
         )
@@ -165,7 +169,6 @@ class TaskManagerApp(MayanAppConfig):
             source=TaskType, widget=column_widgets.ObjectLinkWidget
         )
 
-        # Task
 
         SourceColumn(
             attribute='task_type', include_label=True, label=_(
@@ -195,7 +198,6 @@ class TaskManagerApp(MayanAppConfig):
             source=Task
         )
 
-        # Worker
 
         SourceColumn(
             attribute='label', is_identifier=True, label=_(message='Label'),
@@ -204,6 +206,11 @@ class TaskManagerApp(MayanAppConfig):
         SourceColumn(
             attribute='name', include_label=True, label=_(message='Name'),
             source=Worker
+        )
+        SourceColumn(
+            attribute='default_worker', include_label=True,
+            label=_(message='Default worker?'), source=Worker,
+            widget=column_widgets.TwoStateWidget
         )
         SourceColumn(
             attribute='get_maximum_memory_per_child', include_label=True,
@@ -264,7 +271,9 @@ class TaskManagerApp(MayanAppConfig):
             links=(link_task_type_list, link_worker_list,)
         )
 
-        signal_perform_upgrade.connect(
-            dispatch_uid='task_manager_handler_perform_upgrade',
-            receiver=handler_perform_upgrade
+        InitializationStep(
+            function=initializer_perform_upgrade,
+            label=_(message='Purge obsolete background tasks'),
+            name='task_manager.perform_upgrade', process=PROCESS_UPGRADE,
+            runlevel=runlevel_maintenance
         )

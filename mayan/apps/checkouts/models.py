@@ -26,9 +26,6 @@ logger = logging.getLogger(name=__name__)
 
 
 class DocumentCheckout(ExtraDataModelMixin, models.Model):
-    """
-    Model to store the state and information of a document checkout.
-    """
     document = models.OneToOneField(
         on_delete=models.CASCADE, to=Document, related_name='checkout',
         verbose_name=_(message='Document')

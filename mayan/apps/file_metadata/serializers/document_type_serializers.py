@@ -33,7 +33,8 @@ class DocumentTypeDriverConfigurationSerializer(serializers.ModelSerializer):
 
     class Meta:
         fields = (
-            'arguments', 'document_type', 'enabled', 'stored_driver', 'url'
+            'arguments', 'document_type', 'enabled', 'id', 'stored_driver',
+            'url'
         )
         model = DocumentTypeDriverConfiguration
-        read_only_fields = ('document_type', 'stored_driver', 'url')
+        read_only_fields = ('document_type', 'id', 'stored_driver', 'url')

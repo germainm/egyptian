@@ -13,9 +13,7 @@ class MessageCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['body'].widget.attrs = {
-            'class': 'full-height', 'data-height-difference': 560
-        }
+        self.fields['body'].widget.attrs = {}
         self.fields['user'].queryset = get_user_queryset()
         self.fields['user'].widget.attrs = {'class': 'select2'}
 
@@ -25,8 +23,7 @@ class MessageDetailForm(forms.Form):
         label=_(message='Body'),
         widget=form_widgets.TextAreaDiv(
             attrs={
-                'class': 'views-text-wrap full-height',
-                'data-height-difference': 360
+                'class': 'scrollable views-text-wrap'
             }
         )
     )

@@ -2,16 +2,22 @@
 
 {% load i18n %}
 
-{% load converter_tags %}
+{% load static %}
 
 {% block title %}{{ title }}{% endblock title %}
 
 {% block content %}
-    {% for page in pages %}
-        {% converter_get_object_image_data obj=page transformation_instance_list=transformation_instance_list as object_image_data %}
-        <img
-            alt="{% trans 'Document page image preview' %}"
-            src="{{ object_image_data.url|safe }}" style="width: 100%;"
-        />
-    {% endfor %}
-{% endblock %}
+    {% if page_count %}
+        <iframe
+            class="document-print-frame" id="document-print-frame"
+            src="{{ print_pdf_url }}"
+            title="{% trans 'Document print preview' %}"
+        ></iframe>
+
+        <script src="{% static 'documents/js/document_print.js' %}"></script>
+    {% else %}
+        <p class="document-print-message">
+            {% trans 'There are no pages to print.' %}
+        </p>
+    {% endif %}
+{% endblock content %}

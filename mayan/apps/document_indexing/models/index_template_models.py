@@ -24,10 +24,6 @@ from .index_template_model_mixins import (
 class IndexTemplate(
     ExtraDataModelMixin, IndexTemplateBusinessLogicMixin, models.Model
 ):
-    """
-    Parent model that defines an index and hold all the relationship for its
-    template and instance when resolved.
-    """
     _ordering_fields = ('enabled', 'label', 'slug')
 
     label = models.CharField(
@@ -85,7 +81,6 @@ class IndexTemplate(
         is_new = not self.pk
         super().save(*args, **kwargs)
         if is_new:
-            # Automatically create the root index template node.
             IndexTemplateNode.objects.get_or_create(parent=None, index=self)
             self.do_event_triggers_populate()
 
@@ -134,11 +129,6 @@ class IndexTemplateEventTrigger(ExtraDataModelMixin, models.Model):
 
 
 class IndexTemplateNode(IndexTemplateNodeBusinessLogicMixin, MPTTModel):
-    """
-    The template to generate an index. Each entry represents a level in a
-    hierarchy of levels. Each level can contain further levels or a list of
-    documents but not both.
-    """
     _ordering_fields = ('enabled', 'link_documents')
 
     parent = TreeForeignKey(

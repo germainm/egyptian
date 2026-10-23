@@ -9,44 +9,25 @@ from .mixins import SourceBackendMixinSourceMetadata
 
 
 class SourceBackendBase:
-    """
-    Base class for the source backends.
-    """
     action_class_list = None
 
     def callback_post_document_create(self, document, **kwargs):
-        """
-        Callback to execute when a document is created.
-        """
         return
 
     def callback_post_document_file_create(self, document_file, **kwargs):
-        """
-        Callback to execute when a document file is first created.
-        """
         return
 
     def callback_post_document_file_upload(self, document_file, **kwargs):
-        """
-        Callback to execute when a document file is fully uploaded.
-        """
         return
 
     def clean(self):
-        """
-        Optional method to validate backend data before saving.
-        """
+        pass
 
     def create(self):
-        """
-        Called after the source model's .save() method for new
-        instances.
-        """
+        pass
 
     def delete(self):
-        """
-        Called before the source model's .delete() method.
-        """
+        pass
 
     def get_action(self, name):
         for entry in self.get_action_list():
@@ -60,10 +41,6 @@ class SourceBackendBase:
         )
 
     def get_action_class_list(self):
-        """
-        Returns the non initialized list of action classes. This is to allow
-        mixins to add their own actions to a base source backend class.
-        """
         return self.action_class_list or ()
 
     def get_action_list(self):
@@ -75,21 +52,13 @@ class SourceBackendBase:
             yield action_class(source=source)
 
     def update(self):
-        """
-        Called after the source model's .save() method for existing
-        instances.
-        """
+        pass
 
 
 class SourceBackend(
     DynamicFormBackendMixin, ModelBaseBackend,
     SourceBackendMixinSourceMetadata, SourceBackendBase
 ):
-    """
-    Final `SourceBackend` class. Separate from `SourceBackendBase` to allow
-    for `ModelBaseBackend` to initialize properly while avoiding overriding
-    mixin methods like the ones in `SourceBackendMixinSourceMetadata`.
-    """
     _backend_app_label = 'sources'
     _backend_model_name = 'Source'
     _loader_module_name = 'source_backends'
@@ -108,10 +77,7 @@ class SourceBackend(
 
     @classmethod
     def initialize(cls):
-        """
-        Optional method for subclasses execute their own initialization
-        code.
-        """
+        pass
 
     @classmethod
     def post_load_modules(cls):
@@ -122,8 +88,6 @@ class SourceBackend(
         return self.get_model_instance().enabled
 
     def get_upload_form_class(self, action):
-        # Hidden import to avoid model that are not ready yet. This happens
-        # as `DocumentForm` is imported in `forms.py`.
         from ..forms import UploadBaseForm
 
         return getattr(self, 'upload_form_class', UploadBaseForm)

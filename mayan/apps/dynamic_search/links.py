@@ -49,7 +49,6 @@ link_search_backend_reindex = Link(
     text=_(message='Reindex search backend'), view='search:search_backend_reindex'
 )
 
-# Search model
 
 link_search_model_detail = Link(
     icon=icon_search_model_detail,

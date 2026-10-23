@@ -55,6 +55,7 @@ class WorkflowTemplateTransitionTriggerEventListView(
                 message='Triggers are events that cause this transition to '
                 'execute automatically.'
             ),
+            'submit_label': _(message='Save'),
             'title': _(
                 message='Workflow transition trigger events for: %s'
             ) % self.external_object,
@@ -65,7 +66,6 @@ class WorkflowTemplateTransitionTriggerEventListView(
         obj = self.external_object
         initial = []
 
-        # Return the queryset by name from the sorted list of the class.
         event_type_ids = [
             event_type.id for event_type in EventType.all()
         ]
@@ -73,7 +73,6 @@ class WorkflowTemplateTransitionTriggerEventListView(
             name__in=event_type_ids
         )
 
-        # Sort queryset in Python by namespace, then by label.
         queryset_event_types = sorted(
             queryset_event_types, key=lambda x: (x.namespace, x.label)
         )

@@ -27,12 +27,18 @@ class Template:
         )
         return engine_handler['django']
 
+    @staticmethod
+    @functools.lru_cache(maxsize=2048)
+    def _get_compiled_template(template_string):
+        return Template.get_backend().from_string(
+            template_code=template_string
+        )
+
     def __init__(self, template_string, context_entry_name_list=None):
-        self._template_backend = Template.get_backend()
         self.context_entry_name_list = context_entry_name_list or ()
 
-        self._template = self._template_backend.from_string(
-            template_code=template_string
+        self._template = Template._get_compiled_template(
+            template_string=template_string
         )
 
     def render(self, context=None):

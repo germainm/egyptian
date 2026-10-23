@@ -28,10 +28,9 @@ def code_populate_state_active(apps, schema_editor):
             return last_log_entry.transition
 
     def get_workflow_template_initial_state(self):
-        try:
-            return self.workflow.states.get(initial=True)
-        except self.workflow.states.model.DoesNotExist:
-            return None
+        return self.workflow.states.filter(
+            initial=True
+        ).order_by('pk').first()
 
     WorkflowInstance.get_current_state = get_current_state
     WorkflowInstance.get_last_log_entry = get_last_log_entry

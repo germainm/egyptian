@@ -27,10 +27,6 @@ logger = logging.getLogger(name=__name__)
 
 
 class Asset(AssetBusinessLogicMixin, ExtraDataModelMixin, models.Model):
-    """
-    This model keeps track of files that will be available for use with
-    transformations.
-    """
     _ordering_fields = ('internal_name', 'label')
 
     label = models.CharField(
@@ -46,6 +42,13 @@ class Asset(AssetBusinessLogicMixin, ExtraDataModelMixin, models.Model):
     file = models.FileField(
         storage=DefinedStorageLazy(name=STORAGE_NAME_ASSETS),
         upload_to=model_upload_to, verbose_name=_(message='File')
+    )
+    file_hash = models.CharField(
+        blank=True, editable=False, help_text=_(
+            message='A hash/checksum generated from the asset file. Used to '
+            'invalidate cached images that use the asset when the asset '
+            'file changes.'
+        ), max_length=64, null=True, verbose_name=_(message='File hash')
     )
 
     class Meta:
@@ -81,7 +84,9 @@ class Asset(AssetBusinessLogicMixin, ExtraDataModelMixin, models.Model):
         }
     )
     def save(self, *args, **kwargs):
-        return super().save(*args, **kwargs)
+        result = super().save(*args, **kwargs)
+        self.hash_update()
+        return result
 
 
 class StoredLayer(models.Model):
@@ -135,17 +140,6 @@ class ObjectLayer(ObjectLayerBusinessLogicMixin, models.Model):
 class LayerTransformation(
     LayerTransformationBusinessLogicMixin, models.Model
 ):
-    """
-    Model that stores the transformation and transformation arguments
-    for a given object
-    Fields:
-    * order - Order of a Transformation - In case there are multiple
-    transformations for an object, this field list the order at which
-    they will be execute.
-    * arguments - Arguments of a Transformation - An optional field to hold a
-    transformation argument. Example: if a page is rotated with the Rotation
-    transformation, this field will show by how many degrees it was rotated.
-    """
     object_layer = models.ForeignKey(
         on_delete=models.CASCADE, related_name='transformations',
         to=ObjectLayer, verbose_name=_(message='Object layer')

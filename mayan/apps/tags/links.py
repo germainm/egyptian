@@ -43,8 +43,8 @@ link_tag_create = Link(
     text=_(message='Create new tag'), view='tags:tag_create'
 )
 link_tag_delete_multiple = Link(
-    icon=icon_tag_delete_multiple, text=_(message='Delete'),
-    view='tags:tag_multiple_delete'
+    icon=icon_tag_delete_multiple, tags='dangerous',
+    text=_(message='Delete'), view='tags:tag_multiple_delete'
 )
 link_tag_delete_single = Link(
     args='object.id', icon=icon_tag_delete_single,

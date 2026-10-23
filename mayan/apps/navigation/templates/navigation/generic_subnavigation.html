@@ -5,22 +5,26 @@
     <li class="dropdown">
         <a
             aria-haspopup="true" aria-expanded="true" class="dropdown-toggle"
-            data-toggle="dropdown" href="#" role="button"
+            data-bs-toggle="dropdown" href="#" role="button"
             {% if link.title %}title="{{ link.title }}"{% endif %}
         >
             {% navigation_link_get_icon link=link as link_icon %}
 
             {% if link_icon %}{{ link_icon.render }}{% endif %}
             {{ link.label|default:'' }}
-            <span class="caret"></span>
+            {% if show_menu_label %}<span class="d-md-none ms-2">{{ link.label|default:link.title }}</span>{% endif %}
         </a>
-        <ul class="dropdown-menu">
+        <ul class="dropdown-menu {{ dropdown_menu_extra_classes|default:'' }}">
             {% navigation_resolve_menu name=link.name as sub_menus_results %}
             {% for sub_menu_results in sub_menus_results %}
                 {% for link_group in sub_menu_results.link_groups %}
                     {% with '' as li_class_active %}
                     {% with link_group.links as object_navigation_links %}
+                    {% with 'dropdown-item' as link_classes %}
+                    {% with '' as show_menu_label %}
                         {% include 'navigation/generic_navigation.html' %}
+                    {% endwith %}
+                    {% endwith %}
                     {% endwith %}
                     {% endwith %}
                 {% endfor %}

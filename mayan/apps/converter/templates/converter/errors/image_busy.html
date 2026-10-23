@@ -1,0 +1,11 @@
+{% load i18n %}
+
+{% load icons_tags %}
+
+{% spaceless %}
+<div class="text-center">
+    <div class="mayan-icon-4x" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{% blocktranslate %}The image was not retrieved because it is already being produced. {{ details }}{% endblocktranslate %}">
+        {% icons_get_icon 'mayan.apps.converter.icons.icon_error_image_busy' %}
+    </div>
+</div>
+{% endspaceless %}

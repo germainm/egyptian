@@ -10,11 +10,6 @@ from .managers import UserOptionsManager
 
 
 class UserOptions(models.Model):
-    """
-    This model stores administrative configurations for a user accounts.
-    At the moment it stores a boolean flag to restrict a user's
-    ability to change their password.
-    """
     user = models.OneToOneField(
         on_delete=models.CASCADE, related_name='user_options',
         to=settings.AUTH_USER_MODEL, unique=True, verbose_name=_(message='User')

@@ -1,25 +1,30 @@
 import logging
+import threading
 
 from django.utils.module_loading import import_string
 
 from ..settings import setting_backend, setting_default_lock_timeout
 
+lock_initialize = threading.Lock()
 logger = logging.getLogger(name=__name__)
 
 
 class LockingBackend:
-    """
-    Base class for the lock backends. Defines the base methods that each
-    subclass must define.
-    """
     _is_initialized = False
 
     @classmethod
     def _initialize(cls):
-        """
-        Optional class method for subclasses to overload.
-        """
         return
+
+    @classmethod
+    def _do_initialize(cls):
+        if cls._is_initialized:
+            return
+
+        with lock_initialize:
+            if not cls._is_initialized:
+                cls._initialize()
+                cls._is_initialized = True
 
     @staticmethod
     def get_backend():
@@ -33,17 +38,13 @@ class LockingBackend:
 
     @classmethod
     def purge_locks(cls):
-        if not cls._is_initialized:
-            cls._initialize()
-            cls._is_initialized = True
+        cls._do_initialize()
 
         logger.debug(msg='purging locks')
         return cls._purge_locks()
 
     def __init__(self, *args, **kwargs):
-        if not self.__class__._is_initialized:
-            self.__class__._initialize()
-            self.__class__._is_initialized = True
+        self.__class__._do_initialize()
 
         return self._init(*args, **kwargs)
 

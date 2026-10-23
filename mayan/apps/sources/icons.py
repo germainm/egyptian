@@ -1,6 +1,5 @@
 from mayan.apps.icons.icons import Icon
 
-# Document
 
 icon_document_file_source_metadata_list = Icon(
     driver_name='fontawesome-dual', primary_symbol='upload',
@@ -10,13 +9,11 @@ icon_document_upload_wizard = Icon(
     driver_name='fontawesome', symbol='upload'
 )
 
-# Document file
 
 icon_document_file_upload = Icon(
     driver_name='fontawesome', symbol='upload'
 )
 
-# Source
 
 icon_source_action = Icon(driver_name='fontawesome', symbol='bolt')
 icon_source_backend_selection = Icon(
@@ -27,18 +24,22 @@ icon_source_create = Icon(
     driver_name='fontawesome-dual', primary_symbol='upload',
     secondary_symbol='plus'
 )
-icon_source_delete = Icon(driver_name='fontawesome', symbol='times')
-icon_source_edit = Icon(driver_name='fontawesome', symbol='pencil-alt')
+icon_source_delete = Icon(driver_name='fontawesome', symbol='trash-can')
+icon_source_edit = Icon(driver_name='fontawesome', symbol='pencil')
 icon_source_list = Icon(driver_name='fontawesome', symbol='upload')
 icon_source_test = Icon(driver_name='fontawesome', symbol='check')
 
-# Wizard
 
 icon_upload_view_link = Icon(driver_name='fontawesome', symbol='upload')
 icon_wizard_step_previous = Icon(
-    driver_name='fontawesome', symbol='caret-left'
+    css_classes='mayan-icon-directional', driver_name='fontawesome',
+    symbol='arrow-left'
 )
 icon_wizard_step_first = Icon(
-    driver_name='fontawesome', symbol='step-backward'
+    css_classes='mayan-icon-directional', driver_name='fontawesome',
+    symbol='backward-step'
 )
-icon_wizard_step_next = Icon(driver_name='fontawesome', symbol='caret-right')
+icon_wizard_step_next = Icon(
+    css_classes='mayan-icon-directional', driver_name='fontawesome',
+    symbol='arrow-right'
+)

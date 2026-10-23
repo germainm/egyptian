@@ -8,10 +8,6 @@ logger = logging.getLogger(name=__name__)
 
 
 class EventManager:
-    """
-    keep_attributes - List of event related object attributes that should
-    not be removed after the event is committed.
-    """
     EVENT_ATTRIBUTES = ('ignore', 'keep_attributes', 'type')
     EVENT_ARGUMENTS = ('actor', 'action_object', 'target')
 
@@ -24,8 +20,6 @@ class EventManager:
         if not self.instance_event_attributes['ignore']:
             self._commit()
         else:
-            # If the event is ignored, restore the event related attributes
-            # that were removed via .pop().
             for key, value in self.instance_event_attributes.items():
                 if key not in ('ignore', 'type'):
                     setattr(
@@ -36,9 +30,6 @@ class EventManager:
         result = {}
 
         for argument in self.EVENT_ARGUMENTS:
-            # Grab the static argument value from the argument map.
-            # If the argument is not in the map, it is dynamic and must be
-            # obtained from the instance attributes.
             value = argument_map.get(
                 argument, self.instance_event_attributes[argument]
             )
@@ -56,7 +47,6 @@ class EventManager:
 
     def pop_event_attributes(self):
         for attribute in self.EVENT_ATTRIBUTES:
-            # If the attribute is not set or is set but is None.
             if not self.instance_event_attributes.get(attribute, None):
                 full_name = '_event_{}'.format(attribute)
                 value = self.instance.__dict__.pop(full_name, None)
@@ -64,12 +54,10 @@ class EventManager:
 
         keep_attributes = self.instance_event_attributes['keep_attributes'] or ()
 
-        # Allow passing a runtime defined event.
         if self.instance_event_attributes['type']:
             self.kwargs['event'] = self.instance_event_attributes['type']
 
         for attribute in self.EVENT_ARGUMENTS:
-            # If the attribute is not set or is set but is None.
             if not self.instance_event_attributes.get(attribute, None):
                 full_name = '_event_{}'.format(attribute)
                 if full_name in keep_attributes:
@@ -80,7 +68,7 @@ class EventManager:
                 self.instance_event_attributes[attribute] = value
 
     def prepare(self):
-        """Optional method to gather information before the actual commit."""
+        pass
 
 
 class EventManagerMethodAfter(EventManager):

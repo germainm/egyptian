@@ -32,7 +32,6 @@ class DatabasesApp(MayanAppConfig):
 
         patch_Migration()
 
-        # ModelProperty
 
         SourceColumn(
             attribute='get_label', include_label=True, is_identifier=True,
@@ -46,7 +45,6 @@ class DatabasesApp(MayanAppConfig):
             attribute='get_name', include_label=True, source=ModelProperty
         )
 
-        # ModelWrapper
 
         SourceColumn(
             attribute='get_name_full', include_label=True, is_identifier=True,
@@ -61,7 +59,6 @@ class DatabasesApp(MayanAppConfig):
             source=ModelWrapper
         )
 
-        # menus
 
         menu_tools.bind_links(
             links=(link_property_model_list,)

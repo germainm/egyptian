@@ -21,7 +21,7 @@ class StatisticNamespaceListView(SingleObjectListView):
         'no_results_icon': icon_statistic_namespace_list,
         'no_results_text': _(
             message='Statistics namespaces group statistics into logical '
-            'units. '
+            'units.'
         ),
         'no_results_title': _(message='No statistic namespaces available'),
         'title': _(message='Statistics namespaces')
@@ -91,9 +91,7 @@ class StatisticTypeQueueView(StatisticTypeViewMixin, ConfirmView):
             'namespace': self.object.namespace,
             'navigation_object_list': ('namespace', 'object'),
             'object': self.object,
-            # Translators: This text is asking users if they want to queue
-            # (to send to the queue) a statistic for it to be update ahead
-            # of schedule
+            'submit_label': _(message='Queue'),
             'title': _(
                 message='Queue statistic "%s" to be updated?'
             ) % self.object

@@ -29,9 +29,6 @@ class DocumentFilePreviewForm(forms.Form):
 
 
 class DocumentFilePropertiesForm(forms.DetailForm):
-    """
-    Detail class form to display a document file properties
-    """
     fieldsets = (
         (
             _(message='Original'), {

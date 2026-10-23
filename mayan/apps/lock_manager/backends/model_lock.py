@@ -1,4 +1,5 @@
 from django.apps import apps
+from django.db import transaction
 
 from .base import LockingBackend
 
@@ -16,7 +17,11 @@ class ModelLock(LockingBackend):
     @classmethod
     def _purge_locks(cls):
         Lock = apps.get_model(app_label='lock_manager', model_name='Lock')
-        Lock.objects.select_for_update().delete()
+
+        with transaction.atomic():
+            queryset = Lock.objects.select_for_update()
+
+            queryset.delete()
 
     def _init(self, model_instance):
         self.model_instance = model_instance

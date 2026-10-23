@@ -1,3 +1,0 @@
-.. _Django:  https://www.djangoproject.com/
-.. _`Docker image`: https://hub.docker.com/r/mayanedms/mayanedms
-

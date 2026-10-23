@@ -3,7 +3,6 @@ from mayan.apps.icons.icons import Icon
 
 icon_menu_tags = Icon(driver_name='fontawesome', symbol='tags')
 
-# Documents
 
 icon_document_multiple_tag_multiple_attach = Icon(
     driver_name='fontawesome-dual', primary_symbol='tag',
@@ -23,14 +22,13 @@ icon_document_tag_multiple_remove = Icon(
 )
 icon_document_tag_list = Icon(driver_name='fontawesome', symbol='tags')
 
-# Tags
 
 icon_tag_create = Icon(
     driver_name='fontawesome-dual', primary_symbol='tag',
     secondary_symbol='plus'
 )
-icon_tag_delete_multiple = Icon(driver_name='fontawesome', symbol='times')
-icon_tag_delete_single = Icon(driver_name='fontawesome', symbol='times')
+icon_tag_delete_multiple = Icon(driver_name='fontawesome', symbol='trash-can')
+icon_tag_delete_single = Icon(driver_name='fontawesome', symbol='trash-can')
 icon_tag_document_list = icon_document_list
-icon_tag_edit = Icon(driver_name='fontawesome', symbol='pencil-alt')
+icon_tag_edit = Icon(driver_name='fontawesome', symbol='pencil')
 icon_tag_list = Icon(driver_name='fontawesome', symbol='tag')

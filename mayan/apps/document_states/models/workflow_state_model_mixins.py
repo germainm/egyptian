@@ -17,14 +17,10 @@ from ..literals import (
 
 
 class WorkflowStateBusinessLogicMixin:
-    def do_active_set(self, log_entry=None, workflow_instance=None):
-        # TODO: Update one initial entry log patch is merged.
-        # Break pattern by allowing `workflow_instance` and log_entry=None
-        # until initial entry log patch is merged.
+    def do_active_set(self, log_entry):
         queryset = self.entry_actions.filter(enabled=True)
         self.do_queryset_actions_execute(
-            log_entry=log_entry, queryset=queryset,
-            workflow_instance=workflow_instance
+            log_entry=log_entry, queryset=queryset
         )
 
     def do_active_unset(self, log_entry):
@@ -33,14 +29,8 @@ class WorkflowStateBusinessLogicMixin:
             log_entry=log_entry, queryset=queryset
         )
 
-    def do_queryset_actions_execute(
-        self, queryset, log_entry=None, workflow_instance=None
-    ):
-        # TODO: Update one initial entry log patch is merged.
-        # Break pattern by allowing `workflow_instance` and log_entry=None
-        # until initial entry log patch is merged.
-        if log_entry:
-            workflow_instance = log_entry.workflow_instance
+    def do_queryset_actions_execute(self, queryset, log_entry):
+        workflow_instance = log_entry.workflow_instance
 
         for action in queryset:
             context = workflow_instance.get_context()
@@ -156,10 +146,6 @@ class WorkflowStateBusinessLogicMixin:
 
 class WorkflowStateRuntimeProxyBusinessLogicMixin:
     def get_documents(self, permission=None, user=None):
-        """
-        Provide a queryset of the documents. The queryset is optionally
-        filtered by access.
-        """
         if self.workflow.ignore_completed:
             queryset = Document.valid.none()
         else:
@@ -174,10 +160,6 @@ class WorkflowStateRuntimeProxyBusinessLogicMixin:
         return queryset
 
     def get_document_count(self, user):
-        """
-        Return the numeric count of documents at this workflow state.
-        The count is filtered by access.
-        """
         return self.get_documents(
             permission=permission_document_view, user=user
         ).count()

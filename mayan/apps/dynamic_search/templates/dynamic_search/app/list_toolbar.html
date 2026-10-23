@@ -1,31 +1,33 @@
-{# appearance_app_template_nocache #}
 {% load i18n %}
 
+{% load appearance_tags %}
 {% load icons_tags %}
 {% load search_tags %}
+{% load smart_settings_tags %}
+{% load views_tags %}
 
-{% icons_get_icon "mayan.apps.dynamic_search.icons.icon_search_form_clear" extra_context__html_data__class="appearance-input-search-clear" extra_context__html_data__id="search-form-appearance-input-search-clear" extra_context__html_data__style="top: 1px;" as icon_search_form_clear %}
+{% appearance_app_template_cache_disable %}
 
-<style>
-    #search-form-appearance-input-search-clear {
-        display: none;
-    }
-</style>
+{% smart_setting global_name="VIEWS_PAGING_ARGUMENT" as views_paging_argument %}
+{% search_get_filter_prefix as search_filter_prefix %}
+{% views_get_query_field_list exclude_name_list=views_paging_argument exclude_prefix_list=search_filter_prefix as query_field_list %}
+
+{% icons_get_icon "mayan.apps.dynamic_search.icons.icon_search_form_clear" extra_context__html_data__class="appearance-input-search-clear" as icon_search_form_clear %}
 
 {% if not search_disable_list_filtering and search_model %}
-    <div class="pull-left">
-        <div class="btn-toolbar btn-toolbar-search-filter" role="toolbar">
-            <form action="" id="search-form-filter" method="get" role="search">
-                <div class="form-group">
-                    {# Reset the paging on every filter update #}
-                    {# Avoids invalid page errors when the current page number is higher that the filter page count results #}
-                    <input class="form-control" id="search-filter-page" name="page" type="hidden" value="1">
-                    <span class="appearance-input-search-clearable">
-                        <input class="form-control input-sm" data-submit-on-clear="true" id="search-filter-input-terms" name="{% search_get_filter_prefix %}{% search_get_query_parameter_any_field %}" placeholder="{% trans 'Filter terms' %}" type="search" value="{% search_get_query_any_field_value query=filter_query %}">
-                        {{ icon_search_form_clear }}
-                    </span>
-                </div>
-            </form>
-        </div>
-    </div>
+    <form action="" class="mayan-toolbar-search-filter" id="search-form-filter" method="get" role="search">
+        
+        
+        <input class="form-control" id="search-filter-page" name="{{ views_paging_argument }}" type="hidden" value="1">
+        
+        
+        
+        {% for query_field in query_field_list %}
+            <input name="{{ query_field.name }}" type="hidden" value="{{ query_field.value }}">
+        {% endfor %}
+        <span class="input-group input-group-sm w-auto appearance-input-search-clearable">
+            <input class="form-control mayan-toolbar-search-input" data-submit-on-clear="true" id="search-filter-input-terms" name="{% search_get_filter_prefix %}{% search_get_query_parameter_any_field %}" placeholder="{% trans 'Filter terms' %}" type="search" value="{% search_get_query_any_field_value query=filter_query %}">
+            {{ icon_search_form_clear }}
+        </span>
+    </form>
 {% endif %}

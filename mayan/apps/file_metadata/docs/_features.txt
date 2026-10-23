@@ -1,8 +1,0 @@
-- Automatic extraction of file metadata.
-
-  - In addition to the metadata defined by your organization, make use of the
-    built in metadata available in many file formats.
-  - Extra author information, camera settings used to take a photo, or even
-    GPS coordinates.
-  - Extracted file metadata can be used in other apps of the system to do
-    things like automatic categorization by GPS coordinates.

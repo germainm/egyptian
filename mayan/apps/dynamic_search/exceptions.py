@@ -1,54 +1,54 @@
+from django.utils.translation import gettext_lazy as _
+
+from rest_framework import status
+from rest_framework.exceptions import APIException
+
+
 class DynamicSearchException(Exception):
-    """
-    Base exception for the app.
-    """
+    pass
 
 
 class DynamicSearchBackendException(DynamicSearchException):
-    """
-    Encapsulate search backend specific errors.
-    """
+    pass
+
+
+class DynamicSearchBackendResourceError(DynamicSearchBackendException):
+    pass
 
 
 class DynamicSearchInterpreterError(DynamicSearchException):
-    """
-    Raised when there is an error in a search interpreter.
-    """
+    pass
 
 
 class DynamicSearchInterpreterUnknownSearchType(
     DynamicSearchInterpreterError
 ):
-    """
-    Raised when there is not search interpreter that matches a query.
-    """
+    pass
 
 
 class DynamicSearchModelException(DynamicSearchException):
-    """
-    Used to raise error related to search models and search fields.
-    """
+    pass
 
 
 class DynamicSearchQueryError(DynamicSearchException):
-    """
-    Raised when there is an error in a search query.
-    """
+    pass
 
 
 class DynamicSearchRetry(DynamicSearchException):
-    """
-    Exception to encapsulate backend specific errors that should be retried.
-    """
+    pass
 
 
 class DynamicSearchScopedQueryError(DynamicSearchException):
-    """
-    Raised when there is an error in a scoped query.
-    """
+    pass
 
 
 class DynamicSearchValueTransformationError(DynamicSearchException):
-    """
-    Raised when it is not possible to transform a value.
-    """
+    pass
+
+
+class DynamicSearchAPIErrorServiceUnavailable(APIException):
+    default_code = 'service_unavailable'
+    default_detail = _(
+        message='The search service is temporarily unavailable.'
+    )
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE

@@ -65,6 +65,7 @@ class NotificationMarkReadView(NotificationViewMixin, ConfirmView):
 
     def get_extra_context(self):
         return {
+            'submit_label': _(message='Mark as read'),
             'title': _(message='Mark the selected notification as read?')
         }
 
@@ -92,6 +93,7 @@ class NotificationMarkReadAllView(NotificationViewMixin, ConfirmView):
 
     def get_extra_context(self):
         return {
+            'submit_label': _(message='Mark as read'),
             'title': _(message='Mark all notification as read?')
         }
 

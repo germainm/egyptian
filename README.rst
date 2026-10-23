@@ -1,13 +1,13 @@
 |support| |doi| |license| |docker_tag| |docker_pulls| |docker_stars| |gitlab_tag|
 
-.. image:: https://gitlab.com/mayan-edms/mayan-edms/raw/master/docs/_static/mayan_logo_bw.png
+.. image:: https://docs.mayan-edms.com/_static/mayan_logo_bw.png
     :align: center
     :width: 200
     :height: 200
 
 The most advanced, scalable, and mature open source document management system.
 
-.. image:: https://gitlab.com/mayan-edms/mayan-edms/raw/master/docs/_static/overview.gif
+.. image:: https://docs.mayan-edms.com/_static/overview.gif
     :align: center
     :width: 300
 
@@ -51,7 +51,7 @@ For more in-depth articles, tutorials, and troubleshooting available in the Know
 .. image:: https://docs.mayan-edms.com/_static/knowledge-base.jpg
     :align: center
     :width: 300
-    :target: https://sellfy.com/p/um2fkx/
+    :target: https://forum.mayan-edms.com/s/prod_Ogq3lYaoROC02Q
 
 Click the image or visit: https://forum.mayan-edms.com/s/prod_Ogq3lYaoROC02Q
 
@@ -63,9 +63,6 @@ Important links
 - `Documentation <https://docs.mayan-edms.com>`__
 - `Forum <https://forum.mayan-edms.com>`__
 - `Source code, issues, bugs <https://gitlab.com/mayan-edms/mayan-edms>`__
-
-.. |docker_layers| image:: https://images.microbadger.com/badges/image/mayanedms/mayanedms.svg
-   :target: https://microbadger.com/images/mayanedms/mayanedms
 
 .. |docker_pulls| image:: https://img.shields.io/docker/pulls/mayanedms/mayanedms.svg?style=for-the-badge&logo=docker
    :target: https://hub.docker.com/r/mayanedms/mayanedms/

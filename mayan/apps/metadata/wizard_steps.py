@@ -75,9 +75,6 @@ class DocumentCreateWizardStepMetadata(DocumentCreateWizardStep):
 
     @classmethod
     def condition(cls, wizard):
-        """
-        Skip step if document type has no associated metadata.
-        """
         cleaned_data = wizard.get_cleaned_data_for_step(
             step=DocumentCreateWizardStepDocumentType.name
         ) or {}
@@ -154,14 +151,10 @@ class DocumentCreateWizardStepMetadata(DocumentCreateWizardStep):
                 query_string=query_string
             )
 
-            # Convert metadata_dict_list and used to filter the restricted
-            # queryset.
             queryset_metadata_types_restricted = queryset_metadata_types_restricted.filter(
                 document_types__document_type=document.document_type.pk
             )
 
-            # Convert back the metadata type queryset into a
-            # metadata_dict_list.
 
             metadata_dict_list_restricted = []
 

@@ -153,13 +153,11 @@ class OCRApp(MayanAppConfig):
             model=DocumentTypeOCRSettings, related='document_type',
         )
 
-        # Document type
 
         menu_list_facet.bind_links(
             links=(link_document_type_ocr_settings,), sources=(DocumentType,)
         )
 
-        # Document version
 
         menu_list_facet.bind_links(
             links=(link_document_version_ocr_content_detail,),
@@ -187,7 +185,6 @@ class OCRApp(MayanAppConfig):
             )
         )
 
-        # Document version page
 
         menu_list_facet.bind_links(
             links=(

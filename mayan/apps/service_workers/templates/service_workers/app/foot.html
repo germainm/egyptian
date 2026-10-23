@@ -1,0 +1,56 @@
+{% load i18n %}
+{% load static %}
+
+{% load smart_settings_tags %}
+
+{% smart_setting 'SERVICE_WORKERS_ENABLED' as service_workers_enabled %}
+{% smart_setting 'SERVICE_WORKERS_RETRY_INTERVAL' as service_workers_retry_interval %}
+
+{% if service_workers_enabled %}
+    
+    
+    
+    
+    
+    <script id="template-service-worker-unavailable" type="text/x-template">
+        <div class="row justify-content-center">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-6">
+                <div aria-live="polite" class="card border-primary mt-4" id="service-worker-unavailable" role="alert">
+                    <div class="card-body text-center p-4 p-md-5">
+                        <p class="text-primary mb-3">
+                            <i aria-hidden="true" class="fas fa-exclamation-triangle fa-3x"></i>
+                        </p>
+                        <h2 class="h4 mb-3">{% blocktrans %}Service temporarily unavailable{% endblocktrans %}</h2>
+                        <p class="text-muted mb-2">{% blocktrans %}The server is busy, restarting, or unreachable and could not respond. This is usually temporary.{% endblocktrans %}</p>
+                        <p class="text-muted mb-4">{% blocktrans %}Check your network connection and try again in a few moments.{% endblocktrans %}</p>
+                        <button type="button" class="btn btn-primary" id="service-worker-unavailable-retry">
+                            <i aria-hidden="true" class="fas fa-sync me-2"></i>{% blocktrans %}Retry{% endblocktrans %}
+                        </button>
+                        <div class="text-muted mt-3 small" data-message-template="{% trans 'Retrying automatically in %(seconds)s seconds…' %}" id="service-worker-unavailable-countdown"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </script>
+{% endif %}
+
+<script src="{% static 'service_workers/js/service_worker.js' %}" type="text/javascript"></script>
+
+<script>
+    'use strict';
+
+    
+    
+    
+    
+    
+    
+    jQuery(document).ready(function () {
+        MayanServiceWorker.setup({
+            autoRetrySeconds: {{ service_workers_retry_interval }},
+            enabled: {{ service_workers_enabled|yesno:"true,false" }},
+            partialNavigation: (typeof partialNavigation !== 'undefined') ? partialNavigation : null,
+            scriptUrl: '{% url 'service_workers:service_worker_script' %}'
+        });
+    });
+</script>

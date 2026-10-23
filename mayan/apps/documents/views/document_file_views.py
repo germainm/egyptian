@@ -11,7 +11,6 @@ from mayan.apps.converter.permissions import (
     permission_transformation_delete, permission_transformation_edit
 )
 from mayan.apps.converter.transformations import TransformationResize
-from mayan.apps.sources.links import link_document_file_upload
 from mayan.apps.views.generics import (
     FormView, MultipleObjectConfirmActionView, MultipleObjectDeleteView,
     SingleObjectDetailView, SingleObjectEditView, SingleObjectListView
@@ -42,7 +41,9 @@ from ..permissions import (
 from ..settings import setting_preview_height, setting_preview_width
 from ..tasks import task_document_file_delete, task_document_file_size_update
 
-from .misc_views import DocumentPrintBaseView, PrintFormView
+from .misc_views import (
+    DocumentPrintBaseView, DocumentPrintPDFBaseView, PrintFormView
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -141,6 +142,7 @@ class DocumentFileIntrospectView(MultipleObjectConfirmActionView):
         queryset = self.object_list
 
         result = {
+            'submit_label': _(message='Introspect'),
             'title': ngettext(
                 singular='Introspect the selected document file?',
                 plural='Introspect the selected document files?',
@@ -180,11 +182,12 @@ class DocumentFileIntrospectView(MultipleObjectConfirmActionView):
 class DocumentFileListView(ExternalObjectViewMixin, SingleObjectListView):
     external_object_pk_url_kwarg = 'document_id'
     external_object_queryset = Document.valid.all()
+    no_results_main_link = None
     object_permission = permission_document_file_view
     view_icon = icon_document_file_list
 
-    @staticmethod
-    def get_no_results_context(document=None, request=None):
+    @classmethod
+    def get_no_results_context(cls, document=None, request=None):
         context = {
             'no_results_icon': icon_document_file_list,
             'no_results_text': _(
@@ -195,13 +198,15 @@ class DocumentFileListView(ExternalObjectViewMixin, SingleObjectListView):
             'no_results_title': _(message='No files available')
         }
 
-        if document:
-            context['no_results_main_link'] = link_document_file_upload.resolve(
+        main_link = cls.no_results_main_link
+
+        if document and main_link:
+            resolved_main_link = main_link.resolve(
                 context=RequestContext(
-                    dict_={'object': document},
-                    request=request
+                    dict_={'object': document}, request=request
                 )
             )
+            context['no_results_main_link'] = resolved_main_link
 
         return context
 
@@ -235,6 +240,7 @@ class DocumentFilePreviewView(SingleObjectDetailView):
     object_permission = permission_document_file_view
     pk_url_kwarg = 'document_file_id'
     source_queryset = DocumentFile.valid.all()
+    template_name = 'appearance/viewport_fill.html'
     view_icon = icon_document_file_preview
 
     def dispatch(self, request, *args, **kwargs):
@@ -285,12 +291,21 @@ class DocumentFilePrintView(DocumentPrintBaseView):
     external_object_permission = permission_document_file_print
     external_object_pk_url_kwarg = 'document_file_id'
     external_object_queryset = DocumentFile.valid.all()
+    print_pdf_view_name = 'documents:document_file_print_pdf_view'
+    print_pdf_view_kwarg = 'document_file_id'
     view_icon = icon_document_file_print
 
     def _add_recent_document(self):
         self.external_object.document.add_as_recent_document_for_user(
             user=self.request.user
         )
+
+
+class DocumentFilePrintPDFView(DocumentPrintPDFBaseView):
+    external_object_permission = permission_document_file_print
+    external_object_pk_url_kwarg = 'document_file_id'
+    external_object_queryset = DocumentFile.valid.all()
+    view_icon = icon_document_file_print
 
 
 class DocumentFilePropertiesView(SingleObjectDetailView):
@@ -418,6 +433,7 @@ class DocumentFileTransformationsCloneView(ExternalObjectViewMixin, FormView):
     def get_extra_context(self):
         context = {
             'object': self.external_object,
+            'submit_label': _(message='Clone'),
             'title': _(
                 message='Clone page transformations of document file: %s'
             ) % self.external_object

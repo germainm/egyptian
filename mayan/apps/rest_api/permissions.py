@@ -9,8 +9,8 @@ from mayan.apps.permissions.classes import Permission
 class MayanPermission(BasePermission):
     def get_mayan_object_permission(self, request, view):
         try:
-            method_get_mayan_object_permission = getattr(
-                view, 'get_mayan_object_permission'
+            method_get_mayan_object_permission_map = getattr(
+                view, 'get_mayan_object_permission_map'
             )
         except AttributeError:
             mayan_object_permission_map = getattr(
@@ -22,7 +22,7 @@ class MayanPermission(BasePermission):
             )
             return permission
         else:
-            return method_get_mayan_object_permission()
+            return method_get_mayan_object_permission_map()
 
     def get_mayan_view_permission(self, request, view):
         try:

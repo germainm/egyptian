@@ -50,7 +50,6 @@ class AdvancedSearchForm(SearchFormBase):
                     )
                 )
 
-                # Build the fieldset dictionary.
                 model = search_field.field_name_model_list[0]
 
                 try:
@@ -68,7 +67,6 @@ class AdvancedSearchForm(SearchFormBase):
                     search_field.field_name
                 )
 
-        # Convert the fieldset dictionary to the standard fieldset tuple.
         fieldsets = ()
 
         fieldsets += (

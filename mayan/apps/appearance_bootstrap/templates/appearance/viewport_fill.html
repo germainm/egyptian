@@ -1,0 +1,31 @@
+{% extends 'appearance/base.html' %}
+
+{% load appearance_tags %}
+
+
+
+{% block title %}{% include 'appearance/partials/title.html' with non_html_title=True %}{% endblock %}
+
+{% block base_layout_class %}layout-viewport-fill{% endblock %}
+
+{% block content %}
+    {% if form %}
+        {% for asset in form.media.render_css %}
+            {{ asset|safe }}
+        {% endfor %}
+
+        {% for field in form.hidden_fields %}
+            {{ field }}
+        {% endfor %}
+
+        {% for field in form.visible_fields %}
+            {{ field }}
+        {% endfor %}
+
+        <script>
+            {% for script in form|appearance_get_form_media_js %}
+                $.getScript('{{ script }}');
+            {% endfor %}
+        </script>
+    {% endif %}
+{% endblock %}

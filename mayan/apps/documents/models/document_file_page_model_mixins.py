@@ -1,4 +1,5 @@
 import logging
+from io import BytesIO
 
 from furl import furl
 
@@ -8,12 +9,12 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.converter.classes import ConverterBase
 from mayan.apps.converter.exceptions import AppImageError
-from mayan.apps.converter.literals import CONVERTER_OFFICE_FILE_MIMETYPES
 from mayan.apps.converter.models import LayerTransformation
 from mayan.apps.converter.settings import setting_image_generation_timeout
 from mayan.apps.converter.transformations import BaseTransformation
 from mayan.apps.file_caching.models import CachePartitionFile
 from mayan.apps.lock_manager.backends.base import LockingBackend
+from mayan.apps.lock_manager.exceptions import LockError
 
 from ..literals import (
     ERROR_LOG_DOMAIN_NAME, IMAGE_ERROR_DOCUMENT_FILE_PAGE_TRANSFORMATION_ERROR
@@ -26,9 +27,54 @@ class DocumentFilePageBusinessLogicMixin:
     @cached_property
     def cache_partition(self):
         partition, created = self.document_file.cache.partitions.get_or_create(
-            name=self.uuid
+            name=self.cache_partition_name
         )
         return partition
+
+    @property
+    def cache_partition_name(self):
+        return self.uuid
+
+    def cache_partition_delete(self):
+        for partition in self.document_file.cache.partitions.filter(
+            name=self.cache_partition_name
+        ):
+            partition.delete()
+
+    def _do_transformation_list_apply(
+        self, converter_instance, transformation_instance_list
+    ):
+        try:
+            for transformation in transformation_instance_list:
+                converter_instance.transform(transformation=transformation)
+        except Exception as exception:
+            logger.error(
+                'Error applying transformation to document file page %d; '
+                '%s', self.page_number, exception, exc_info=True
+            )
+            error_log_text = _(
+                message='Error applying transformation to page '
+                '%(page_number)d; %(exception)s'
+            ) % {
+                'exception': exception, 'page_number': self.page_number
+            }
+
+            self.error_log.create(
+                domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
+            )
+            raise
+
+        return converter_instance.get_page()
+
+    def get_image_cache_filename(
+        self, maximum_layer_order=None, transformation_instance_list=None,
+        user=None
+    ):
+        return self.get_combined_cache_filename(
+            maximum_layer_order=maximum_layer_order,
+            transformation_instance_list=transformation_instance_list,
+            user=user
+        )
 
     def generate_image(
         self, user=None, _acquire_lock=True,
@@ -59,8 +105,6 @@ class DocumentFilePageBusinessLogicMixin:
         except Exception:
             raise
         else:
-            # Second try block to release the lock even on fatal errors inside
-            # the block.
             try:
                 try:
                     self.cache_partition.get_file(
@@ -90,16 +134,8 @@ class DocumentFilePageBusinessLogicMixin:
 
     def get_api_image_url(
         self, maximum_layer_order=None, transformation_instance_list=None,
-        user=None
+        user=None, _stored_transformation_list=None
     ):
-        """
-        Create an unique URL combining:
-        - the page's image URL
-        - the interactive argument
-        - a hash from the server side and interactive transformations
-        The purpose of this unique URL is to allow client side caching
-        if document page images.
-        """
         transformation_instance_list = transformation_instance_list or ()
 
         try:
@@ -107,7 +143,8 @@ class DocumentFilePageBusinessLogicMixin:
                 transformations=self.get_combined_transformation_list(
                     maximum_layer_order=maximum_layer_order,
                     transformation_instance_list=transformation_instance_list,
-                    user=user
+                    user=user,
+                    _stored_transformation_list=_stored_transformation_list
                 )
             )
         except Exception as exception:
@@ -123,7 +160,6 @@ class DocumentFilePageBusinessLogicMixin:
                 'document_file_page_id': self.pk
             }, viewname='rest_api:documentfilepage-image'
         )
-        # Remove leading '?' character.
         final_url.query = BaseTransformation.list_as_query_string(
             transformation_instance_list=transformation_instance_list
         )[1:]
@@ -149,29 +185,45 @@ class DocumentFilePageBusinessLogicMixin:
 
     def get_combined_transformation_list(
         self, maximum_layer_order=None, transformation_instance_list=None,
-        user=None
+        user=None, _stored_transformation_list=None
     ):
-        """
-        Return a list of transformation containing the server side
-        transformations for this object as well as transformations
-        created from the arguments as transient interactive transformation.
-        """
         result = []
 
-        # Stored transformations first.
-        result.extend(
-            LayerTransformation.objects.get_for_object(
+        if _stored_transformation_list is None:
+            _stored_transformation_list = LayerTransformation.objects.get_for_object(
                 as_classes=True, maximum_layer_order=maximum_layer_order,
                 obj=self, user=user
             )
-        )
 
-        # Interactive transformations second.
+        result.extend(_stored_transformation_list)
+
         result.extend(
             transformation_instance_list or []
         )
 
         return result
+
+    def _image_from_base_cache_file(
+        self, cache_file, transformation_instance_list
+    ):
+        if transformation_instance_list:
+            with cache_file.open() as file_object:
+                converter_class = ConverterBase.get_converter_class()
+                converter_instance = converter_class(
+                    file_object=file_object
+                )
+
+                converter_instance.seek_page(page_number=0)
+
+                return self._do_transformation_list_apply(
+                    converter_instance=converter_instance,
+                    transformation_instance_list=transformation_instance_list
+                )
+        else:
+            with cache_file.open() as file_object:
+                return BytesIO(
+                    file_object.read()
+                )
 
     def get_image(self, transformation_instance_list=None):
         cache_filename = 'base_image'
@@ -182,80 +234,87 @@ class DocumentFilePageBusinessLogicMixin:
         except CachePartitionFile.DoesNotExist:
             logger.debug('Page cache file "%s" not found', cache_filename)
 
+            lock_name = 'document_file_page_base_image_{}'.format(self.pk)
+            base_image_lock = LockingBackend.get_backend().acquire_lock(
+                name=lock_name, timeout=setting_image_generation_timeout.value
+            )
             try:
-                with self.document_file.get_intermediate_file() as file_object:
-                    converter_class = ConverterBase.get_converter_class()
-                    # Office formats are converted to PDF by get_intermediate_file
-                    # via LibreOffice; let the converter auto-detect that PDF.
-                    # All other formats return the original file, so pass the
-                    # stored MIME type to avoid falling back to text/plain.
-                    doc_mime = self.document_file.mimetype
-                    mime_type = (
-                        None
-                        if doc_mime in CONVERTER_OFFICE_FILE_MIMETYPES
-                        else doc_mime
+                try:
+                    cache_file = self.cache_partition.get_file(
+                        filename=cache_filename
                     )
-                    converter_instance = converter_class(
-                        file_object=file_object,
-                        mime_type=mime_type
-                    )
-                    converter_instance.seek_page(
-                        page_number=self.page_number - 1
-                    )
+                except CachePartitionFile.DoesNotExist:
+                    try:
+                        with self.document_file.get_intermediate_file() as file_object:
+                            converter_class = ConverterBase.get_converter_class()
+                            # Office formats are converted to PDF by
+                            # get_intermediate_file via LibreOffice; let the
+                            # converter auto-detect that PDF. All other formats
+                            # return the original file, so pass the stored MIME
+                            # type to avoid falling back to text/plain.
+                            document_file_mime_type = self.document_file.mimetype
+                            if ConverterBase.is_office_format(mime_type=document_file_mime_type):
+                                document_file_mime_type = None
+                            converter_instance = converter_class(
+                                file_object=file_object,
+                                mime_type=document_file_mime_type
+                            )
+                            converter_instance.seek_page(
+                                page_number=self.page_number - 1
+                            )
 
-                    page_image = converter_instance.get_page()
+                            page_image = converter_instance.get_page()
 
-                    # Since open "wb+" doesn't create files, create it
-                    # explicitly.
-                    with self.cache_partition.create_file(filename=cache_filename) as file_object:
-                        file_object.write(
-                            page_image.getvalue()
+                            with self.cache_partition.create_file(filename=cache_filename) as file_object:
+                                file_object.write(
+                                    page_image.getvalue()
+                                )
+                    except LockError:
+                        raise
+                    except Exception as exception:
+                        logger.error(
+                            'Error creating document file page cache file from '
+                            'document file intermediate file. Expected file named '
+                            '"%s" failed to be created; %s', cache_filename,
+                            exception, exc_info=True
                         )
+                        error_log_text = _(
+                            message='Error generating image for page '
+                            '%(page_number)d; %(exception)s') % {
+                            'exception': exception, 'page_number': self.page_number
+                        }
 
-                    # Apply runtime transformations.
-                    for transformation in transformation_instance_list or ():
-                        converter_instance.transform(
-                            transformation=transformation
+                        self.document_file.error_log.create(
+                            domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
                         )
+                        raise
+                    else:
+                        if transformation_instance_list:
+                            return self._do_transformation_list_apply(
+                                converter_instance=converter_instance,
+                                transformation_instance_list=transformation_instance_list
+                            )
+                        else:
+                            page_image.seek(0)
+                            return page_image
+                else:
+                    logger.debug(
+                        'Page cache file "%s" created while waiting for the '
+                        'lock', cache_filename
+                    )
+                    return self._image_from_base_cache_file(
+                        cache_file=cache_file,
+                        transformation_instance_list=transformation_instance_list
+                    )
+            finally:
+                base_image_lock.release()
 
-                    return converter_instance.get_page()
-            except Exception as exception:
-                logger.error(
-                    'Error creating document file page cache file from '
-                    'document file intermediate file. Expected file named '
-                    '"%s" failed to be created; %s', cache_filename,
-                    exception, exc_info=True
-                )
-                error_log_text = _(
-                    message='Error generating image for page '
-                    '%(page_number)d; %(exception)s') % {
-                    'exception': exception, 'page_number': self.page_number
-                }
-
-                self.document_file.error_log.create(
-                    domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
-                )
-                raise
         else:
             logger.debug('Page cache file "%s" found', cache_filename)
-
-            with cache_file.open() as file_object:
-                converter_class = ConverterBase.get_converter_class()
-                converter_instance = converter_class(
-                    file_object=file_object
-                )
-
-                converter_instance.seek_page(page_number=0)
-
-                # This code is also repeated below to allow using a context
-                # manager with cache_file.open and close it automatically.
-                # Apply runtime transformations.
-                for transformation in transformation_instance_list or ():
-                    converter_instance.transform(
-                        transformation=transformation
-                    )
-
-                return converter_instance.get_page()
+            return self._image_from_base_cache_file(
+                cache_file=cache_file,
+                transformation_instance_list=transformation_instance_list
+            )
 
     def get_label(self):
         return _(
@@ -290,8 +349,4 @@ class DocumentFilePageBusinessLogicMixin:
 
     @property
     def uuid(self):
-        """
-        Make cache UUID a mix of file ID and page ID to avoid using stale
-        images.
-        """
         return '{}-{}'.format(self.document_file.uuid, self.pk)

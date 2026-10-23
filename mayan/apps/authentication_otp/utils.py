@@ -3,7 +3,6 @@ from mayan.apps.common.utils import get_class_full_name
 
 
 def is_otp_backend_enabled():
-    # Hidden import.
     from .authentication_backends import (
         AuthenticationBackendModelUsernamePasswordTOTP
     )

@@ -6,8 +6,6 @@ namespace = PermissionNamespace(
     label=_(message='Cabinets'), name='cabinets'
 )
 
-# Translators: this refers to the permission that will allow users to add
-# documents to cabinets.
 permission_cabinet_add_document = namespace.add_permission(
     label=_(message='Add documents to cabinets'), name='cabinet_add_document'
 )

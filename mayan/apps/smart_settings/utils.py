@@ -1,15 +1,26 @@
 import errno
 import os
+import sys
 
 import yaml
 
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.encoding import force_str
 
 from mayan.apps.common.serialization import yaml_dump, yaml_load
 from mayan.apps.templating.template_backends import Template
 from mayan.literals import ENVIRONMENT_VARIABLE_PREFIX
 
-from .literals import CONFIGURATION_FILENAME, CONFIGURATION_FILENAME_LAST_GOOD
+from .literals import (
+    CONFIGURATION_FILENAME, CONFIGURATION_FILENAME_LAST_GOOD,
+    DEFAULT_AUTH_PASSWORD_VALIDATORS, DEFAULT_AUTHENTICATION_BACKENDS,
+    DEFAULT_SECURE_PROXY_SSL_HEADER, DEFAULT_USE_X_FORWARDED_HOST,
+    DEFAULT_USE_X_FORWARDED_PORT
+)
+from .setting_validators import (
+    check_setting_is_list_of_mappings, check_setting_is_list_of_strings,
+    check_setting_secure_proxy_ssl_header
+)
 
 environment_variable_prefix = ENVIRONMENT_VARIABLE_PREFIX
 
@@ -23,8 +34,6 @@ def serialize_data_to_display(data):
     result = yaml_dump(
         allow_unicode=True, data=data, default_flow_style=False
     )
-    # safe_dump returns bytestrings.
-    # Disregard the last 3 dots that mark the end of the YAML document.
     if force_str(s=result).endswith('...\n'):
         result = result[:-4]
 
@@ -32,16 +41,12 @@ def serialize_data_to_display(data):
 
 
 class SettingNamespaceSingleton:
-    """
-    Self hosting bootstrap setting class.
-    Allow managing setting in a compatible way before Mayan EDMS starts.
-    """
     _setting_kwargs = {}
     _setting_overrides = {}
     _settings = {}
 
     class SettingNotFound(Exception):
-        """Mostly a stand-in or typecast for KeyError for readability."""
+        pass
 
     @classmethod
     def load_config_file(cls, filepath):
@@ -53,14 +58,13 @@ class SettingNamespaceSingleton:
                     try:
                         return yaml_load(stream=file_object)
                     except yaml.YAMLError as exception:
-                        exit(
+                        raise SystemExit(
                             'Error loading configuration file: {}; {}'.format(
                                 filepath, exception
                             )
                         )
         except IOError as exception:
             if exception.errno == errno.ENOENT:
-                # No config file, return empty dictionary
                 return {}
             else:
                 raise
@@ -73,6 +77,7 @@ class SettingNamespaceSingleton:
     def __init__(self, global_symbol_table):
         self.global_symbol_table = global_symbol_table
         self.settings = {}
+        self._config_file_content_cache = {}
 
         for name, klass in self.__class__._settings.items():
             kwargs = self.__class__._setting_kwargs[name].copy()
@@ -81,7 +86,6 @@ class SettingNamespaceSingleton:
             setting.namespace = self
             self.settings[name] = setting
 
-        # Proto setting.
         global environment_variable_prefix
         environment_variable_prefix = os.environ.get(
             'MAYAN_ENVIRONMENT_VARIABLE_PREFIX', ENVIRONMENT_VARIABLE_PREFIX
@@ -90,17 +94,18 @@ class SettingNamespaceSingleton:
     def get_config_file_content(self):
         filepath = self.get_setting_value(name='CONFIGURATION_FILEPATH')
 
-        return self.load_config_file(filepath=filepath) or {}
+        try:
+            return self._config_file_content_cache[filepath]
+        except KeyError:
+            content = self.load_config_file(filepath=filepath) or {}
+            self._config_file_content_cache[filepath] = content
+
+            return content
 
     def get_setting(self, name):
         return self.settings[name]
 
     def get_setting_value(self, name):
-        """
-        Wrapper that calls the individual setting .get_value method.
-        Convenience method to allow returning setting values from the
-        namespace.
-        """
         try:
             setting = self.get_setting(name=name)
         except KeyError:
@@ -109,14 +114,8 @@ class SettingNamespaceSingleton:
             return setting.get_value()
 
     def get_values(self, only_critical=False):
-        """
-        Return a dictionary will all the settings and their respective
-        resolved values.
-        """
         result = {}
         for name, setting in self.settings.items():
-            # If `only_critical` is set to `True` load only the settings with
-            # the critical flag. Otherwise load all.
             if only_critical and setting.critical or not only_critical:
                 try:
                     result[name] = setting.get_value()
@@ -126,7 +125,7 @@ class SettingNamespaceSingleton:
                     dictionary.
                     """
                 except Exception as exception:
-                    exit(
+                    raise SystemExit(
                         'Unable to load bootstrap setting; {}'.format(
                             exception
                         )
@@ -135,9 +134,6 @@ class SettingNamespaceSingleton:
         return result
 
     def update_globals(self, global_symbol_table=None, only_critical=False):
-        """
-        Insert all resolved values into the symbol table of the caller.
-        """
         result = self.get_values(only_critical=only_critical)
 
         if global_symbol_table is None:
@@ -153,12 +149,13 @@ class BaseSetting:
 
     def __init__(
         self, name, critical=False, default_value=None,
-        has_default=False
+        has_default=False, validation_function=None
     ):
         self.critical = critical
         self.default_value = default_value
         self.has_default = has_default
         self.name = name
+        self.validation_function = validation_function
 
     def do_load_value_from_config_file(self):
         content = self.namespace.get_config_file_content()
@@ -189,15 +186,6 @@ class BaseSetting:
         return self.namespace.global_symbol_table[self.name]
 
     def _get_value(self):
-        """
-        By default will try to get the value from the namespace symbol table,
-        then the configuration file, and finally from the environment.
-        """
-        # Resolution order
-        # 1 - Environment
-        # 2 - Config
-        # 3 - Global
-        # 4 - Default
         try:
             return self.do_load_value_from_environment()
         except SettingNamespaceSingleton.SettingNotFound:
@@ -240,7 +228,7 @@ class BaseSetting:
         content = self.namespace.get_config_file_content()
         template_name = self.get_template_name()
 
-        content[template_name]
+        return content[template_name]
 
     def get_template_string_from_environment(self):
         template_environment_name = self.get_template_environment_name()
@@ -251,7 +239,45 @@ class BaseSetting:
         template_name = self.get_template_name()
         return self.namespace.global_symbol_table[template_name]
 
+    def do_value_validate(self, value):
+        if not self.validation_function:
+            return value
+
+        try:
+            return self.validation_function(raw_value=value, setting=self)
+        except Exception as exception:
+            return self.do_value_validation_error_handle(exception=exception)
+
+    def do_value_validation_error_handle(self, exception):
+        settings_ignore_errors = self.get_settings_ignore_errors()
+
+        if settings_ignore_errors:
+            sys.stderr.write(
+                'WARNING: Ignoring invalid value for setting `{}`; {} Using '
+                'the default value instead.\n'.format(self.name, exception)
+            )
+            return self.get_default_value()
+        else:
+            raise ImproperlyConfigured(
+                'Invalid value for setting `{}`; {}'.format(
+                    self.name, exception
+                )
+            )
+
+    def get_settings_ignore_errors(self):
+        try:
+            return self.namespace.get_setting_value(
+                name='SETTINGS_IGNORE_ERRORS'
+            )
+        except SettingNamespaceSingleton.SettingNotFound:
+            return True
+
     def get_value(self):
+        value = self.get_value_resolved()
+
+        return self.do_value_validate(value=value)
+
+    def get_value_resolved(self):
         try:
             return self.namespace._setting_overrides[self.name]
         except KeyError:
@@ -283,13 +309,9 @@ class FilesystemBootstrapSetting(BaseSetting):
         self.has_default = True
         self.name = name
         self.path_parts = path_parts
+        self.validation_function = None
 
     def _get_value(self):
-        """
-        It is not possible to look for this setting in the config file
-        because not even the config file setup has completed.
-        This setting only supports being set from the environment.
-        """
         try:
             return self.do_load_value_from_environment()
         except SettingNamespaceSingleton.SettingNotFound:
@@ -299,12 +321,6 @@ class FilesystemBootstrapSetting(BaseSetting):
                 raise SettingNamespaceSingleton.SettingNotFound
 
     def get_default_value(self):
-        """
-        The default value of this setting class is not static but calculated.
-        """
-        # Can't use BASE_DIR from django.conf.settings.
-        # Use it from the `global_symbol_table` which should be the
-        # same.
         try:
             BASE_DIR = self.namespace._setting_overrides['MEDIA_ROOT']
         except KeyError:
@@ -323,9 +339,6 @@ class FilesystemBootstrapSetting(BaseSetting):
 
 class MediaBootstrapSetting(FilesystemBootstrapSetting):
     def get_default_value(self):
-        """
-        The default value of this setting class is not static but calculated.
-        """
         media_root = self.namespace.get_setting_value(name='MEDIA_ROOT')
 
         return os.path.join(media_root, *self.path_parts)
@@ -339,7 +352,6 @@ def smart_yaml_load(value):
         return yaml_load(stream=stream)
 
 
-# FilesystemBootstrapSetting settings
 
 SettingNamespaceSingleton.register_setting(
     klass=MediaBootstrapSetting, kwargs={
@@ -352,7 +364,6 @@ SettingNamespaceSingleton.register_setting(
     }, name='CONFIGURATION_FILE_IGNORE'
 )
 
-# MediaBootstrapSetting settings
 
 SettingNamespaceSingleton.register_setting(
     klass=MediaBootstrapSetting, kwargs={
@@ -365,22 +376,30 @@ SettingNamespaceSingleton.register_setting(
     }, name='MEDIA_ROOT'
 )
 
-# Normal settings
 
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, kwargs={
         'has_default': True,
-        'default_value': ['127.0.0.1', 'localhost', '[::1]']
+        'default_value': ['127.0.0.1', 'localhost', '[::1]'],
+        'validation_function': check_setting_is_list_of_strings
     }, name='ALLOWED_HOSTS'
 )
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, name='APPEND_SLASH'
 )
 SettingNamespaceSingleton.register_setting(
-    klass=BaseSetting, name='AUTH_PASSWORD_VALIDATORS'
+    klass=BaseSetting, kwargs={
+        'has_default': True,
+        'default_value': DEFAULT_AUTH_PASSWORD_VALIDATORS,
+        'validation_function': check_setting_is_list_of_mappings
+    }, name='AUTH_PASSWORD_VALIDATORS'
 )
 SettingNamespaceSingleton.register_setting(
-    klass=BaseSetting, name='AUTHENTICATION_BACKENDS'
+    klass=BaseSetting, kwargs={
+        'has_default': True,
+        'default_value': DEFAULT_AUTHENTICATION_BACKENDS,
+        'validation_function': check_setting_is_list_of_strings
+    }, name='AUTHENTICATION_BACKENDS'
 )
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, kwargs={
@@ -402,7 +421,8 @@ SettingNamespaceSingleton.register_setting(
     klass=BaseSetting,
     kwargs={
         'has_default': True,
-        'default_value': []
+        'default_value': [],
+        'validation_function': check_setting_is_list_of_strings
     }, name='CSRF_TRUSTED_ORIGINS'
 )
 SettingNamespaceSingleton.register_setting(
@@ -460,7 +480,8 @@ SettingNamespaceSingleton.register_setting(
 )
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, kwargs={
-        'has_default': True, 'default_value': ['127.0.0.1']
+        'has_default': True, 'default_value': ['127.0.0.1'],
+        'validation_function': check_setting_is_list_of_strings
     }, name='INTERNAL_IPS'
 )
 SettingNamespaceSingleton.register_setting(
@@ -485,6 +506,16 @@ SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, name='LANGUAGE_CODE'
 )
 SettingNamespaceSingleton.register_setting(
+    klass=BaseSetting, name='SERVER_EMAIL'
+)
+SettingNamespaceSingleton.register_setting(
+    klass=BaseSetting, kwargs={
+        'has_default': True,
+        'default_value': DEFAULT_SECURE_PROXY_SSL_HEADER,
+        'validation_function': check_setting_secure_proxy_ssl_header
+    }, name='SECURE_PROXY_SSL_HEADER'
+)
+SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, name='SESSION_COOKIE_NAME'
 )
 SettingNamespaceSingleton.register_setting(
@@ -503,10 +534,19 @@ SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, name='TIME_ZONE'
 )
 SettingNamespaceSingleton.register_setting(
+    klass=BaseSetting, kwargs={
+        'has_default': True, 'default_value': DEFAULT_USE_X_FORWARDED_HOST
+    }, name='USE_X_FORWARDED_HOST'
+)
+SettingNamespaceSingleton.register_setting(
+    klass=BaseSetting, kwargs={
+        'has_default': True, 'default_value': DEFAULT_USE_X_FORWARDED_PORT
+    }, name='USE_X_FORWARDED_PORT'
+)
+SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, name='WSGI_APPLICATION'
 )
 
-# Celery
 
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, kwargs={
@@ -528,7 +568,6 @@ SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, name='CELERY_RESULT_BACKEND'
 )
 
-# Mayan
 
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, kwargs={
@@ -591,7 +630,6 @@ SettingNamespaceSingleton.register_setting(
     }, name='TESTING'
 )
 
-# Settings
 
 SettingNamespaceSingleton.register_setting(
     klass=BaseSetting, kwargs={

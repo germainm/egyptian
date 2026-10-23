@@ -3,8 +3,8 @@
 {% if not hide_links %}
     {% navigation_resolve_menu name='list facet' sort_results=True source=object as facet_menus_link_results %}
     {% if facet_menus_link_results %}
-        <td class="text-center">
-            <div class="btn-list text-center">
+        <td class="align-middle text-center text-nowrap">
+            <div class="text-center">
                 {% include 'appearance/partials/list/column_object_facet_links.html' %}
             </div>
         </td>
@@ -12,8 +12,8 @@
 
     {% navigation_resolve_menu name='object' source=object sort_results=True as object_menus_link_results %}
     {% if object_menus_link_results %}
-        <td class="last">
-            <div class="btn-list text-center">
+        <td class="align-middle last text-nowrap">
+            <div class="text-center">
                {% include 'appearance/partials/list/column_object_links.html' %}
             </div>
         </td>

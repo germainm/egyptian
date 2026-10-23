@@ -8,15 +8,18 @@ from django.contrib.auth import get_user_model
 from mayan.apps.lock_manager.exceptions import LockError
 from mayan.celery import app
 
-from .settings import setting_image_generation_max_retries
+from .settings import (
+    setting_image_generation_max_retries,
+    setting_image_generation_retry_delay
+)
 from .utils import IndexedDictionary
 
 logger = logging.getLogger(name=__name__)
 
 
 @app.task(
-    bind=True, max_retries=setting_image_generation_max_retries.value,
-    retry_backoff=True
+    bind=True, ignore_result=False,
+    max_retries=setting_image_generation_max_retries.value
 )
 def task_content_object_image_generate(
     self, content_type_id, object_id, maximum_layer_order=None,
@@ -27,7 +30,7 @@ def task_content_object_image_generate(
     )
     User = get_user_model()
 
-    content_type = ContentType.objects.get(pk=content_type_id)
+    content_type = ContentType.objects.get_for_id(id=content_type_id)
 
     if user_id:
         user = User.objects.get(pk=user_id)
@@ -54,7 +57,10 @@ def task_content_object_image_generate(
             obj
         )
         try:
-            raise self.retry(exc=exception)
+            raise self.retry(
+                countdown=setting_image_generation_retry_delay.value,
+                exc=exception
+            )
         except celery.exceptions.MaxRetriesExceededError:
             logger.error(
                 'Maximum retries reached for image generation task. '

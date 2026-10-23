@@ -1,7 +1,9 @@
 import logging
+from contextlib import contextmanager
+from pathlib import Path
 
 from django.apps import apps
-from django.conf import settings
+from django.db import transaction
 from django.db.utils import IntegrityError, OperationalError, ProgrammingError
 from django.utils.functional import classproperty
 from django.utils.translation import gettext_lazy as _
@@ -11,11 +13,15 @@ from mayan.apps.common.utils import (
     convert_to_internal_name, deduplicate_dictionary_values,
     get_class_full_name
 )
+from mayan.apps.storage.utils import TemporaryDirectory
 from mayan.apps.templating.template_backends import Template
 
 from .exceptions import FileMetadataError
-from .literals import ERROR_LOG_DOMAIN_NAME
-from .settings import setting_auto_process, setting_drivers_arguments
+from .literals import ERROR_LOG_DOMAIN_NAME, MIME_TYPE_WILDCARD
+from .settings import (
+    setting_auto_process, setting_drivers_arguments,
+    setting_maximum_value_length
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -31,12 +37,27 @@ class FileMetadataDriverCollection:
                 'Driver "{}" is already registered.'.format(klass)
             )
 
+        internal_name = getattr(klass, 'internal_name', None)
+        if internal_name is not None:
+            for registered_driver in cls._driver_to_mime_type_dict:
+                registered_internal_name = getattr(
+                    registered_driver, 'internal_name', None
+                )
+                if registered_internal_name == internal_name:
+                    raise FileMetadataError(
+                        'A driver with the internal name "{}" is already '
+                        'registered.'.format(internal_name)
+                    )
+
         cls._driver_to_mime_type_dict[klass] = klass.mime_type_list
 
         for mime_type in klass.mime_type_list:
-            cls._mime_type_to_driver_dict.setdefault(
+            driver_class_list = cls._mime_type_to_driver_dict.setdefault(
                 mime_type, []
-            ).append(klass)
+            )
+
+            if klass not in driver_class_list:
+                driver_class_list.append(klass)
 
         klass.dotted_path = get_class_full_name(klass=klass)
 
@@ -52,21 +73,23 @@ class FileMetadataDriverCollection:
 
     @classmethod
     def get_driver_for_mime_type(cls, mime_type):
-        driver_class_list = cls._mime_type_to_driver_dict.get(
-            mime_type, ()
-        )
-        # Add wildcard drivers, drivers meant to be executed for all MIME
-        # types.
-        driver_class_list += tuple(
+        driver_class_list = list(
             cls._mime_type_to_driver_dict.get(
-                '*', ()
+                mime_type, ()
             )
         )
-        driver_class_list = [
+
+        driver_class_list_wildcard = cls._mime_type_to_driver_dict.get(
+            MIME_TYPE_WILDCARD, ()
+        )
+
+        for driver_class in driver_class_list_wildcard:
+            if driver_class not in driver_class_list:
+                driver_class_list.append(driver_class)
+
+        return [
             driver_class for driver_class in driver_class_list if driver_class.model_instance
         ]
-
-        return driver_class_list
 
 
 class FileMetadataDriverMetaclass(type):
@@ -85,10 +108,6 @@ class FileMetadataDriver(
     _loader_module_name = 'drivers'
     argument_name_list = ()
     description = ''
-    # Workaround a Django bug that causes the template system to call the
-    # class which would cause it to create an instance without required
-    # arguments and lead to an empty entry in list views.
-    # https://stackoverflow.com/questions/6861601/cannot-resolve-callable-context-variable
     do_not_call_in_templates = True
     dotted_path_previous_list = ()
     enabled = None
@@ -145,7 +164,6 @@ class FileMetadataDriver(
                 }
             )
         except IntegrityError:
-            # May be a driver that moved to another location.
             model_instance = StoredDriver.objects.get(
                 internal_name=cls.internal_name
             )
@@ -157,7 +175,6 @@ class FileMetadataDriver(
 
                 created = False
             else:
-                # Unknown situation, re-raise original error.
                 raise
 
         cls.model_instance = model_instance
@@ -207,7 +224,7 @@ class FileMetadataDriver(
 
         for argument_name in argument_name_list:
             value = raw_argument_values.get(argument_name)
-            if value:
+            if value is not None:
                 result[argument_name] = value
 
         return result
@@ -245,18 +262,6 @@ class FileMetadataDriver(
 
     @classmethod
     def get_enabled_value(cls):
-        """
-        Calculate the final value of the class enabled field when populated
-        or for new document types.
-
-        - `None` the final value will be up to the setting
-          `setting_auto_process`.
-        - `True` will be enabled.
-        - `False` will not be enabled.
-
-        The value itself an be overridden by the setting
-        `FILE_METADATA_DRIVERS_ARGUMENTS` to change the behavior per driver.
-        """
 
         enabled_from_settings = cls.get_enabled_value_from_settings()
 
@@ -299,8 +304,6 @@ class FileMetadataDriver(
             """
         else:
             try:
-                # Reset all `StoredDriver` in case a file metadata app was
-                # disabled.
                 StoredDriver.objects.update(exists=False)
             except (OperationalError, ProgrammingError):
                 """
@@ -311,6 +314,18 @@ class FileMetadataDriver(
             else:
                 for driver in cls.collection.get_all():
                     driver.do_model_instance_populate()
+
+    @contextmanager
+    def get_document_file_path(self, document_file, raw=False):
+        with TemporaryDirectory() as temporary_folder:
+            path_temporary_file = Path(
+                temporary_folder, Path(document_file.filename).name
+            )
+
+            with path_temporary_file.open(mode='xb') as file_object:
+                document_file.save_to_file(file_object=file_object, raw=raw)
+
+            yield str(path_temporary_file)
 
     def _instance_do_document_file_process(self, document_file):
         try:
@@ -338,48 +353,54 @@ class FileMetadataDriver(
                 dictionary=internal_name_dictionary
             )
 
-            queryset_document_file_metadata = self.model_instance.driver_entries.filter(
-                document_file=document_file
-            )
-            queryset_document_file_metadata.delete()
+            maximum_value_length = setting_maximum_value_length.value
 
-            document_file_driver_entry = self.model_instance.driver_entries.create(
-                document_file=document_file
-            )
+            with transaction.atomic():
+                queryset_document_file_metadata = self.model_instance.driver_entries.filter(
+                    document_file=document_file
+                )
+                queryset_document_file_metadata.delete()
 
-            coroutine = FileMetadataEntry.objects.create_bulk()
-            next(coroutine)
-
-            for key, value in file_metadata_dictionary.items():
-                internal_name = internal_name_dictionary_deduplicated[key]
-
-                # Drivers should not be returning `None` values.
-                # Added to workaround undocumented backward incompatible
-                # changes in Ollama.
-                value_clean = value or ''
-
-                coroutine.send(
-                    {
-                        'document_file_driver_entry': document_file_driver_entry,
-                        'internal_name': internal_name, 'key': key,
-                        'value': value_clean
-                    }
+                document_file_driver_entry = self.model_instance.driver_entries.create(
+                    document_file=document_file
                 )
 
-            coroutine.close()
+                coroutine = FileMetadataEntry.objects.create_bulk()
+                next(coroutine)
+
+                for key, value in file_metadata_dictionary.items():
+                    internal_name = internal_name_dictionary_deduplicated[key]
+
+                    value_clean = value or ''
+
+                    is_bounded = maximum_value_length is not None
+                    if is_bounded and isinstance(value_clean, str):
+                        value_clean = value_clean[:maximum_value_length]
+
+                    coroutine.send(
+                        {
+                            'document_file_driver_entry': document_file_driver_entry,
+                            'internal_name': internal_name, 'key': key,
+                            'value': value_clean
+                        }
+                    )
+
+                coroutine.close()
         except Exception as exception:
-            if settings.DEBUG and 0:
-                raise
-            else:
-                error_log_text = _(
-                    message='Cannot process driver "%(driver)s"; '
-                    '%(exception)s'
-                ) % {
-                    'driver': self.label, 'exception': exception
-                }
-                document_file.error_log.create(
-                    domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
-                )
+            logger.exception(
+                'Cannot process driver "%s" for document file: %s; %s',
+                self.label, document_file, exception
+            )
+
+            error_log_text = _(
+                message='Cannot process driver "%(driver)s"; '
+                '%(exception)s'
+            ) % {
+                'driver': self.label, 'exception': exception
+            }
+            document_file.error_log.create(
+                domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
+            )
 
     def _process(self, document_file):
         raise NotImplementedError(

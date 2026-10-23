@@ -15,7 +15,6 @@ from .permissions import (
     permission_file_metadata_submit, permission_file_metadata_view
 )
 
-# Document file
 
 link_document_file_metadata_driver_list = Link(
     icon=icon_file_metadata,
@@ -42,7 +41,6 @@ link_document_file_metadata_submit_single = Link(
     view='file_metadata:document_file_metadata_single_submit'
 )
 
-# Document type
 
 link_document_type_file_metadata_driver_configuration_edit = Link(
     icon=icon_document_type_file_metadata_driver_configuration_edit,
@@ -67,7 +65,6 @@ link_document_type_file_metadata_submit = Link(
     view='file_metadata:document_type_file_metadata_submit'
 )
 
-# Tools
 
 link_file_metadata_driver_list = Link(
     icon=icon_file_metadata_driver_list,

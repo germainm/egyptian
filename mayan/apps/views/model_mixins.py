@@ -15,7 +15,10 @@ class ModelMixinAppConfig:
     get_app_config.short_description = _(message='App')
 
     def get_app_config_verbose_name(self):
-        app_config = self.get_app_config()
+        try:
+            app_config = self.get_app_config()
+        except KeyError:
+            return None
 
         return app_config.verbose_name
 
@@ -26,9 +29,7 @@ class ModelMixinAppConfig:
 
 
 class ModelMixinUserConfirmViewBusinessLogic(ModelMixinAppConfig):
-    """
-    No other code besides the `ModelMixinAppConfig` inheritance.
-    """
+    pass
 
 
 class ModelMixinUserViewModeBusinessLogic(ModelMixinAppConfig):

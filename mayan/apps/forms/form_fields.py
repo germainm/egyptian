@@ -1,5 +1,5 @@
-from django.forms import ModelChoiceField  # NOQA
-from django.forms.fields import *  # NOQA
+from django.forms import ModelChoiceField
+from django.forms.fields import *
 from django.forms.fields import ChoiceField, MultipleChoiceField
 from django.forms.models import ModelMultipleChoiceField
 
@@ -11,16 +11,16 @@ from .field_mixins import (
 class FormFieldFilteredModelChoice(
     FormFieldMixinFilteredQueryset, ChoiceField
 ):
-    """Single selection filtered model choice field."""
+    pass
 
 
 class FormFieldFilteredModelChoiceMultiple(
     FormFieldMixinFilteredQueryset, MultipleChoiceField
 ):
-    """Multiple selection filtered model choice field."""
+    pass
 
 
 class ModelFormFieldFilteredModelMultipleChoice(
     ModelFieldMixinFilteredQuerySet, ModelMultipleChoiceField
 ):
-    """Multiple selection filtered model choice field."""
+    pass

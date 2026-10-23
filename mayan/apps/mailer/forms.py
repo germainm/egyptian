@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 
-import mayan
 from mayan.apps.acls.models import AccessControlList
 from mayan.apps.backends.forms import FormDynamicModelBackend
 from mayan.apps.forms import form_fields, form_widgets, forms
@@ -29,18 +28,15 @@ class ObjectMailForm(forms.Form):
 
             self.fields[
                 'body'
-            ].initial = setting_attachment_body_template.value % {
-                'project_title': mayan.__title__,
-                'project_website': mayan.__website__
-            }
+            ].initial = setting_attachment_body_template.value
         else:
             self.fields[
                 'subject'
             ].initial = setting_document_link_subject_template.value
-            self.fields['body'].initial = setting_document_link_body_template.value % {
-                'project_title': mayan.__title__,
-                'project_website': mayan.__website__
-            }
+
+            self.fields[
+                'body'
+            ].initial = setting_document_link_body_template.value
 
         queryset = AccessControlList.objects.restrict_queryset(
             permission=permission_mailing_profile_use,

@@ -7,6 +7,9 @@ from ..exceptions import (
 from ..tasks import task_source_backend_action_background_task
 
 from .interfaces import SourceBackendActionInterface
+from .mixins.server_upload_mixins import (
+    SourceBackendActionMixinServerUpload
+)
 from .mixins.source_metadata_mixins import (
     SourceBackendActionMixinSourceMetadata
 )
@@ -36,9 +39,7 @@ class SourceBackendActionMetaclass(type):
 
         if interface_dict:
             class InterfaceNamespace:
-                """
-                Temporary class to hold all computed interface subclasses.
-                """
+                pass
 
             for key, value in interface_dict.items():
                 InterfaceClass = type(
@@ -54,18 +55,15 @@ class SourceBackendActionMetaclass(type):
 
 class SourceBackendActionBase(metaclass=SourceBackendActionMetaclass):
     accept_files = False
-    confirmation = True  # Require a submit or a POST to execute.
+    confirmation = True
     name = None
     permission = None
 
     class Interface:
-        """
-        Class which all actions are expected to have.
-        """
+        pass
 
     @classproperty
     def interface_visible_list(cls):
-        # Used by the REST API serializer.
         for interface in cls.get_interface_list():
             if not interface.hidden:
                 yield interface
@@ -135,9 +133,6 @@ class SourceBackendActionBase(metaclass=SourceBackendActionMetaclass):
         )
 
         try:
-            # Only intercept action exception to add additional content.
-            # All other should be ignored. They might exception with
-            # interface context like Http404 for views or REST API.
             execute_kwargs = interface_instance.load(**interface_load_kwargs)
         except SourceActionException as exception:
             raise SourceActionException(
@@ -219,16 +214,11 @@ class SourceBackendActionBase(metaclass=SourceBackendActionMetaclass):
 
 
 class SourceBackendAction(
+    SourceBackendActionMixinServerUpload,
     SourceBackendActionMixinSourceMetadata, SourceBackendActionBase
 ):
-    """
-    Class to define actions per source backends. Each action also defines
-    interfaces. The action backend will process the input data and transform
-    the source backend output for each interface class.
-    """
+    pass
 
 
 class SourceBackendActionDummy(SourceBackendAction):
-    """
-    Blank source action class for use in API documentation.
-    """
+    pass

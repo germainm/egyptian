@@ -82,7 +82,6 @@ class APITrashedDocumentImageView(
     def get_object(self):
         obj = super().get_object()
 
-        # Return a 404 if the document doesn't have any pages.
         first_page = obj.pages.first()
 
         if first_page:

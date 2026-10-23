@@ -61,7 +61,6 @@ link_asset_setup = Link(
     view='converter:asset_list'
 )
 
-# Transformations
 
 link_transformation_delete_multiple = LayerLink(
     action='delete', icon=icon_transformation_delete, multi_item=True,

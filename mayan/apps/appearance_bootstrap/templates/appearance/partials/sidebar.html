@@ -5,25 +5,25 @@
 
 {% if sidebar_menus_link_results %}
     <div id="sidebar">
-        <ul class="list-group">
+        <div class="list-group small">
             {% for menu_link_result in sidebar_menus_link_results %}
                 {% for link_group in menu_link_result.link_groups %}
                     {% if menu_link_result|length > 1 %}
                         {% if menu_link_result.menu.name not in 'facet,list facet'|split:"," %}
-                            <li class="dropdown-header">{{ menu_link_result.menu.label }}</li>
+                            <div class="dropdown-header text-muted">{{ menu_link_result.menu.label }}</div>
                         {% else %}
                             {% ifchanged link_group.object %}
                                 {% common_get_object_verbose_name obj=link_group.object as link_group_object_verbose_name %}
-                                <li class="dropdown-header">{% if link_group_object_verbose_name %}{{ link_group_object_verbose_name }}{% else %}{% trans 'Object' %}{% endif %}</li>
+                                <div class="dropdown-header text-muted">{% if link_group_object_verbose_name %}{{ link_group_object_verbose_name }}{% else %}{% trans 'Object' %}{% endif %}</div>
                             {% endifchanged %}
                         {% endif %}
                     {% endif %}
 
                     {% with link_group.links as object_navigation_links %}
                     {% with 'true' as hide_active_anchor %}
-                    {% with 'active' as link_class_active %}
-                    {% with 'list-group-item btn-sm' as link_classes %}
-                    {% with 'true' as as_li %}
+                    {% with 'active border-1 border-secondary' as link_class_active %}
+                    {% with 'd-flex align-items-baseline gap-1 list-group-item list-group-item-action py-2 px-2 rounded-1' as link_classes %}
+                    {% with '' as as_li %}
                         {% include 'navigation/generic_navigation.html' %}
                     {% endwith %}
                     {% endwith %}
@@ -32,6 +32,6 @@
                     {% endwith %}
                 {% endfor %}
             {% endfor %}
-        </ul>
+        </div>
     </div>
 {% endif %}

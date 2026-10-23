@@ -46,7 +46,6 @@ class NestableLazyIterator:
         return self
 
     def __next__(self):
-        # Setup the initial values on the initial access.
         if not self.items:
             if self.parent_iterator:
                 next(self.parent_iterator)
@@ -98,7 +97,6 @@ class BatchRequest:
 
     def execute(self):
         if self.iterables:
-            # Initialize the iterables list to allow using any index.
             self.collection.context['iterables'] = [None] * len(
                 self.iterables
             )
@@ -296,7 +294,6 @@ class BatchRequestCollection:
         for request in self.requests:
             request.execute()
 
-        # Convert responses in context into response class instances.
         result = []
         for key, value in self.responses.items():
             if json.loads(s=value.get('include', 'true')):

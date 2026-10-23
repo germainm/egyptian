@@ -2,17 +2,21 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.acls.classes import ModelPermission
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import (
+    PROCESS_INITIAL_SETUP, PROCESS_UPGRADE
+)
+from mayan.apps.app_manager.runlevels import (
+    runlevel_bootstrap, runlevel_maintenance
+)
 from mayan.apps.common.menus import (
     menu_facet, menu_list_facet, menu_object, menu_return, menu_secondary,
     menu_tools
 )
-from mayan.apps.common.signals import (
-    signal_post_initial_setup, signal_post_upgrade
-)
 from mayan.apps.navigation.source_columns import SourceColumn
 
-from .handlers import (
-    handler_search_backend_initialize, handler_search_backend_upgrade
+from .initializers import (
+    initializer_search_backend_initialize, initializer_search_backend_upgrade
 )
 from .links import (
     link_saved_resultset_delete_single, link_saved_resultset_list,
@@ -32,7 +36,6 @@ class DynamicSearchApp(MayanAppConfig):
     app_namespace = 'search'
     app_url = 'search'
     has_rest_api = True
-    has_static_media = True
     has_tests = True
     name = 'mayan.apps.dynamic_search'
     verbose_name = _(message='Dynamic search')
@@ -44,6 +47,21 @@ class DynamicSearchApp(MayanAppConfig):
         SearchBackend._enable()
 
         SavedResultset = self.get_model(model_name='SavedResultset')
+
+        InitializationStep(
+            function=initializer_search_backend_initialize,
+            label=_(message='Initialize the search engine'),
+            name='dynamic_search.search_backend_initialize',
+            order=20, process=PROCESS_INITIAL_SETUP,
+            runlevel=runlevel_bootstrap
+        )
+
+        InitializationStep(
+            function=initializer_search_backend_upgrade,
+            label=_(message='Upgrade the search engine'),
+            name='dynamic_search.search_backend_upgrade',
+            process=PROCESS_UPGRADE, runlevel=runlevel_maintenance,
+        )
 
         ModelPermission.register(
             model=SavedResultset,
@@ -80,7 +98,6 @@ class DynamicSearchApp(MayanAppConfig):
             source=SavedResultset
         )
 
-        # Search model
 
         SourceColumn(
             attribute='label', help_text=_(
@@ -95,7 +112,6 @@ class DynamicSearchApp(MayanAppConfig):
             ), include_label=True, source=SearchModel
         )
 
-        # Search field
 
         SourceColumn(
             attribute='label', help_text=_(
@@ -158,15 +174,5 @@ class DynamicSearchApp(MayanAppConfig):
             links=(
                 link_saved_resultset_list, link_search_backend_reindex,
                 link_search_model_list,
-            ),
-        )
-
-        signal_post_initial_setup.connect(
-            dispatch_uid='search_handler_search_backend_initialize',
-            receiver=handler_search_backend_initialize
-        )
-
-        signal_post_upgrade.connect(
-            dispatch_uid='search_handler_search_backend_upgrade',
-            receiver=handler_search_backend_upgrade
+            )
         )

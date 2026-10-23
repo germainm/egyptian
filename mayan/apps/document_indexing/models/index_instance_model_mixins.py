@@ -1,28 +1,78 @@
 import logging
+from contextlib import contextmanager
+from functools import lru_cache
 
 from django.apps import apps
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.acls.models import AccessControlList
 from mayan.apps.documents.models.document_models import Document
 from mayan.apps.documents.permissions import permission_document_view
 from mayan.apps.lock_manager.backends.base import LockingBackend
-from mayan.apps.lock_manager.exceptions import LockError
 from mayan.apps.templating.template_backends import Template
 
 logger = logging.getLogger(name=__name__)
 
 
 class IndexInstanceBusinessLogicMixin:
-    def _delete_empty_nodes(self):
-        queryset_children = self.index_instance_root_node.get_children()
-        queryset_children_filtered = queryset_children.filter(
-            children=None, documents=None
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _get_index_instance_node_value_max_length():
+        IndexInstanceNode = apps.get_model(
+            app_label='document_indexing', model_name='IndexInstanceNode'
         )
-        queryset_children_filtered.delete()
+        field = IndexInstanceNode._meta.get_field(field_name='value')
 
-    def _document_add(self, document, index_instance_node_parent):
-        for index_template_node in index_instance_node_parent.index_template_node.get_children().filter(enabled=True):
+        return field.max_length
+
+    def _delete_empty_nodes(self, index_instance_root_node=None):
+        IndexInstanceNode = apps.get_model(
+            app_label='document_indexing', model_name='IndexInstanceNode'
+        )
+
+        if index_instance_root_node is None:
+            index_instance_root_node = self.index_instance_root_node
+
+        while True:
+            pk_list = list(
+                index_instance_root_node.get_descendants().filter(
+                    children=None, documents=None
+                ).values_list('pk', flat=True).distinct()
+            )
+
+            if not pk_list:
+                break
+
+            IndexInstanceNode.objects.filter(pk__in=pk_list).delete()
+
+    def _get_index_template_node_children_map(self):
+        try:
+            return self._index_template_node_children_map
+        except AttributeError:
+            IndexTemplateNode = apps.get_model(
+                app_label='document_indexing', model_name='IndexTemplateNode'
+            )
+
+            children_map = {}
+            for index_template_node in IndexTemplateNode.objects.filter(
+                enabled=True, index=self.pk
+            ):
+                children_map.setdefault(
+                    index_template_node.parent_id, []
+                ).append(index_template_node)
+
+            self._index_template_node_children_map = children_map
+
+            return children_map
+
+    def _document_add(
+        self, document, index_instance_node_parent, index_template_node_parent
+    ):
+        children_map = self._get_index_template_node_children_map()
+        value_max_length = IndexInstanceBusinessLogicMixin._get_index_instance_node_value_max_length()
+
+        for index_template_node in children_map.get(index_template_node_parent.pk, ()):
             try:
                 template = Template(
                     template_string=index_template_node.expression
@@ -47,7 +97,7 @@ class IndexInstanceBusinessLogicMixin:
                 if result:
                     index_instance_node, created = index_template_node.index_instance_nodes.get_or_create(
                         parent=index_instance_node_parent,
-                        value=result
+                        value=result[:value_max_length]
                     )
 
                     if index_template_node.link_documents:
@@ -55,108 +105,79 @@ class IndexInstanceBusinessLogicMixin:
 
                     self._document_add(
                         document=document,
-                        index_instance_node_parent=index_instance_node
+                        index_instance_node_parent=index_instance_node,
+                        index_template_node_parent=index_template_node
                     )
+
+    @contextmanager
+    def _acquire_lock(self, name):
+        locking_backend = LockingBackend.get_backend()
+        lock = locking_backend.acquire_lock(name=name)
+        try:
+            yield lock
+        finally:
+            lock.release()
 
     def delete_empty_nodes(self):
         if not self.enabled:
             return
 
-        try:
-            locking_backend = LockingBackend.get_backend()
-            lock_name = self.get_lock_string()
-            lock_index_instance = locking_backend.acquire_lock(name=lock_name)
-        except LockError:
-            raise
-        else:
-            try:
-                self.initialize_index_instance_root_node_node()
-                self._delete_empty_nodes()
-            finally:
-                lock_index_instance.release()
+        lock_name = self.get_lock_string()
+        with self._acquire_lock(name=lock_name):
+            self.initialize_index_instance_root_node_node()
+            self._delete_empty_nodes()
 
     def document_nodes_delete(self, document):
         IndexInstanceNode = apps.get_model(
             app_label='document_indexing', model_name='IndexInstanceNode'
         )
 
-        IndexInstanceNode.documents.through.objects.filter(
+        deleted_count, deleted_detail = IndexInstanceNode.documents.through.objects.filter(
             document=document,
             indexinstancenode__index_template_node__enabled=True,
-            indexinstancenode__index_template_node__index=self,
-            indexinstancenode__index_template_node__index__enabled=True,
-            indexinstancenode__index_template_node__index__document_types=document.document_type
+            indexinstancenode__index_template_node__index=self
         ).delete()
 
+        return deleted_count
+
     def document_add(self, document):
-        """
-        Method to start the indexing process for a document. The entire
-        process happens inside one transaction. The document is first
-        removed from all the index nodes to which it already belongs.
-        The different index templates that match this document's type
-        are evaluated and for each result a node is fetched or created and
-        the document is added to that node.
-        """
         logger.debug('Index; Indexing document: %s', document)
 
         if Document.valid.filter(pk=document.pk).exists() and self.enabled and self.document_types.filter(pk=document.document_type.pk).exists():
-            try:
-                locking_backend = LockingBackend.get_backend()
+            lock_name_index = self.get_lock_string()
+            lock_name_document = self.get_document_lock_string(
+                document=document
+            )
+            with self._acquire_lock(name=lock_name_index), self._acquire_lock(name=lock_name_document):
+                with transaction.atomic():
+                    index_instance_root_node = self.initialize_index_instance_root_node_node()
 
-                lock_index_instance = locking_backend.acquire_lock(
-                    name=self.get_lock_string()
-                )
-            except LockError:
-                raise
-            else:
-                try:
-                    lock_document = locking_backend.acquire_lock(
-                        name=self.get_document_lock_string(document=document)
+                    deleted_count = self.document_nodes_delete(
+                        document=document
                     )
-                except LockError:
-                    raise
-                else:
-                    try:
-                        self.initialize_index_instance_root_node_node()
 
-                        self.document_nodes_delete(document=document)
+                    self._document_add(
+                        document=document,
+                        index_instance_node_parent=index_instance_root_node,
+                        index_template_node_parent=self.index_template_root_node
+                    )
 
-                        self._document_add(
-                            document=document,
-                            index_instance_node_parent=self.index_instance_root_node
+                    if deleted_count:
+                        self._delete_empty_nodes(
+                            index_instance_root_node=index_instance_root_node
                         )
-
-                        self._delete_empty_nodes()
-                    finally:
-                        lock_document.release()
-                finally:
-                    lock_index_instance.release()
 
     def document_remove(self, document):
         if self.enabled and self.document_types.filter(pk=document.document_type.pk).exists():
-            try:
-                lock_index_instance = LockingBackend.get_backend().acquire_lock(
-                    name=self.get_lock_string()
-                )
-            except LockError:
-                raise
-            else:
-                try:
-                    lock_document = LockingBackend.get_backend().acquire_lock(
-                        name=self.get_document_lock_string(
-                            document=document
-                        )
-                    )
-                except LockError:
-                    raise
-                else:
-                    try:
-                        self.document_nodes_delete(document=document)
-                        self._delete_empty_nodes()
-                    finally:
-                        lock_document.release()
-                finally:
-                    lock_index_instance.release()
+            lock_name_index = self.get_lock_string()
+            lock_name_document = self.get_document_lock_string(
+                document=document
+            )
+            with self._acquire_lock(name=lock_name_index), self._acquire_lock(name=lock_name_document):
+                deleted_count = self.document_nodes_delete(document=document)
+
+                if deleted_count:
+                    self._delete_empty_nodes()
 
     def get_children(self):
         return self.index_instance_root_node.get_children()
@@ -194,7 +215,6 @@ class IndexInstanceBusinessLogicMixin:
     )
 
     def get_root(self):
-        """Compatibility method."""
         return self.index_instance_root_node
 
     @property
@@ -234,10 +254,6 @@ class IndexInstanceNodeBusinessLogicMixin:
     get_descendants_document_count.help_text = IndexInstanceBusinessLogicMixin.get_descendants_document_count.help_text
 
     def get_documents(self, permission, user):
-        """
-        Provide a queryset of the documents in an index instance node.
-        The queryset is filtered by access.
-        """
         return AccessControlList.objects.restrict_queryset(
             permission=permission, queryset=self._get_documents(),
             user=user
@@ -269,13 +285,15 @@ class IndexInstanceNodeBusinessLogicMixin:
     get_level_count.help_text = IndexInstanceBusinessLogicMixin.get_level_count.help_text
 
     def index(self):
-        """
-        Return's the index instance of this node instance.
-        """
-        IndexInstance = apps.get_model(
-            app_label='document_indexing', model_name='IndexInstance'
-        )
+        try:
+            return self._index_instance
+        except AttributeError:
+            IndexInstance = apps.get_model(
+                app_label='document_indexing', model_name='IndexInstance'
+            )
 
-        return IndexInstance.objects.get(
-            pk=self.index_template_node.index.pk
-        )
+            self._index_instance = IndexInstance.objects.get(
+                pk=self.index_template_node.index.pk
+            )
+
+            return self._index_instance

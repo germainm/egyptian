@@ -1,7 +1,7 @@
 {% load navigation_tags %}
 
-<div class="{{ column_class|default:'col-xs-12 col-sm-4 col-md-3 col-lg-2' }}">
-    <div class="panel panel-primary panel-item">
+<div class="{{ column_class|default:'col-12 col-sm-4 col-md-3 col-lg-2' }}">
+    <div class="card border-primary card-item h-100">
         {% include 'appearance/partials/list/panel/heading.html' %}
         {% include 'appearance/partials/list/panel/body.html' %}
         {% include 'appearance/partials/list/panel/footer.html' %}

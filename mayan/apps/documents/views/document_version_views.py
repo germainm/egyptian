@@ -44,7 +44,9 @@ from ..permissions import (
 from ..settings import setting_preview_height, setting_preview_width
 from ..tasks import task_document_version_delete
 
-from .misc_views import DocumentPrintBaseView, PrintFormView
+from .misc_views import (
+    DocumentPrintBaseView, DocumentPrintPDFBaseView, PrintFormView
+)
 from .view_mixins import RecentDocumentViewMixin
 
 logger = logging.getLogger(name=__name__)
@@ -59,6 +61,7 @@ class DocumentVersionActiveView(ExternalObjectViewMixin, ConfirmView):
     def get_extra_context(self):
         return {
             'object': self.external_object,
+            'submit_label': _(message='Set active'),
             'title': _(
                 message='Make the document version "%s" the active version?'
             ) % self.external_object
@@ -136,8 +139,6 @@ class DocumentVersionDeleteView(MultipleObjectDeleteView):
         return context
 
     def get_post_action_redirect(self):
-        # Use [0] instead of first(). First returns None and it is not
-        # usable.
         return reverse(
             kwargs={
                 'document_id': self.object_list[0].document_id
@@ -247,6 +248,7 @@ class DocumentVersionModifyView(ExternalObjectViewMixin, FormView):
     def get_extra_context(self):
         context = {
             'object': self.external_object,
+            'submit_label': _(message='Save'),
             'title': _(
                 message='Execute version modification action for document '
                 'version: %s'
@@ -261,6 +263,7 @@ class DocumentVersionPreviewView(SingleObjectDetailView):
     object_permission = permission_document_version_view
     pk_url_kwarg = 'document_version_id'
     source_queryset = DocumentVersion.valid.all()
+    template_name = 'appearance/viewport_fill.html'
     view_icon = icon_document_version_preview
 
     def dispatch(self, request, *args, **kwargs):
@@ -313,12 +316,21 @@ class DocumentVersionPrintView(DocumentPrintBaseView):
     external_object_permission = permission_document_version_print
     external_object_pk_url_kwarg = 'document_version_id'
     external_object_queryset = DocumentVersion.valid.all()
+    print_pdf_view_name = 'documents:document_version_print_pdf_view'
+    print_pdf_view_kwarg = 'document_version_id'
     view_icon = icon_document_version_print
 
     def _add_recent_document(self):
         self.external_object.document.add_as_recent_document_for_user(
             user=self.request.user
         )
+
+
+class DocumentVersionPrintPDFView(DocumentPrintPDFBaseView):
+    external_object_permission = permission_document_version_print
+    external_object_pk_url_kwarg = 'document_version_id'
+    external_object_queryset = DocumentVersion.valid.all()
+    view_icon = icon_document_version_print
 
 
 class DocumentVersionTransformationsClearView(
@@ -428,6 +440,7 @@ class DocumentVersionTransformationsCloneView(
     def get_extra_context(self):
         context = {
             'object': self.external_object,
+            'submit_label': _(message='Clone'),
             'title': _(
                 message='Clone page transformations of document version: %s'
             ) % self.external_object

@@ -10,19 +10,27 @@ from mayan.apps.common.menus import (
     menu_multi_item, menu_object, menu_tools, menu_user
 )
 from mayan.apps.events.classes import ModelEventType
+from mayan.apps.forms import column_widgets
+from mayan.apps.navigation.source_columns import SourceColumn
 
 from .classes import AuthenticationBackend
 from .events import (
-    event_user_impersonation_ended, event_user_impersonation_started,
-    event_user_logged_in, event_user_logged_out
+    event_user_account_lockout_reset, event_user_impersonation_ended,
+    event_user_impersonation_started, event_user_logged_in,
+    event_user_logged_out
 )
 from .handlers import handler_user_logged_in, handler_user_logged_out
 from .links import (
-    link_logout, link_password_change, link_user_impersonate_form_start,
-    link_user_impersonate_start, link_user_multiple_set_password,
-    link_user_set_password
+    link_logout, link_password_change,
+    link_user_account_lockout_reset_multiple,
+    link_user_account_lockout_reset_single,
+    link_user_impersonate_form_start, link_user_impersonate_start,
+    link_user_multiple_set_password, link_user_set_password
 )
-from .permissions import permission_users_impersonate
+from .lockouts import is_user_locked
+from .permissions import (
+    permission_account_lockout_reset, permission_users_impersonate
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -44,6 +52,7 @@ class AuthenticationApp(MayanAppConfig):
 
         ModelEventType.register(
             model=User, event_types=(
+                event_user_account_lockout_reset,
                 event_user_impersonation_ended,
                 event_user_impersonation_started, event_user_logged_in,
                 event_user_logged_out
@@ -52,17 +61,33 @@ class AuthenticationApp(MayanAppConfig):
 
         ModelPermission.register(
             model=User, permissions=(
-                permission_users_impersonate,
+                permission_account_lockout_reset,
+                permission_users_impersonate
             )
         )
 
+        SourceColumn(
+            func=lambda context: is_user_locked(user=context['object']),
+            help_text=_(
+                message='Whether the user account is currently locked '
+                'out due to repeated failed login attempts. Locked '
+                'accounts cannot authenticate until the lockout is '
+                'reset or the cool-off period elapses.'
+            ),
+            include_label=True, label=_(message='Locked'), source=User,
+            widget=column_widgets.TwoStateWidget
+        )
+
         menu_multi_item.bind_links(
-            links=(link_user_multiple_set_password,),
-            sources=('user_management:user_list',)
+            links=(
+                link_user_account_lockout_reset_multiple,
+                link_user_multiple_set_password,
+            ), sources=('user_management:user_list',)
         )
 
         menu_object.bind_links(
             links=(
+                link_user_account_lockout_reset_single,
                 link_user_impersonate_start, link_user_set_password,
             ), sources=(User,)
         )

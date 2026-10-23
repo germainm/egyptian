@@ -60,7 +60,7 @@ class DashboardWidgetFileCacheSizeUsed(DashboardWidgetNumeric):
 
         total_size_allocated = queryset.aggregate(
             total_size=Sum('maximum_size')
-        )['total_size'] or 1  # Cannot be 0 to avoid a division by zero.
+        )['total_size'] or 1
 
         total_size_used = queryset.aggregate(
             total_size=Sum('partitions__files__file_size')

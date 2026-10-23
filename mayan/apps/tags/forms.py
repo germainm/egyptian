@@ -11,7 +11,9 @@ class TagForm(forms.ModelForm):
         fields = ('label', 'color')
         model = Tag
         widgets = {
-            'color': form_widgets.ColorWidget()
+            'color': form_widgets.ColorWidget(
+                auto_color_source_field_name='label'
+            )
         }
 
 

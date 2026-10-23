@@ -1,28 +1,24 @@
 from mayan.apps.icons.icons import Icon
 
-# App
 
-icon_permission = Icon(driver_name='fontawesome', symbol='thumbs-up')
+icon_permission = Icon(driver_name='fontawesome', symbol='key')
 
-# Group
 
-icon_group_role_list = Icon(driver_name='fontawesome', symbol='user-secret')
+icon_group_role_list = Icon(driver_name='fontawesome', symbol='user-shield')
 
-# Permission
 
-icon_permission_detail = Icon(driver_name='fontawesome', symbol='thumbs-up')
+icon_permission_detail = Icon(driver_name='fontawesome', symbol='key')
 
-# Role
 
 icon_role_create = Icon(
-    driver_name='fontawesome-dual', primary_symbol='user-secret',
+    driver_name='fontawesome-dual', primary_symbol='user-shield',
     secondary_symbol='plus'
 )
-icon_role_single_delete = Icon(driver_name='fontawesome', symbol='times')
+icon_role_single_delete = Icon(driver_name='fontawesome', symbol='trash-can')
 icon_role_multiple_delete = icon_role_single_delete
-icon_role_edit = Icon(driver_name='fontawesome', symbol='pencil-alt')
+icon_role_edit = Icon(driver_name='fontawesome', symbol='pencil')
 icon_role_group_list = Icon(driver_name='fontawesome', symbol='users')
-icon_role_list = Icon(driver_name='fontawesome', symbol='user-secret')
+icon_role_list = Icon(driver_name='fontawesome', symbol='user-shield')
 icon_role_permission_list = Icon(
-    driver_name='fontawesome', symbol='thumbs-up'
+    driver_name='fontawesome', symbol='key'
 )

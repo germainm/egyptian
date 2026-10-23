@@ -4,16 +4,16 @@ from django.apps import apps
 from django.db import OperationalError
 
 from mayan.apps.lock_manager.exceptions import LockError
+from mayan.apps.task_manager.task_classes import DeduplicatedTask
 from mayan.celery import app
 
 logger = logging.getLogger(name=__name__)
 
 
-# Index instance
 
 @app.task(
-    bind=True, ignore_result=True, max_retries=None, retry_backoff=True,
-    retry_backoff_max=60
+    base=DeduplicatedTask, bind=True, ignore_result=True, max_retries=None,
+    retry_backoff=True, retry_backoff_max=60
 )
 def task_index_instance_document_add(
     self, document_id, index_instance_id=None
@@ -64,9 +64,6 @@ def task_index_instance_document_remove(self, document_id):
     try:
         document = Document.objects.get(pk=document_id)
     except Document.DoesNotExist:
-        # Document was deleted before we could execute
-        # Since it was automatically removed from the document M2M
-        # we just now delete the empty instance nodes
         try:
             IndexInstance.objects.delete_empty_nodes()
         except LockError as exception:
@@ -78,7 +75,6 @@ def task_index_instance_document_remove(self, document_id):
             raise self.retry(exc=exception)
 
 
-# Index template
 
 @app.task(bind=True, ignore_result=True, retry_backoff=True)
 def task_index_template_rebuild(self, index_id):
@@ -90,5 +86,4 @@ def task_index_template_rebuild(self, index_id):
         index = IndexTemplate.objects.get(pk=index_id)
         index.rebuild()
     except LockError as exception:
-        # This index is being rebuilt by another task, retry later
         raise self.retry(exc=exception)

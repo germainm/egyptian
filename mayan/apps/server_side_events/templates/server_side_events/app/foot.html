@@ -1,0 +1,21 @@
+{% load appearance_tags %}
+{% load static %}
+
+{% appearance_app_template_cache_disable %}
+
+{% if request.user.is_authenticated %}
+    <script src="{% static 'server_side_events/js/server_side_events.js' %}" type="text/javascript"></script>
+    <script>
+        'use strict';
+
+        window.serverSideEvents = new MayanServerSideEvents({
+            url: '{% url "rest_api:event_stream" %}'
+        });
+
+        // Connect once the document is parsed, by which point every app
+        // footer template has registered its event handlers.
+        document.addEventListener('DOMContentLoaded', function () {
+            window.serverSideEvents.connect();
+        });
+    </script>
+{% endif %}

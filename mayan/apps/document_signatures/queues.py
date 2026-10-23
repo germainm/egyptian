@@ -1,13 +1,13 @@
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.task_manager.classes import CeleryQueue
-from mayan.apps.task_manager.workers import worker_c, worker_d
+from mayan.apps.task_manager.workers import worker_c, worker_f
 
 queue_signatures = CeleryQueue(
     label=_(message='Signatures'), name='signatures', worker=worker_c
 )
 queue_signatures_slow = CeleryQueue(
-    label=_(message='Signatures slow'), name='signatures_slow', worker=worker_d
+    label=_(message='Signatures slow'), name='signatures_slow', worker=worker_f
 )
 
 queue_signatures.add_task_type(

@@ -8,7 +8,8 @@ icon_document_index_instance_list = Icon(
 icon_document_type_index_templates = icon_index
 
 icon_index_level_up = Icon(
-    driver_name='fontawesome-css', css_classes='fa-level-up-alt fa-rotate-90'
+    css_classes='fa-rotate-90', driver_name='fontawesome',
+    symbol='arrow-turn-up'
 )
 icon_index_instance_list = Icon(driver_name='fontawesome', symbol='list-ul')
 icon_index_instance_node_with_documents = Icon(
@@ -20,17 +21,17 @@ icon_index_instances_rebuild = Icon(
 )
 icon_index_instances_reset = Icon(
     driver_name='fontawesome-dual', primary_symbol='list-ul',
-    secondary_symbol='times'
+    secondary_symbol='xmark'
 )
 
 icon_index_template_create = Icon(
     driver_name='fontawesome-dual', primary_symbol='list-ul',
     secondary_symbol='plus'
 )
-icon_index_template_delete = Icon(driver_name='fontawesome', symbol='times')
+icon_index_template_delete = Icon(driver_name='fontawesome', symbol='trash-can')
 icon_index_template_document_types = icon_document_type
 icon_index_template_edit = Icon(
-    driver_name='fontawesome', symbol='pencil-alt'
+    driver_name='fontawesome', symbol='pencil'
 )
 icon_index_template_event_triggers = Icon(
     driver_name='fontawesome', symbol='bolt'
@@ -43,10 +44,10 @@ icon_index_template_node_create = Icon(
 
 
 icon_index_template_node_delete = Icon(
-    driver_name='fontawesome', symbol='times'
+    driver_name='fontawesome', symbol='trash-can'
 )
 icon_index_template_node_edit = Icon(
-    driver_name='fontawesome', symbol='pencil-alt'
+    driver_name='fontawesome', symbol='pencil'
 )
 
 icon_index_template_node_tree_view = Icon(

@@ -1,6 +1,6 @@
 exclude mayan/urls/development.py
-include README.md LICENSE HISTORY.rst mayan/LICENSE
-recursive-include mayan/apps *.css *.eot *.gif *.html *.ico *.jpg *.js *.mo *.png *.svg *.tiff *.tmpl *.ttf *.txt *.woff *.woff2
+include README.md LICENSE HISTORY.rst mayan/LICENSE TRADEMARK_POLICY.md mayan/TRADEMARK_POLICY.md
+recursive-include mayan/apps *.css *.eot *.gif *.html *.ico *.jpg *.js *.mo *.png *.svg *.tiff *.tmpl *.ttf *.txt *.woff *.woff2 *.yaml
 global-exclude mayan/settings/local.py *.po
 prune mayan/apps/*/static/*/node_modules/*
 prune mayan/apps/*/tests/

@@ -33,13 +33,13 @@ from .view_mixins import (
     ObjectActionViewMixin, ObjectNameViewMixin, RedirectionViewMixin,
     RestrictedQuerysetViewMixin, SortingViewMixin, ViewIconMixin,
     ViewMixinConfirmRemember, ViewMixinDeleteObject,
-    ViewPermissionCheckViewMixin, ViewMixinPostAction
+    ViewMixinFormSaveAndAddAnother, ViewMixinModalFragment,
+    ViewMixinPagingArgument, ViewPermissionCheckViewMixin, ViewMixinPostAction
 )
 
 logger = logging.getLogger(name=__name__)
 
 
-# Required by other views, moved to the top.
 class MultiFormView(DjangoFormView):
     form_extra_kwargs = None
     prefix = None
@@ -82,9 +82,6 @@ class MultiFormView(DjangoFormView):
         )
 
     def get_context_data(self, **kwargs):
-        """
-        Insert the form into the context dict.
-        """
         if 'forms' not in kwargs:
             kwargs['forms'] = self.get_forms(
                 form_classes=self.get_form_classes()
@@ -164,6 +161,7 @@ class AddRemoveView(
     MultiFormView
 ):
     form_classes = {'form_available': ChoiceForm, 'form_added': ChoiceForm}
+    template_name = 'appearance/add_remove.html'
     list_added_help_text = _(
         message='Select entries to be removed. Hold Control to select '
         'multiple entries. Once the selection is complete, click the button '
@@ -175,29 +173,22 @@ class AddRemoveView(
         'or double click the list to activate the action.'
     )
 
-    # Form titles.
     list_added_title = None
     list_available_title = None
 
-    # Attributes to filter the object to which selections will be added or
-    # remove.
     main_object_model = None
     main_object_permission = None
     main_object_pk_url_kwarg = None
     main_object_pk_url_kwargs = None
     main_object_source_queryset = None
 
-    # Attributes to filter the queryset of the selection.
     secondary_object_model = None
     secondary_object_permission = None
     secondary_object_source_queryset = None
 
-    # Main object methods to use to add and remove selections.
     main_object_method_add_name = None
     main_object_method_remove_name = None
 
-    # If a method is not specified, use this related field to add and remove
-    # selections.
     related_field = None
 
     prefixes = {'form_available': 'available', 'form_added': 'added'}
@@ -300,19 +291,15 @@ class AddRemoveView(
             )
 
     def get_action_add_extra_kwargs(self):
-        # Keyword arguments to apply to the add method.
         return {}
 
     def get_action_remove_extra_kwargs(self):
-        # Keyword arguments to apply to the remove method.
         return {}
 
     def get_actions_extra_kwargs(self):
-        # Keyword arguments to apply to both the add and remove methods.
         return {}
 
     def get_context_data(self, **kwargs):
-        # Use get_context_data to leave the get_extra_context for subclasses.
         context = super().get_context_data(**kwargs)
         context.update(
             {
@@ -424,7 +411,6 @@ class AddRemoveView(
         return self.secondary_object_source_queryset
 
     def get_success_url(self):
-        # Redirect to the same view.
         return reverse(
             kwargs=self.request.resolver_match.kwargs,
             viewname=self.request.resolver_match.view_name
@@ -432,13 +418,11 @@ class AddRemoveView(
 
 
 class ConfirmView(
-    RestrictedQuerysetViewMixin, ViewPermissionCheckViewMixin,
-    ExtraContextViewMixin, RedirectionViewMixin, ViewIconMixin,
-    ViewMixinConfirmRemember, ViewMixinPostAction, TemplateView
+    ViewMixinModalFragment, RestrictedQuerysetViewMixin,
+    ViewPermissionCheckViewMixin, ExtraContextViewMixin,
+    RedirectionViewMixin, ViewIconMixin, ViewMixinConfirmRemember,
+    ViewMixinPostAction, TemplateView
 ):
-    """
-    View that will execute an view action upon user Yes/No confirmation.
-    """
     template_name = 'appearance/confirm.html'
 
     def get_context_data(self, **kwargs):
@@ -457,28 +441,19 @@ class FormView(
     RedirectionViewMixin, FormExtraKwargsViewMixin, ViewIconMixin,
     DjangoFormView
 ):
-    """
-    Basic form view that will check for view level permission, allow
-    providing extra context, extra keyword arguments for the forms, and
-    customizable redirection.
-    """
     template_name = 'appearance/form_container.html'
 
 
 class DynamicFormView(
     DynamicFieldSetFormViewMixin, FormView
 ):
-    """Form view that uses a single dynamic form."""
+    pass
 
 
 class MultipleObjectFormActionView(
     ObjectActionViewMixin, RestrictedQuerysetViewMixin,
     MultipleObjectViewMixin, FormView
 ):
-    """
-    This view will present a form and upon receiving a POST request
-    will perform an action on an object or queryset.
-    """
     template_name = 'appearance/form_container.html'
 
     def __init__(self, *args, **kwargs):
@@ -514,15 +489,11 @@ class MultipleObjectFormActionView(
 
 
 class MultipleObjectConfirmActionView(
-    ExtraContextViewMixin, ObjectActionViewMixin,
+    ViewMixinModalFragment, ExtraContextViewMixin, ObjectActionViewMixin,
     ViewPermissionCheckViewMixin, RestrictedQuerysetViewMixin,
     MultipleObjectViewMixin, RedirectionViewMixin, ViewIconMixin,
     ViewMixinConfirmRemember, ViewMixinPostAction, TemplateView
 ):
-    """
-    Form that will execute an action to a queryset upon user Yes/No
-    confirmation.
-    """
 
     template_name = 'appearance/confirm.html'
 
@@ -603,13 +574,12 @@ class SimpleView(
     ViewPermissionCheckViewMixin, ExtraContextViewMixin, ViewIconMixin,
     TemplateView
 ):
-    """
-    Basic template view class with permission check and extra context.
-    """
+    pass
 
 
 class SingleObjectCreateView(
-    ObjectNameViewMixin, ViewPermissionCheckViewMixin, ExtraContextViewMixin,
+    ViewMixinFormSaveAndAddAnother, ObjectNameViewMixin,
+    ViewPermissionCheckViewMixin, ExtraContextViewMixin,
     RedirectionViewMixin, FormExtraKwargsViewMixin,
     ModelFormFieldsetsViewMixin, ViewIconMixin, CreateView
 ):
@@ -617,7 +587,6 @@ class SingleObjectCreateView(
     template_name = 'appearance/form_container.html'
 
     def form_valid(self, form):
-        # This overrides the original Django form_valid method.
 
         self.object = form.save(commit=False)
 
@@ -630,7 +599,6 @@ class SingleObjectCreateView(
         else:
             save_extra_data = {}
 
-        # Validate duplicates first.
         try:
             self.object.validate_unique()
         except ValidationError as exception:
@@ -674,7 +642,7 @@ class SingleObjectCreateView(
             )
 
         return HttpResponseRedirect(
-            redirect_to=self.get_success_url()
+            redirect_to=self.get_form_save_and_add_another_success_url()
         )
 
     def get_error_message_duplicate(self):
@@ -682,7 +650,7 @@ class SingleObjectCreateView(
 
 
 class SingleObjectDeleteView(
-    ObjectNameViewMixin, ExtraDataDeleteViewMixin,
+    ViewMixinModalFragment, ObjectNameViewMixin, ExtraDataDeleteViewMixin,
     ViewPermissionCheckViewMixin, RestrictedQuerysetViewMixin,
     ExtraContextViewMixin, RedirectionViewMixin, ViewIconMixin,
     ViewMixinConfirmRemember, ViewMixinDeleteObject, DeleteView
@@ -780,10 +748,7 @@ class SingleObjectDetailView(
 class SingleObjectDynamicFormCreateView(
     DynamicFieldSetFormViewMixin, SingleObjectCreateView
 ):
-    """
-    A form that will allow creation of a single instance from the values
-    of a dynamic field form.
-    """
+    pass
 
 
 class SingleObjectEditView(
@@ -795,7 +760,6 @@ class SingleObjectEditView(
     template_name = 'appearance/form_container.html'
 
     def form_valid(self, form):
-        # This overrides the original Django form_valid method.
 
         self.object = form.save(commit=False)
 
@@ -852,20 +816,15 @@ class SingleObjectEditView(
 class SingleObjectDynamicFormEditView(
     DynamicFieldSetFormViewMixin, SingleObjectEditView
 ):
-    """
-    A form that will allow editing a single instance from the values
-    of a dynamic field form.
-    """
+    pass
 
 
 class SingleObjectListView(
-    SortingViewMixin, ListModeViewMixin, ViewPermissionCheckViewMixin,
-    SearchFilterEnabledListViewMixin, RestrictedQuerysetViewMixin,
-    ExtraContextViewMixin, RedirectionViewMixin, ViewIconMixin, ListView
+    SortingViewMixin, ListModeViewMixin, ViewMixinPagingArgument,
+    ViewPermissionCheckViewMixin, SearchFilterEnabledListViewMixin,
+    RestrictedQuerysetViewMixin, ExtraContextViewMixin,
+    RedirectionViewMixin, ViewIconMixin, ListView
 ):
-    """
-    A view that will generate a list of instances from a queryset.
-    """
     template_name = 'appearance/list.html'
 
     def __init__(self, *args, **kwargs):

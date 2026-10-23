@@ -1,4 +1,5 @@
 import csv
+from functools import partial
 import logging
 
 from furl import furl
@@ -89,15 +90,13 @@ class ActionExporter:
             app_label='messaging', model_name='Message'
         )
 
-        download_file = DownloadFile(
+        content_function = partial(self.export, user=user)
+
+        download_file = DownloadFile.objects.create_from_content_function(
+            binary=False, content_function=content_function,
             filename=DEFAULT_EVENT_LIST_EXPORT_FILENAME,
             label=_(message='Event list export to CSV'), user=user
         )
-        download_file._event_actor = user
-        download_file.save()
-
-        with download_file.open(mode='w') as file_object:
-            self.export(file_object=file_object, user=user)
 
         event_events_exported.commit(
             actor=user, target=download_file
@@ -138,13 +137,16 @@ class EventModelRegistry:
     @classmethod
     def register(
         cls, model, acl_bind_link=True, bind_events_link=True,
-        bind_subscription_link=True, exclude=None, menu=None,
-        register_permissions=True
+        bind_subscription_link=True, delete_events_on_object_deletion=False,
+        exclude=None, menu=None, register_permissions=True
     ):
-        # Hidden imports.
+        from django.db.models.signals import post_delete
+
         from actstream import registry
 
         from mayan.apps.acls.classes import ModelPermission
+
+        from .handlers import handler_delete_object_events
 
         AccessControlList = apps.get_model(
             app_label='acls', model_name='AccessControlList'
@@ -165,8 +167,15 @@ class EventModelRegistry:
 
         if model not in cls._registry:
             cls._registry.add(model)
-            # These need to happen only once.
             registry.register(model)
+
+            if delete_events_on_object_deletion:
+                post_delete.connect(
+                    dispatch_uid='events_handler_delete_object_events_{}'.format(
+                        model._meta.label
+                    ),
+                    receiver=handler_delete_object_events, sender=model
+                )
 
             menu = menu or menu_list_facet
 
@@ -232,7 +241,6 @@ class EventTypeNamespace(
     @classmethod
     def post_load_modules(cls):
         try:
-            # Pre cache all stored event types.
             EventType.refresh()
         except (OperationalError, ProgrammingError):
             """
@@ -286,7 +294,6 @@ class EventType:
 
     @classmethod
     def all(cls):
-        # Return sorted permissions by namespace.name.
         return EventType.sort(
             event_type_list=cls._registry.values()
         )
@@ -308,11 +315,45 @@ class EventType:
 
     @classmethod
     def refresh(cls):
-        for event_type in cls.all():
-            # Invalidate cache and recreate store events while repopulating
-            # cache.
-            event_type.stored_event_type = None
-            event_type.get_stored_event_type()
+        StoredEventType = apps.get_model(
+            app_label='events', model_name='StoredEventType'
+        )
+
+        event_type_list = list(
+            cls.all()
+        )
+
+        stored_event_type_map = {
+            stored_event_type.name: stored_event_type
+            for stored_event_type in StoredEventType.objects.all()
+        }
+
+        missing_stored_event_type_list = []
+        for event_type in event_type_list:
+            if event_type.id not in stored_event_type_map:
+                missing_stored_event_type_list.append(
+                    StoredEventType(name=event_type.id)
+                )
+
+        if missing_stored_event_type_list:
+            StoredEventType.objects.bulk_create(
+                ignore_conflicts=True, objs=missing_stored_event_type_list
+            )
+            stored_event_type_map = {
+                stored_event_type.name: stored_event_type
+                for stored_event_type in StoredEventType.objects.all()
+            }
+
+        for event_type in event_type_list:
+            stored_event_type = stored_event_type_map.get(event_type.id)
+
+            if stored_event_type is None:
+                get_or_create_result = StoredEventType.objects.get_or_create(
+                    name=event_type.id
+                )
+                stored_event_type = get_or_create_result[0]
+
+            event_type.stored_event_type = stored_event_type
 
     def __init__(self, namespace, name, label):
         self.namespace = namespace
@@ -341,11 +382,12 @@ class EventType:
         ObjectEventSubscription = apps.get_model(
             app_label='events', model_name='ObjectEventSubscription'
         )
+        StoredEventType = apps.get_model(
+            app_label='events', model_name='StoredEventType'
+        )
         User = get_user_model()
 
         if actor is None and target is None:
-            # If the actor and the target are None there is no way to
-            # create a new event.
             logger.error(
                 'Attempting to commit event "%s" without an actor or a '
                 'target. This is not supported.', self
@@ -356,54 +398,51 @@ class EventType:
             actor or target, actor=actor, verb=self.id,
             action_object=action_object, target=target
         )[0][1]
-        # The [0][1] means: get the first and only action from the list
-        # and ignore the handler.
 
-        # Create notifications for the actions created by the event committed.
 
-        # Gather the users subscribed globally to the event.
+        stored_event_type_id = StoredEventType.objects.get_pk_for_name(
+            name=result.verb
+        )
+
+        if stored_event_type_id is None:
+            return
+
+        action_object_is_recorded = result.action_object_object_id is not None
+        target_is_recorded = result.target_object_id is not None
+
+        if not action_object_is_recorded and not target_is_recorded:
+            return
+
         queryset_users = User.objects.filter(
             id__in=EventSubscription.objects.filter(
-                stored_event_type__name=result.verb
+                stored_event_type_id=stored_event_type_id
             ).values('user')
         )
 
-        # Gather the users subscribed to the target object event.
-        if result.target:
+        if target_is_recorded:
             queryset_users = queryset_users | User.objects.filter(
                 id__in=ObjectEventSubscription.objects.filter(
-                    content_type=result.target_content_type,
-                    object_id=result.target.pk,
-                    stored_event_type__name=result.verb
+                    content_type_id=result.target_content_type_id,
+                    object_id=target.pk,
+                    stored_event_type_id=stored_event_type_id
                 ).values('user')
             )
 
-        # Gather the users subscribed to the action object event.
-        if result.action_object:
+        if action_object_is_recorded:
             queryset_users = queryset_users | User.objects.filter(
                 id__in=ObjectEventSubscription.objects.filter(
-                    content_type=result.action_object_content_type,
-                    object_id=result.action_object.pk,
-                    stored_event_type__name=result.verb
+                    content_type_id=result.action_object_content_type_id,
+                    object_id=action_object.pk,
+                    stored_event_type_id=stored_event_type_id
                 ).values('user')
             )
 
-        for user in queryset_users:
-            if result.action_object:
-                Notification.objects.create(action=result, user=user)
-                # Don't check or add any other notification for the
-                # same user-event-object.
-                continue
+        queryset_user_id = queryset_users.values_list('pk', flat=True)
 
-            if result.target:
-                Notification.objects.create(action=result, user=user)
-                # Don't check or add any other notification for the
-                # same user-event-object.
-                continue
+        for user_id in queryset_user_id:
+            Notification.objects.create(action=result, user_id=user_id)
 
     def commit(self, action_object=None, actor=None, target=None):
-        # Hidden import.
-        # This circular import is necessary.
         from .tasks import task_event_commit
 
         task_kwargs = {'event_id': self.id}
@@ -466,9 +505,6 @@ class EventType:
 
 
 class ModelEventType:
-    """
-    Class to allow matching a model to a specific set of events.
-    """
     _inheritances = {}
     _registry = {}
 

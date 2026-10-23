@@ -15,13 +15,6 @@ from .model_mixins import (
 
 
 class Role(ExtraDataModelMixin, RoleBusinessLogicMixin, models.Model):
-    """
-    This model represents a Role. Roles are permission units. They are the
-    only object to which permissions can be granted. They are themselves
-    containers too, containing Groups, which are organization units. Roles
-    are the basic method to grant a permission to a group. Permissions granted
-    to a group using a role, are granted for the entire system.
-    """
     _ordering_fields = ('label',)
 
     label = models.CharField(
@@ -69,11 +62,6 @@ class Role(ExtraDataModelMixin, RoleBusinessLogicMixin, models.Model):
 
 
 class StoredPermission(StoredPermissionBusinessLogicMixin, models.Model):
-    """
-    This model is the counterpart of the permissions.classes.Permission
-    class. Allows storing a database counterpart of a permission class.
-    It is used to store the permissions help by a role or in an ACL.
-    """
     namespace = models.CharField(
         max_length=64, verbose_name=_(message='Namespace')
     )

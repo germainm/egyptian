@@ -2,13 +2,13 @@ from io import BytesIO
 from importlib.metadata import PackageNotFoundError, version
 import json
 import logging
-from packaging.requirements import Requirement
-from packaging.version import Version
 from pathlib import Path
 import shutil
 import sys
 
 from furl import furl
+from packaging.requirements import Requirement
+from packaging.version import Version
 import requests
 from nodesemver import max_satisfying
 
@@ -23,6 +23,7 @@ from mayan.apps.common.exceptions import ResolverPipelineError
 from mayan.apps.common.utils import ResolverPipelineObjectAttribute
 from mayan.apps.locales.translatable import join_translatable
 from mayan.apps.storage.compressed_files import TarArchive
+from mayan.apps.storage.exceptions import CompressionFileError
 from mayan.apps.storage.utils import (
     TemporaryDirectory, fs_cleanup, mkdtemp,
     patch_files as storage_patch_files
@@ -30,13 +31,14 @@ from mayan.apps.storage.utils import (
 
 from .algorithms import HashAlgorithm
 from .exceptions import DependenciesException
-from .literals import DEFAULT_HTTP_TIMEOUT
+from .literals import DEFAULT_HTTP_TIMEOUT, REGULAR_EXPRESSION_CSS_URL
+from .settings import setting_google_fonts_url, setting_npm_registry_url
 
 logger = logging.getLogger(name=__name__)
 
 
 class Provider:
-    """Base provider class."""
+    pass
 
 
 class PyPIRespository(Provider):
@@ -44,15 +46,19 @@ class PyPIRespository(Provider):
 
 
 class GoogleFontsProvider(Provider):
-    url = 'https://fonts.googleapis.com/'
+    @property
+    def url(self):
+        return setting_google_fonts_url.value
 
 
 class NPMRegistryRespository(Provider):
-    url = 'https://registry.npmjs.com'
+    @property
+    def url(self):
+        return setting_npm_registry_url.value
 
 
 class OperatingSystemProvider(Provider):
-    """Placeholder for the OS provider."""
+    pass
 
 
 class DependencyGroup:
@@ -363,9 +369,6 @@ class Dependency(AppsModuleLoaderMixin):
         return apps.get_app_config(app_label=self.app_label).verbose_name
 
     def download(self):
-        """
-        Download the dependency from a repository.
-        """
         raise NotImplementedError
 
     def get_copyright_text(self):
@@ -444,9 +447,6 @@ class Dependency(AppsModuleLoaderMixin):
         return '<{}: {}>'.format(self.__class__.__name__, self.name)
 
     def check(self):
-        """
-        Returns the version found or an exception.
-        """
         if self._check():
             return True
         else:
@@ -529,13 +529,9 @@ class Dependency(AppsModuleLoaderMixin):
         storage_patch_files(path=path, replace_list=replace_list)
 
     def verify(self):
-        """
-        Verify the integrity of the dependency.
-        """
         raise NotImplementedError
 
 
-# Dependency subclasses.
 
 
 class BinaryDependency(Dependency):
@@ -639,6 +635,19 @@ class JavaScriptDependency(Dependency):
         fs_cleanup(filename=path_install)
 
     def extract(self, replace_list=None):
+        try:
+            self._extract(replace_list=replace_list)
+        except CompressionFileError as exception:
+            raise DependenciesException(
+                'The package archive for "{label}" was rejected by an '
+                'archive safety limit: {exception} The package is not '
+                'necessarily malicious, the limits are conservative by '
+                'default.'.format(
+                    exception=exception, label=self.get_label_full()
+                )
+            ) from exception
+
+    def _extract(self, replace_list=None):
         with TemporaryDirectory() as temporary_directory:
             path_compressed_file = self.get_tar_file_path()
             path_temporary = Path(temporary_directory)
@@ -672,19 +681,12 @@ class JavaScriptDependency(Dependency):
 
             path_install = self.get_install_path()
 
-            # Clear the installation path of previous content.
             shutil.rmtree(
                 path=str(path_install), ignore_errors=True
             )
 
-            # Scoped packages are nested under a parent directory create it
-            # to avoid rename errors.
             path_install.mkdir(parents=True)
 
-            # Copy the content under the dependency's extracted content
-            # folder 'package' to the final location.
-            # We do a copy and delete instead of move because os.rename
-            # doesn't support renames across filesystems.
             path_uncompressed_package = Path(temporary_directory, 'package')
             shutil.rmtree(
                 path=str(path_install)
@@ -694,16 +696,21 @@ class JavaScriptDependency(Dependency):
                 dst=str(path_install)
             )
 
-            # Clean up temporary directory used for download.
             shutil.rmtree(path=self.path_cache, ignore_errors=True)
 
     def download(self):
         self.path_cache = mkdtemp()
 
-        with requests.get(stream=True, timeout=DEFAULT_HTTP_TIMEOUT, url=self.version_metadata['dist']['tarball']) as response:
+        url_tarball = self.version_metadata['dist']['tarball']
+
+        with requests.get(stream=True, timeout=DEFAULT_HTTP_TIMEOUT, url=url_tarball) as response:
             response.raise_for_status()
             with self.get_tar_file_path().open(mode='wb') as file_object:
-                shutil.copyfileobj(fsrc=response.raw, fdst=file_object)
+                shutil.copyfileobj(
+                    fsrc=BytesIO(
+                        initial_bytes=response.content
+                    ), fdst=file_object
+                )
 
     def get_best_version(self):
         versions = self.versions
@@ -956,50 +963,30 @@ class GoogleFontDependency(Dependency):
         self.path_cache = Path(
             mkdtemp()
         )
-        # Use .css to keep the same ContentType, otherwise the webserver
-        # will use the generic octet and the browser will ignore the import.
-        # https://www.w3.org/TR/2013/CR-css-cascade-3-20131003/#content-type
         self.path_import_file = self.path_cache / 'import.css'
 
-        self.font_files = []
+        self.font_files = {}
+
+        url = self.get_url()
 
         with self.path_import_file.open(mode='w') as file_object:
             for agent_name, agent_string in self.user_agents.items():
                 headers = {'User-Agent': agent_string}
+
                 response = requests.get(
-                    headers=headers, timeout=DEFAULT_HTTP_TIMEOUT,
-                    url=self.url
+                    headers=headers, timeout=DEFAULT_HTTP_TIMEOUT, url=url
                 )
                 response.raise_for_status()
-                import_file = response.text
 
-                for line in import_file.split('\n'):
-                    if 'url' in line:
-                        font_url = line.split(' ')[-2][4:-1]
-                        url = furl(font_url)
-                        font_filename = url.path.segments[-1]
-                        path_font_filename = self.path_cache / font_filename
-                        with path_font_filename.open(mode='wb') as font_file_object:
-                            with requests.get(stream=True, timeout=DEFAULT_HTTP_TIMEOUT, url=font_url) as response:
-                                # Use response.content instead of response.raw
-                                # to allow requests to handle gzip and deflate
-                                # content.
-                                # https://2.python-requests.org/en/master/user/quickstart/#binary-response-content
-                                response.raise_for_status()
-                                shutil.copyfileobj(
-                                    fsrc=BytesIO(
-                                        initial_bytes=response.content
-                                    ), fdst=font_file_object
-                                )
+                stylesheet = response.text
 
-                        line = line.replace(font_url, font_filename)
-
-                    file_object.write(line)
+                for line in stylesheet.split('\n'):
+                    line_localized = self.get_line_localized(line=line)
+                    file_object.write(line_localized)
 
     def extract(self, replace_list=None):
         path_install = self.get_install_path()
 
-        # Clear the installation path of previous content.
         shutil.rmtree(
             path=str(path_install), ignore_errors=True
         )
@@ -1011,6 +998,54 @@ class GoogleFontDependency(Dependency):
             path=str(self.path_cache), ignore_errors=True
         )
 
+    def get_filename_unique(self, filename):
+        filename_list = self.font_files.values()
+
+        if filename not in filename_list:
+            return filename
+
+        path_filename = Path(filename)
+        filename_stem = path_filename.stem
+        filename_suffix = path_filename.suffix
+
+        counter = 1
+
+        while True:
+            filename_result = '{}_{}{}'.format(
+                filename_stem, counter, filename_suffix
+            )
+
+            if filename_result not in filename_list:
+                return filename_result
+
+            counter = counter + 1
+
+    def get_font_file_download(self, url):
+        filename_cached = self.font_files.get(url)
+
+        if filename_cached:
+            return filename_cached
+
+        url_parsed = furl(url)
+        filename_remote = url_parsed.path.segments[-1]
+        filename = self.get_filename_unique(filename=filename_remote)
+
+        path_font_file = self.path_cache / filename
+
+        with requests.get(stream=True, timeout=DEFAULT_HTTP_TIMEOUT, url=url) as response:
+            response.raise_for_status()
+
+            with path_font_file.open(mode='wb') as file_object:
+                shutil.copyfileobj(
+                    fsrc=BytesIO(
+                        initial_bytes=response.content
+                    ), fdst=file_object
+                )
+
+        self.font_files[url] = filename
+
+        return filename
+
     def get_install_path(self):
         app = apps.get_app_config(app_label=self.app_label)
         result = Path(
@@ -1018,6 +1053,36 @@ class GoogleFontDependency(Dependency):
             'google_fonts', self.name
         )
         return result
+
+    def get_line_localized(self, line):
+        url_list = REGULAR_EXPRESSION_CSS_URL.findall(string=line)
+
+        result = line
+
+        for url_raw in url_list:
+            url = url_raw.strip('\'"')
+
+            if not url:
+                continue
+
+            filename = self.get_font_file_download(url=url)
+            result = result.replace(url, filename)
+
+        return result
+
+    def get_url(self):
+        url_declared = furl(self.url)
+        origin = url_declared.origin
+
+        if not self.url.startswith(origin):
+            return self.url
+
+        url_provider = self.repository.url
+        url_base = url_provider.rstrip('/')
+
+        remainder = self.url[len(origin):]
+
+        return '{}{}'.format(url_base, remainder)
 
 
 DependencyGroup(

@@ -78,7 +78,6 @@ class WorkflowTemplateTransitionTriggerSerializer(
         )
 
     def create(self, validated_data):
-        # Unroll nested source `event_type.event_type.id`.
         event_type = validated_data.pop('event_type', None)
         event_type = event_type.get(
             'event_type', {}
@@ -93,7 +92,6 @@ class WorkflowTemplateTransitionTriggerSerializer(
         return super().create(validated_data=validated_data)
 
     def update(self, instance, validated_data):
-        # Unroll nested source `event_type.event_type.id`.
         event_type = validated_data.pop('event_type', None)
         event_type = event_type.get(
             'event_type', {}

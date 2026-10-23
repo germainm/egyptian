@@ -5,6 +5,7 @@ import sys
 import traceback
 
 from django.apps import apps, AppConfig
+from django.core.checks import register
 from django.urls import include, re_path
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
@@ -18,6 +19,7 @@ from mayan.apps.organizations.settings import (
 )
 from mayan.settings import BASE_DIR
 
+from .checks import check_initialization_step_arguments
 from .links import link_app_list
 
 logger = logging.getLogger(name=__name__)
@@ -54,7 +56,6 @@ class MayanAppConfig(AppConfig):
         )
 
     def configure_urls(self):
-        # Hidden import.
         from mayan.urls import urlpatterns as mayan_urlpatterns
 
         installation_base_url = setting_organization_url_base_path.value
@@ -69,10 +70,8 @@ class MayanAppConfig(AppConfig):
                 installation_base_url=installation_base_url
             )
         elif self.app_url is not None:
-            # When using app_url as '' to register a top of URL view.
             top_url = installation_base_url
         else:
-            # If app_url is None, use the app's name for the URL base.
             top_url = '{installation_base_url}{app_name}/'.format(
                 app_name=self.name,
                 installation_base_url=installation_base_url
@@ -97,9 +96,6 @@ class MayanAppConfig(AppConfig):
                 traceback.print_exception(*exc_info)
                 raise exception
         else:
-            # Allow blank namespaces. These are used to register the
-            # urlpatterns of encapsulated libraries as top level named
-            # URLs.
             if self.app_namespace is not None:
                 app_namespace = self.app_namespace
             else:
@@ -194,6 +190,7 @@ class MayanAppConfig(AppConfig):
 class AppManagerAppConfig(MayanAppConfig):
     app_namespace = 'app_manager'
     app_url = 'app_manager'
+    has_tests = True
     name = 'mayan.apps.app_manager'
     verbose_name = _(message='App manager')
 
@@ -228,3 +225,5 @@ class AppManagerAppConfig(MayanAppConfig):
         menu_tools.bind_links(
             links=(link_app_list,)
         )
+
+        register(check=check_initialization_step_arguments)

@@ -1,8 +1,3 @@
-"""
-Sort existing cabinets after adding:
-    class MPTTMeta:
-        order_insertion_by = ('label',)
-"""
 from django.db import migrations
 
 from mptt.models import MPTTModel

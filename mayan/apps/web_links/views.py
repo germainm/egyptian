@@ -19,6 +19,7 @@ from mayan.apps.views.view_mixins import ExternalObjectViewMixin
 from .forms import WebLinkForm
 from .icons import icon_web_link_setup
 from .links import link_web_link_create
+from .literals import TEXT_WEB_LINK_NO_RESULTS
 from .models import ResolvedWebLink, WebLink
 from .permissions import (
     permission_web_link_create, permission_web_link_delete,
@@ -161,11 +162,7 @@ class WebLinkListView(SingleObjectListView):
             'no_results_main_link': link_web_link_create.resolve(
                 context=RequestContext(request=self.request)
             ),
-            'no_results_text': _(
-                message='Web links allow generating HTTP links from documents to '
-                'external resources. The link URL\'s can contain document '
-                'properties values.'
-            ),
+            'no_results_text': TEXT_WEB_LINK_NO_RESULTS,
             'no_results_title': _(
                 message='There are no web links'
             ),
@@ -191,11 +188,7 @@ class DocumentWebLinkListView(ExternalObjectViewMixin, WebLinkListView):
             'hide_link': True,
             'hide_object': True,
             'no_results_icon': icon_web_link_setup,
-            'no_results_text': _(
-                message='Web links allow generating HTTP links from documents to '
-                'external resources. The link URL\'s can contain document '
-                'properties values.'
-            ),
+            'no_results_text': TEXT_WEB_LINK_NO_RESULTS,
             'no_results_title': _(
                 message='There are no web links for this document'
             ),

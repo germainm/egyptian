@@ -6,6 +6,7 @@ from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 
 from .exceptions import SettingsException
+from .setting_data_types import DATA_TYPE_FUNCTION_MAP
 from .utils import serialize_data_to_display
 
 logger = logging.getLogger(name=__name__)
@@ -36,6 +37,9 @@ class SettingMixinDoers:
     def do_cache_invalidate(self):
         self.value_loaded = False
 
+        cluster = self.get_cluster()
+        cluster.do_template_cache_invalidate()
+
     def do_namespace_join(self):
         self.namespace.do_setting_join(setting=self)
 
@@ -57,10 +61,6 @@ class SettingMixinDoers:
         self.do_post_edit_function_call()
 
     def do_value_cache(self):
-        """
-        Preload and cache the value of the setting for a deterministic
-        access time.
-        """
         self.value
 
     def do_value_load(self):
@@ -73,8 +73,6 @@ class SettingMixinDoers:
             )
         except KeyError:
             value = self.default
-
-        self.value_loaded = True
 
         logger.debug('cluster read value value: %s', value)
 
@@ -91,7 +89,9 @@ class SettingMixinDoers:
 
         value_expressed = Setting.express_promises(value=value_original)
 
-        self._value = value_expressed
+        self.do_value_set(value=value_expressed)
+
+        self.value_loaded = True
 
         logger.debug('Final value: %s', self._value)
 
@@ -111,19 +111,28 @@ class SettingMixinDoers:
         if self.value_error is None:
             self.value_loaded = True
             value_expressed = Setting.express_promises(value=value_validated)
-            self._value = value_expressed
+            self.do_value_set(value=value_expressed)
+
+    def do_value_set(self, value):
+        value_previous = self._value
+
+        self._value = value
+
+        if value != value_previous:
+            cluster = self.get_cluster()
+            cluster.do_template_cache_invalidate()
 
     def do_value_validate(self, value):
         self.value_error = None
 
-        # Coerce a raw input (string,YAML parsed,etc) into a Python type.
         if self.data_type is not None:
+            data_type_function = self.get_data_type_function()
+
             try:
-                value = self.data_type(value)
+                value = data_type_function(value)
             except Exception as exception:
                 self.value_error = str(exception)
 
-        # Validate according to the setting's specific validation logic.
         try:
             value = self.do_value_raw_validate(raw_value=value)
         except Exception as exception:
@@ -162,10 +171,43 @@ class SettingMixinGetters:
     def get_cluster(self):
         return self.namespace.cluster
 
+    def get_data_type_function(self):
+        return DATA_TYPE_FUNCTION_MAP.get(self.data_type, self.data_type)
+
     def get_display_value(self):
         value = self.get_value_pending()
         result = serialize_data_to_display(data=value)
         return result
+
+    def get_display_default_value(self):
+        return serialize_data_to_display(data=self.default)
+
+    get_display_default_value.short_description = _(message='Default value')
+    get_display_default_value.help_text = _(
+        message='The value the setting reverts to when nothing overrides it.'
+    )
+
+    def get_load_error_text(self):
+        error_list = []
+
+        if self.value_error is not None:
+            error_list.append(
+                force_str(s=self.value_error)
+            )
+
+        for domain_name, domain_value in self.domain_dict.items():
+            try:
+                domain_error = domain_value['error']
+            except KeyError:
+                """The domain reported no error."""
+            else:
+                error_list.append(
+                    force_str(s=domain_error)
+                )
+
+        return '\n'.join(error_list)
+
+    get_load_error_text.short_description = _(message='Error')
 
     def get_has_load_error(self):
         if self.value_error is not None:
@@ -214,17 +256,31 @@ class SettingMixinGetters:
     )
 
     def get_value_choices(self):
-        return self.choices
+        if callable(self.choices):
+            return self.choices()
+        else:
+            return self.choices
 
     get_value_choices.short_description = _(message='Choices')
     get_value_choices.help_text = _(
         message='Possible values allowed for this setting.'
     )
 
-    def get_value_pending(self):
-        cluster = self.get_cluster()
+    def get_value_pending(self, value_pending_map=None):
+        if value_pending_map is None:
+            cluster = self.get_cluster()
+
+            try:
+                value_pending = cluster.get_setting_value_pending(
+                    setting=self
+                )
+            except KeyError:
+                return self.value
+            else:
+                return value_pending
+
         try:
-            value_pending = cluster.get_setting_value_pending(setting=self)
+            value_pending = value_pending_map[self.global_name]
         except KeyError:
             return self.value
         else:
@@ -236,9 +292,6 @@ class Setting(
 ):
     @staticmethod
     def express_promises(value):
-        """
-        Walk all the elements of a value and force promises to text.
-        """
         if isinstance(value, (list, tuple)):
             return [
                 Setting.express_promises(item) for item in value
@@ -280,9 +333,6 @@ class Setting(
 
     @property
     def pk(self):
-        """
-        Compatibility property for views that expect model instances.
-        """
         return self.global_name
 
     @property

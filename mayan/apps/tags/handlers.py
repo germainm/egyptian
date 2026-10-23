@@ -17,7 +17,4 @@ def handler_index_document(sender, **kwargs):
 
 def handler_tag_pre_delete(sender, **kwargs):
     for document in kwargs['instance'].documents.all():
-        # Remove each of the documents from the tag.
-        # Trigger the remove event for each document so they can be
-        # reindexed.
         kwargs['instance']._remove_from(document=document)

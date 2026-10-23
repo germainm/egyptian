@@ -30,18 +30,27 @@ def task_document_move_to_trash(self, document_id, user_id=None):
 
     logger.debug(msg='Executing')
     try:
-        document = Document.objects.get(
+        document = Document.valid.get(
             pk=document_id
         )
-        document._event_actor = user
-        document.delete()
+    except Document.DoesNotExist:
+        logger.info(
+            'Document with ID: %s is not a valid document. It was already '
+            'moved to the trash or deleted.', document_id
+        )
     except OperationalError as exception:
         raise self.retry(exc=exception)
+    else:
+        try:
+            document._event_actor = user
+            document.delete()
+        except OperationalError as exception:
+            raise self.retry(exc=exception)
 
     logger.debug(msg='Finished')
 
 
-@app.task(bind=True, ignore_results=True, retry_backoff=True)
+@app.task(bind=True, retry_backoff=True)
 def task_document_upload(
     self, document_type_id, shared_uploaded_file_id,
     callback_dict=None, description=None, label=None, language=None,

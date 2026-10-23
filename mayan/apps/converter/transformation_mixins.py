@@ -1,12 +1,14 @@
 import logging
 
-from PIL import Image, ImageColor, ImageDraw
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 from django.apps import apps
 from django.utils.encoding import force_bytes
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.forms import form_fields, form_widgets, forms
+
+from .literals import DEFAULT_TEXT_FONT_SIZE
 
 logger = logging.getLogger(name=__name__)
 
@@ -38,9 +40,6 @@ class ImagePasteTransformationMixin:
     def _update_hash(self):
         result = super()._update_hash()
         instance = self.get_model_instance()
-        # Add the image hash to the transformation hash. Ensures
-        # that the content object image is updated if the image is
-        # updated even if the transformation itself is not updated.
         result.update(
             force_bytes(
                 s=instance.get_hash()
@@ -51,7 +50,7 @@ class ImagePasteTransformationMixin:
 
     def execute_on(self, *args, **kwargs):
         super().execute_on(*args, **kwargs)
-        return self._execute_on(self, *args, **kwargs)
+        return self._execute_on(*args, **kwargs)
 
     def get_image(self):
         instance = self.get_model_instance()
@@ -301,6 +300,90 @@ class ImageWatermarkPercentTransformationMixin(
         return self.image
 
 
+class TransformationDrawTextMixin(ImagePasteTransformationMixin):
+    @classmethod
+    def get_arguments(cls):
+        arguments = super().get_arguments() + (
+            'text', 'font_size', 'font_color'
+        )
+        return arguments
+
+    @classmethod
+    def get_form_class(cls):
+        SuperForm = super().get_form_class()
+
+        class FormWithText(SuperForm):
+            text = form_fields.CharField(
+                help_text=_(message='Text to draw on the image.'),
+                label=_(message='Text'), required=True
+            )
+            font_size = form_fields.IntegerField(
+                help_text=_(message='Size of the text in pixels.'),
+                initial=DEFAULT_TEXT_FONT_SIZE,
+                label=_(message='Font size'), required=False
+            )
+            font_color = form_fields.CharField(
+                help_text=_(message='Color used to draw the text.'),
+                label=_(message='Font color'), required=False,
+                widget=form_widgets.ColorWidget()
+            )
+
+        return FormWithText
+
+    def _update_hash(self):
+        result = super(
+            ImagePasteTransformationMixin, self
+        )._update_hash()
+
+        for value in (self.text, self.font_size, self.font_color):
+            result.update(
+                force_bytes(s=value)
+            )
+
+        return result
+
+    def get_image(self):
+        text = self.text or ''
+
+        try:
+            font_size = int(self.font_size or DEFAULT_TEXT_FONT_SIZE)
+        except (TypeError, ValueError):
+            font_size = DEFAULT_TEXT_FONT_SIZE
+
+        if font_size < 1:
+            font_size = DEFAULT_TEXT_FONT_SIZE
+
+        font_color_value = getattr(self, 'font_color', None)
+        if font_color_value and font_color_value != 'None':
+            fill_color = ImageColor.getrgb(color=font_color_value)
+        else:
+            fill_color = (0, 0, 0)
+
+        fill_color += (255,)
+
+        font = ImageFont.load_default(size=font_size)
+
+        measure_draw = ImageDraw.Draw(
+            im=Image.new(mode='RGBA', size=(1, 1))
+        )
+        left, top, right, bottom = measure_draw.multiline_textbbox(
+            font=font, text=text, xy=(0, 0)
+        )
+
+        width = max(right - left, 1)
+        height = max(bottom - top, 1)
+
+        text_image = Image.new(
+            color=(0, 0, 0, 0), mode='RGBA', size=(width, height)
+        )
+        draw = ImageDraw.Draw(im=text_image)
+        draw.multiline_text(
+            fill=fill_color, font=font, text=text, xy=(-left, -top)
+        )
+
+        return text_image
+
+
 class AssetTransformationMixin:
     @classmethod
     def get_form_class(cls):
@@ -390,8 +473,6 @@ class TransformationDrawRectangleMixin:
             elif fill_transparency > 100:
                 fill_transparency = 100
 
-        # Convert transparency to opacity. Invert intensity logic, transpose
-        # from percent to 8-bit value.
         opacity = int(
             (100 - fill_transparency) / 100 * 255
         )

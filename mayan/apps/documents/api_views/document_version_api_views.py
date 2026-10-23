@@ -62,8 +62,6 @@ class APIDocumentVersionListView(
     serializer_class = DocumentVersionSerializer
 
     def get_instance_extra_data(self):
-        # This method is only called during POST, therefore filter only by
-        # edit permission.
         return {
             '_event_actor': self.request.user,
             'document': self.get_document(
@@ -171,8 +169,6 @@ class APIDocumentVersionPageListView(
     serializer_class = DocumentVersionPageSerializer
 
     def get_instance_extra_data(self):
-        # This method is only called during POST, therefore filter only by
-        # edit permission.
         return {
             '_event_actor': self.request.user,
             'document_version': self.get_document_version(
@@ -181,8 +177,6 @@ class APIDocumentVersionPageListView(
         }
 
     def get_source_queryset(self):
-        # This method is only called during GET, therefore filter only by
-        # the view permission.
         document_version = self.get_document_version(
             permission=permission_document_version_view
         )

@@ -125,7 +125,6 @@ class TagsApp(MayanAppConfig):
             field_name='documents'
         )
 
-        # Document
 
         SourceColumn(
             label=_(message='Tags'), source=Document, widget=DocumentTagWidget
@@ -149,7 +148,6 @@ class TagsApp(MayanAppConfig):
             source=DocumentVersionPageSearchResult, widget=DocumentTagWidget
         )
 
-        # Tag
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -169,7 +167,6 @@ class TagsApp(MayanAppConfig):
         )
         source_column_tag_document_count.add_exclude(source=DocumentTag)
 
-        # Document
 
         menu_list_facet.bind_links(
             links=(link_document_tag_list,), sources=(Document,)
@@ -183,7 +180,6 @@ class TagsApp(MayanAppConfig):
             sources=(Document,)
         )
 
-        # Tag
 
         menu_list_facet.bind_links(
             links=(
@@ -223,7 +219,6 @@ class TagsApp(MayanAppConfig):
             )
         )
 
-        # Index update
 
         post_save.connect(
             dispatch_uid='tags_handler_index_document',

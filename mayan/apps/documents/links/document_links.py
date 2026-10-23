@@ -34,7 +34,6 @@ link_document_properties_edit = Link(
     view='documents:document_properties_edit'
 )
 
-# Document type
 
 link_document_type_change_multiple = Link(
     text=_(message='Change type'), icon=icon_document_type_change_multiple,
@@ -47,7 +46,6 @@ link_document_type_change_single = Link(
     ), view='documents:document_type_change'
 )
 
-# Recently accessed
 
 link_document_recently_accessed_list = Link(
     icon=icon_document_recently_accessed_list, text=_(
@@ -55,7 +53,6 @@ link_document_recently_accessed_list = Link(
     ), view='documents:document_recently_accessed_list'
 )
 
-# Recently created
 
 link_document_recently_created_list = Link(
     icon=icon_document_recently_created_list, text=_(

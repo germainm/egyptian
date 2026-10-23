@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import NON_FIELD_ERRORS
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -9,7 +10,7 @@ from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.views.generics import MultiFormView
-from mayan.apps.views.utils import request_is_ajax
+from mayan.apps.views.utils import request_is_ajax, request_wants_json
 from mayan.apps.views.view_mixins import ViewIconMixin
 
 from .view_mixins import SourceActionViewMixin, SourceLinkNavigationViewMixin
@@ -48,11 +49,53 @@ class UploadBaseView(
             elif request_is_ajax(request=request):
                 return JsonResponse(
                     data={
-                        'error': force_str(s=exception)
+                        'error': self.get_exception_message(
+                            exception=exception
+                        )
                     }, status=500
                 )
             else:
                 raise
+
+    def forms_invalid(self, forms):
+        if request_wants_json(request=self.request):
+            error_list = []
+
+            for form in forms.values():
+                for field_name, message_list in form.errors.items():
+                    if field_name == NON_FIELD_ERRORS:
+                        field_label = None
+                    else:
+                        form_field = form.fields.get(field_name)
+                        field_label = getattr(form_field, 'label', None)
+
+                    for message in message_list:
+                        if field_label:
+                            error = '{}: {}'.format(field_label, message)
+                        else:
+                            error = message
+
+                        error_list.append(error)
+
+            return JsonResponse(
+                data={
+                    'error': ' '.join(error_list)
+                }, status=400
+            )
+        else:
+            return super().forms_invalid(forms=forms)
+
+    def get_exception_message(self, exception):
+        message = force_str(s=exception)
+
+        if not message:
+            message = _(
+                message='Unexpected error: %(exception_class)s'
+            ) % {
+                'exception_class': type(exception).__name__
+            }
+
+        return message
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

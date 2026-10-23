@@ -3,6 +3,9 @@ from datetime import timedelta
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.task_manager.classes import CeleryQueue
+from mayan.apps.task_manager.task_deduplication_backends import (
+    TaskDeduplicationBackendReleaseOnCompletion
+)
 from mayan.apps.task_manager.workers import worker_e
 
 from .literals import TASK_SAVED_RESULTSET_EXPIRED_DELETE_INTERVAL
@@ -20,6 +23,7 @@ queue_search.add_task_type(
     name='task_deindex_instance'
 )
 queue_search.add_task_type(
+    deduplication_backend=TaskDeduplicationBackendReleaseOnCompletion,
     dotted_path='mayan.apps.dynamic_search.tasks.task_index_instance',
     label=_(message='Index a model instance to the search engine.'),
     name='task_index_instance'

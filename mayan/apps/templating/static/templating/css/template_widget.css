@@ -1,0 +1,71 @@
+.templating-widget-code-container {
+    position: relative;
+}
+
+.templating-widget-code-copy {
+    inset-inline-end: 1rem;
+    position: absolute;
+    top: 0.25rem;
+    z-index: 3;
+}
+
+textarea.templating-widget-code,
+pre.templating-widget-code-preview,
+pre.templating-widget-code-preview code.templating-widget-code-preview-code {
+    -moz-tab-size: 4;
+    font-family: monospace;
+    font-size: 1rem;
+    letter-spacing: normal;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+textarea.templating-widget-code {
+    background-color: transparent;
+    caret-color: var(
+        --templating-widget-code-caret-color, var(--bs-body-color, GrayText)
+    );
+    color: transparent;
+    display: block;
+    overflow: auto;
+    position: relative;
+    resize: vertical;
+    white-space: pre;
+    width: 100%;
+    z-index: 2;
+}
+
+
+textarea.templating-widget-code:focus {
+    background-color: transparent;
+    color: transparent;
+}
+
+textarea.templating-widget-code::selection {
+    background-color: var(
+        --templating-widget-code-selection-background,
+        color-mix(in srgb, var(--bs-body-color, GrayText) 30%, transparent)
+    );
+    color: transparent;
+}
+
+pre.templating-widget-code-preview {
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    inset: 0;
+    margin: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+}
+
+pre.templating-widget-code-preview code.templating-widget-code-preview-code {
+    box-sizing: border-box;
+    display: block;
+    height: 100%;
+    overflow: hidden;
+    padding: 0.375rem 0.75rem;
+    white-space: pre;
+    width: 100%;
+}

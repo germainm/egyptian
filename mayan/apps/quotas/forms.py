@@ -43,8 +43,6 @@ class QuotaDynamicForm(forms.DynamicModelForm):
 
     def clean(self):
         data = super().clean()
-        # Consolidate the dynamic fields into a single JSON field called
-        # 'backend_data'.
         backend_data = {}
 
         for field_name, field_data in self.schema['fields'].items():
@@ -52,11 +50,9 @@ class QuotaDynamicForm(forms.DynamicModelForm):
                 field_name, field_data.get('default', None)
             )
 
-            # Reduce models to a pk.
             if isinstance(field_data, models.Model):
                 field_data = field_data.pk
 
-            # Reduce querysets to a list.
             if isinstance(field_data, models.query.QuerySet):
                 field_data = list(
                     field_data.values_list('pk', flat=True)

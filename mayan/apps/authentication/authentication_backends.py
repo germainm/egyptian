@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
 
@@ -19,12 +18,17 @@ from .literals import SESSION_MULTI_FACTOR_USER_ID_KEY
 class AuthenticationBackendModelDjangoDefault(
     AuthenticationBackendRememberMeMixin, AuthenticationBackend
 ):
-    """Bare bones backend that preserves Django's default behaviors."""
+    django_authentication_backend_paths = (
+        get_class_full_name(klass=ModelBackend),
+    )
 
 
 class AuthenticationBackendModelUsernamePassword(
     AuthenticationBackendRememberMeMixin, AuthenticationBackend
 ):
+    django_authentication_backend_paths = (
+        get_class_full_name(klass=ModelBackend),
+    )
     login_form_class = AuthenticationFormUsernamePassword
 
     def get_user(self, request, form_list=None, kwargs=None):
@@ -32,23 +36,16 @@ class AuthenticationBackendModelUsernamePassword(
             pk=request.session[SESSION_MULTI_FACTOR_USER_ID_KEY]
         )
 
-    def initialize(self):
-        settings.AUTHENTICATION_BACKENDS = (
-            get_class_full_name(klass=ModelBackend),
-        )
-
 
 class AuthenticationBackendModelEmailPassword(
     AuthenticationBackendRememberMeMixin, AuthenticationBackend
 ):
+    django_authentication_backend_paths = (
+        get_class_full_name(klass=DjangoAuthenticationBackendModelEmail),
+    )
     login_form_class = AuthenticationFormEmailPassword
 
     def get_user(self, request, form_list=None, kwargs=None):
         return get_user_model().objects.get(
             pk=request.session[SESSION_MULTI_FACTOR_USER_ID_KEY]
-        )
-
-    def initialize(self):
-        settings.AUTHENTICATION_BACKENDS = (
-            get_class_full_name(klass=DjangoAuthenticationBackendModelEmail),
         )

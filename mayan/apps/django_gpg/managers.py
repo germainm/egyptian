@@ -20,13 +20,13 @@ class KeyManager(models.Manager):
     def _preload_keys(
         self, all_keys=False, key_fingerprint=None, key_id=None
     ):
-        # Preload keys.
         if all_keys:
             logger.debug(msg='preloading all keys')
             keys = self.values()
         elif key_fingerprint:
             logger.debug('preloading key fingerprint: %s', key_fingerprint)
-            keys = self.filter(fingerprint=key_fingerprint).values()
+            queryset = self.filter(fingerprint=key_fingerprint)
+            keys = queryset.values()
             if not keys:
                 logger.debug(
                     'key fingerprint %s not found', key_fingerprint
@@ -36,9 +36,10 @@ class KeyManager(models.Manager):
                 )
         elif key_id:
             logger.debug('preloading key id: %s', key_id)
-            keys = self.filter(fingerprint__endswith=key_id).values()
+            queryset = self.filter(fingerprint__endswith=key_id)
+            keys = queryset.values()
             if keys:
-                logger.debug('key id %s impored', key_id)
+                logger.debug('key id %s imported', key_id)
             else:
                 logger.debug('key id %s not found', key_id)
         else:
@@ -53,13 +54,14 @@ class KeyManager(models.Manager):
             all_keys=all_keys, key_fingerprint=key_fingerprint, key_id=key_id
         )
 
-        decrypt_result = GPGBackend.get_instance().decrypt_file(
+        backend = GPGBackend.get_instance()
+        decrypt_result = backend.decrypt_file(
             file_object=file_object, keys=keys
         )
 
-        logger.debug('decrypt_result.status: %s', decrypt_result.status)
+        logger.debug('decrypt_result.success: %s', decrypt_result.success)
 
-        if not decrypt_result.status or decrypt_result.status == 'no data was provided':
+        if not decrypt_result.success:
             raise DecryptionError('Unable to decrypt file')
 
         file_object.close()
@@ -73,7 +75,8 @@ class KeyManager(models.Manager):
         return self.filter(key_type=KEY_TYPE_PUBLIC)
 
     def receive_key(self, key_id):
-        key_data = GPGBackend.get_instance().recv_keys(
+        backend = GPGBackend.get_instance()
+        key_data = backend.recv_keys(
             key_id=key_id, keyserver=setting_keyserver.value
         )
 
@@ -83,15 +86,15 @@ class KeyManager(models.Manager):
             return self.create(key_data=key_data)
 
     def search(self, query):
-        key_data_list = GPGBackend.get_instance().search_keys(
+        backend = GPGBackend.get_instance()
+        key_data_list = backend.search_keys(
             keyserver=setting_keyserver.value, query=query
         )
 
         result = []
         for key_data in key_data_list:
-            result.append(
-                KeyStub(raw=key_data)
-            )
+            key_stub = KeyStub(raw=key_data)
+            result.append(key_stub)
 
         return result
 
@@ -105,8 +108,6 @@ class KeyManager(models.Manager):
         )
 
         if signature_file:
-            # Save the original data and invert the argument order:
-            # signature first, file second.
             with NamedTemporaryFile() as temporary_file_object:
                 shutil.copyfileobj(
                     fsrc=file_object, fdst=temporary_file_object
@@ -120,34 +121,33 @@ class KeyManager(models.Manager):
                     )
                     temporary_signature_file_object.seek(0)
                     signature_file.seek(0)
-                    verify_result = GPGBackend.get_instance().verify_file(
+                    backend = GPGBackend.get_instance()
+                    verify_result = backend.verify_file(
                         data_filename=temporary_file_object.name,
                         file_object=temporary_signature_file_object,
                         keys=keys
                     )
         else:
-            verify_result = GPGBackend.get_instance().verify_file(
+            backend = GPGBackend.get_instance()
+            verify_result = backend.verify_file(
                 file_object=file_object, keys=keys
             )
 
-        logger.debug('verify_result.status: %s', verify_result.status)
+        logger.debug('verify_result.valid: %s', verify_result.valid)
 
         if verify_result:
-            # Signed and key present.
             logger.debug(msg='signed and key present')
-            return SignatureVerification(verify_result.__dict__)
-        elif verify_result.status == 'no public key' and not (key_fingerprint or all_keys or key_id):
-            # Signed but key not present, retry with key fetch.
+            return SignatureVerification(verify_result=verify_result)
+        elif verify_result.key_missing and not (key_fingerprint or all_keys or key_id):
             logger.debug(msg='no public key')
             file_object.seek(0)
             return self.verify_file(
                 file_object=file_object, signature_file=signature_file,
                 key_id=verify_result.key_id
             )
-        elif verify_result.key_id:
-            # Signed, retried and key still not found.
+        elif verify_result.signature_present:
             logger.debug(msg='signed, retried and key still not found')
-            return SignatureVerification(verify_result.__dict__)
+            return SignatureVerification(verify_result=verify_result)
         else:
             logger.debug(msg='file not signed')
             raise VerificationError('File not signed')

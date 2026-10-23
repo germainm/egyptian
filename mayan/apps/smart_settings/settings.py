@@ -12,19 +12,24 @@ from .literals import (
     DEFAULT_FILE_UPLOAD_MAX_MEMORY_SIZE, DEFAULT_INTERNAL_IPS,
     DEFAULT_LANGUAGE_CODE, DEFAULT_LANGUAGES, DEFAULT_LOGIN_REDIRECT_URL,
     DEFAULT_LOGIN_URL, DEFAULT_LOGOUT_REDIRECT_URL,
-    DEFAULT_SECURE_PROXY_SSL_HEADER, DEFAULT_SESSION_COOKIE_NAME,
-    DEFAULT_SESSION_ENGINE, DEFAULT_STATIC_URL, DEFAULT_STORAGES,
-    DEFAULT_TIME_ZONE, DEFAULT_USE_X_FORWARDED_HOST,
+    DEFAULT_SECURE_PROXY_SSL_HEADER, DEFAULT_SERVER_EMAIL,
+    DEFAULT_SESSION_COOKIE_NAME, DEFAULT_SESSION_ENGINE, DEFAULT_STATIC_URL,
+    DEFAULT_STORAGES, DEFAULT_TIME_ZONE, DEFAULT_USE_X_FORWARDED_HOST,
     DEFAULT_USE_X_FORWARDED_PORT, DEFAULT_WSGI_APPLICATION
 )
 from .setting_clusters import setting_cluster
+from .setting_validators import (
+    check_setting_auth_password_validators, check_setting_is_list_of_strings,
+    check_setting_secure_proxy_ssl_header
+)
 
 setting_namespace = setting_cluster.do_namespace_add(
     label=_(message='Django'), name='django'
 )
 
 setting_django_allowed_hosts = setting_namespace.do_setting_add(
-    default=DEFAULT_ALLOWED_HOSTS, global_name='ALLOWED_HOSTS', help_text=_(
+    default=DEFAULT_ALLOWED_HOSTS, global_name='ALLOWED_HOSTS',
+    validation_function=check_setting_is_list_of_strings, help_text=_(
         message='A list of strings representing the host/domain names that '
         'this site can serve. This is a security measure to prevent HTTP '
         'Host header attacks, which are possible even under many '
@@ -53,14 +58,17 @@ setting_django_append_slash = setting_namespace.do_setting_add(
 )
 setting_django_auth_password_validators = setting_namespace.do_setting_add(
     default=DEFAULT_AUTH_PASSWORD_VALIDATORS,
-    global_name='AUTH_PASSWORD_VALIDATORS', help_text=_(
+    global_name='AUTH_PASSWORD_VALIDATORS',
+    validation_function=check_setting_auth_password_validators,
+    help_text=_(
         message='The list of validators that are used to check the strength '
         'of user\'s passwords.'
     )
 )
 setting_django_authentication_backends = setting_namespace.do_setting_add(
     default=DEFAULT_AUTHENTICATION_BACKENDS,
-    global_name='AUTHENTICATION_BACKENDS', help_text=_(
+    global_name='AUTHENTICATION_BACKENDS',
+    validation_function=check_setting_is_list_of_strings, help_text=_(
         message='A list of authentication backend classes (as strings) to '
         'use when attempting to authenticate a user.'
     )
@@ -86,7 +94,7 @@ setting_django_csrf_cookie_secure = setting_namespace.do_setting_add(
 )
 setting_django_csrf_trusted_origins = setting_namespace.do_setting_add(
     default=DEFAULT_CSRF_TRUSTED_ORIGINS, global_name='CSRF_TRUSTED_ORIGINS',
-    help_text=_(
+    validation_function=check_setting_is_list_of_strings, help_text=_(
         message='A list of trusted origins for unsafe requests (e.g. POST). '
         'https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-CSRF_TRUSTED_ORIGINS'
     )
@@ -250,7 +258,8 @@ setting_django_logout_redirect_url = setting_namespace.do_setting_add(
     )
 )
 setting_django_internal_ips = setting_namespace.do_setting_add(
-    default=DEFAULT_INTERNAL_IPS, global_name='INTERNAL_IPS', help_text=_(
+    default=DEFAULT_INTERNAL_IPS, global_name='INTERNAL_IPS',
+    validation_function=check_setting_is_list_of_strings, help_text=_(
         message='A list of IP addresses, as strings, that: Allow the debug() '
         'context processor to add some variables to the template context. '
         'Can use the admindocs bookmarklets even if not logged in as a '
@@ -282,6 +291,16 @@ setting_django_language_code = setting_namespace.do_setting_add(
         'literal doesn\'t exist for the user\'s preferred language.'
     )
 )
+setting_django_server_email = setting_namespace.do_setting_add(
+    default=DEFAULT_SERVER_EMAIL, global_name='SERVER_EMAIL',
+    help_text=_(
+        message='Default: \'root@localhost\' The email address that error '
+        'messages come from, such as those sent to ADMINS and MANAGERS. '
+        'This is separate from the address used for regular automated '
+        'correspondence from the site manager(s); for that, see '
+        'DEFAULT_FROM_EMAIL.'
+    )
+)
 setting_django_cookie_name = setting_namespace.do_setting_add(
     default=DEFAULT_SESSION_COOKIE_NAME, global_name='SESSION_COOKIE_NAME',
     help_text=_(
@@ -299,7 +318,8 @@ setting_django_session_engine = setting_namespace.do_setting_add(
 )
 setting_django_secure_proxy_ssl_header = setting_namespace.do_setting_add(
     default=DEFAULT_SECURE_PROXY_SSL_HEADER,
-    global_name='SECURE_PROXY_SSL_HEADER', help_text=_(
+    global_name='SECURE_PROXY_SSL_HEADER',
+    validation_function=check_setting_secure_proxy_ssl_header, help_text=_(
         message='A tuple representing a HTTP header/value combination that '
         'signifies a request is secure. This controls the behavior of the '
         'request object’s is_secure() method. Warning: Modifying this '

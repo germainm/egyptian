@@ -17,5 +17,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(code=code_convert_uuid_to_hex)
+        migrations.RunPython(
+            code=code_convert_uuid_to_hex,
+            reverse_code=migrations.RunPython.noop, elidable=True
+        )
     ]

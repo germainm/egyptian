@@ -20,11 +20,6 @@ from .model_mixins import (
 class SmartLink(
     ExtraDataModelMixin, SmartLinkBusinessLogicMixin, models.Model
 ):
-    """
-    This model stores the basic fields for a smart link. Smart links allow
-    linking documents using a programmatic method of conditions that mirror
-    Django's database filter operations.
-    """
     _ordering_fields = ('dynamic_label', 'enabled', 'label')
 
     label = models.CharField(
@@ -72,10 +67,6 @@ class SmartLink(
 
 
 class ResolvedSmartLink(ResolvedSmartLinkBusinessLogicMixin, SmartLink):
-    """
-    Proxy model to represent an already resolved smart link. Used for easier
-    columns registration.
-    """
     class Meta:
         proxy = True
 
@@ -83,10 +74,6 @@ class ResolvedSmartLink(ResolvedSmartLinkBusinessLogicMixin, SmartLink):
 class SmartLinkCondition(
     ExtraDataModelMixin, SmartLinkConditionBusinessLogicMixin, models.Model
 ):
-    """
-    This model stores a single smart link condition. A smart link is a
-    collection of one of more smart link conditions.
-    """
     _ordering_fields = ('enabled',)
 
     smart_link = models.ForeignKey(

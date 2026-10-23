@@ -198,14 +198,12 @@ class MetadataApp(MayanAppConfig):
             model=DocumentMetadata, related='metadata_type'
         )
 
-        model_query_fields_document = ModelQueryFields(model=Document)
+        model_query_fields_document = ModelQueryFields.get(model=Document)
         model_query_fields_document.add_prefetch_related_field(
             field_name='metadata'
         )
 
-        # Columns
 
-        # Document
 
         SourceColumn(
             source=Document, label=_(message='Metadata'),
@@ -231,7 +229,6 @@ class MetadataApp(MayanAppConfig):
             widget=DocumentMetadataWidget
         )
 
-        # Document Metadata
 
         SourceColumn(
             attribute='metadata_type', is_identifier=True,
@@ -257,7 +254,6 @@ class MetadataApp(MayanAppConfig):
             widget=SourceColumnWidgetMetadataDocumentThumbnail
         )
 
-        # Metadata type
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -268,7 +264,6 @@ class MetadataApp(MayanAppConfig):
             source=MetadataType
         )
 
-        # Document metadata
 
         menu_list_facet.bind_links(
             links=(link_metadata_list,), sources=(Document,)
@@ -288,7 +283,6 @@ class MetadataApp(MayanAppConfig):
             )
         )
 
-        # Document type
 
         menu_list_facet.bind_links(
             links=(link_document_type_metadata_type_relationship,), sources=(
@@ -303,7 +297,6 @@ class MetadataApp(MayanAppConfig):
             )
         )
 
-        # Metadata type
 
         menu_list_facet.bind_links(
             links=(
@@ -344,7 +337,6 @@ class MetadataApp(MayanAppConfig):
             links=(link_metadata_type_setup,)
         )
 
-        # Signals
 
         post_delete.connect(
             dispatch_uid='metadata_handler_post_document_type_metadata_type_delete',
@@ -362,7 +354,6 @@ class MetadataApp(MayanAppConfig):
             sender=Document
         )
 
-        # Index updates
 
         post_save.connect(
             dispatch_uid='metadata_handler_index_metadata_type_documents',

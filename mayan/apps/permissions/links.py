@@ -14,7 +14,6 @@ from .permissions import (
     permission_role_view
 )
 
-# Group
 
 link_group_role_list = Link(
     args='object.id', icon=icon_group_role_list,
@@ -22,7 +21,6 @@ link_group_role_list = Link(
     view='permissions:group_role_list'
 )
 
-# Role
 
 link_role_create = Link(
     icon=icon_role_create, permission=permission_role_create,

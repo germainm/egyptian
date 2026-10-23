@@ -9,6 +9,7 @@ from mayan.apps.lock_manager.backends.base import LockingBackend
 from mayan.apps.lock_manager.exceptions import LockError
 from mayan.celery import app
 
+from .exceptions import SourceActionExceptionRejected
 from .literals import DEFAULT_SOURCES_LOCK_EXPIRE, ERROR_LOG_DOMAIN_NAME
 
 logger = logging.getLogger(name=__name__)
@@ -30,15 +31,36 @@ def task_source_backend_action_background_task(
     except OperationalError as exception:
         raise self.retry(exc=exception)
 
-    action.background_task(interface_load_kwargs=action_interface_kwargs)
+    try:
+        action.background_task(
+            interface_load_kwargs=action_interface_kwargs
+        )
+    except SourceActionExceptionRejected as exception:
+        logger.warning(
+            'Rejected input for source id: %s; %s', source_id, exception
+        )
+        source.error_log.create(
+            domain_name=ERROR_LOG_DOMAIN_NAME, text=str(exception)
+        )
+    except Exception as exception:
+        logger.error(
+            'Error processing source id: %s; %s', source_id, exception,
+            exc_info=True
+        )
+        source.error_log.create(
+            domain_name=ERROR_LOG_DOMAIN_NAME,
+            text='{}; {}'.format(
+                exception.__class__.__name__, exception
+            )
+        )
+        if settings.DEBUG:
+            raise
 
 
 @app.task(ignore_result=True)
 def task_source_backend_action_execute(
     action_name, source_id, action_interface_kwargs=None, user_id=None
 ):
-    # This task is not be retried because it runs on a schedule.
-    # Retrying the task can cause the same source file to be uploaded twice.
     Source = apps.get_model(
         app_label='sources', model_name='Source'
     )
@@ -88,10 +110,5 @@ def task_source_backend_action_execute(
             )
             if settings.DEBUG:
                 raise
-        else:
-            queryset_error_logs = source.error_log.filter(
-                domain_name=ERROR_LOG_DOMAIN_NAME
-            )
-            queryset_error_logs.delete()
         finally:
             lock.release()

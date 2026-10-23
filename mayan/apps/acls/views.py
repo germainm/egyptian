@@ -21,6 +21,7 @@ from .icons import (
     icon_global_acl_list
 )
 from .links import link_acl_create
+from .literals import TEXT_ACL_NO_RESULTS
 from .models import AccessControlList, GlobalAccessControlListProxy
 from .permissions import permission_acl_edit, permission_acl_view
 
@@ -48,8 +49,6 @@ class ACLCreateView(
         }
 
     def get_external_object_queryset(self):
-        # Here we get a queryset the object model for which an ACL will be
-        # created.
         return self.get_content_type().get_all_objects_for_this_type()
 
     def get_extra_context(self):
@@ -64,8 +63,6 @@ class ACLCreateView(
         try:
             roles = self.external_object.acls.values('role')
         except AttributeError:
-            # Fallback when attempting to access the ACLs generic relation
-            # field of models that have not been registered.
             roles = Role.objects.none()
 
         return {
@@ -83,7 +80,7 @@ class ACLCreateView(
         }
 
     def get_queryset(self):
-        self.external_object.acls.all()
+        return self.external_object.acls.all()
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -128,8 +125,6 @@ class ACLListView(
     view_icon = icon_acl_list
 
     def get_external_object_queryset(self):
-        # Here we get a queryset the object model for which an ACL will be
-        # created.
         return self.get_content_type().get_all_objects_for_this_type()
 
     def get_extra_context(self):
@@ -146,16 +141,11 @@ class ACLListView(
             'no_results_title': _(
                 message='There are no ACLs for this object'
             ),
-            'no_results_text': _(
-                message='ACL stands for Access Control List and is a precise '
-                'method to control user access to objects in the system. '
-                'ACLs allow granting a permission to a role but only for a '
-                'specific object or set of objects.'
-            ),
+            'no_results_text': TEXT_ACL_NO_RESULTS,
             'object': self.external_object,
             'title': _(
-                message='Access control lists for: %s' % self.external_object
-            )
+                message='Access control lists for: %s'
+            ) % self.external_object
         }
 
     def get_source_queryset(self):
@@ -176,13 +166,11 @@ class ACLPermissionAddRemoveView(AddRemoveView):
     def generate_choices(self, queryset):
         namespaces_dictionary = {}
 
-        # Sort permissions by their translatable label.
         object_list = sorted(
             queryset,
             key=lambda permission: permission.volatile_permission.label
         )
 
-        # Group permissions by namespace.
         for permission in object_list:
             namespaces_dictionary.setdefault(
                 permission.volatile_permission.namespace.label, []
@@ -195,7 +183,6 @@ class ACLPermissionAddRemoveView(AddRemoveView):
                 )
             )
 
-        # Sort permissions by their translatable namespace label.
         return sorted(
             namespaces_dictionary.items()
         )
@@ -204,10 +191,6 @@ class ACLPermissionAddRemoveView(AddRemoveView):
         return {'user': self.request.user}
 
     def get_disabled_choices(self):
-        """
-        Get permissions from a parent's ACLs or directly granted to the role.
-        We return a list since that is what the form widget's can process.
-        """
         return self.main_object.get_inherited_permissions().values_list(
             'pk', flat=True
         )
@@ -238,15 +221,6 @@ class ACLPermissionAddRemoveView(AddRemoveView):
             return super().get_list_added_help_text()
 
     def get_list_added_queryset(self):
-        """
-        Merge of permissions we hold for this object and the permissions we
-        hold for this object's parents via another ACL. .distinct() is added
-        in case the permission was added to the ACL and then added to a
-        parent ACL's and thus inherited and would appear twice. If
-        order to remove the double permission from the ACL it would need to
-        be remove from the parent first to enable the choice in the form,
-        remove it from the ACL and then re-add it to the parent ACL.
-        """
         queryset_acl = super().get_list_added_queryset()
 
         return (
@@ -269,11 +243,6 @@ class GlobalACLListView(SingleObjectListView):
             'hide_object': True,
             'no_results_icon': icon_acl_list,
             'no_results_title': _(message='There are no ACLs'),
-            'no_results_text': _(
-                message='ACL stands for Access Control List and is a precise '
-                'method to control user access to objects in the system. '
-                'ACLs allow granting a permission to a role but only for a '
-                'specific object or set of objects.'
-            ),
+            'no_results_text': TEXT_ACL_NO_RESULTS,
             'title': _(message='Global access control lists')
         }

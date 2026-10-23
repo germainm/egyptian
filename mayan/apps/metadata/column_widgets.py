@@ -8,9 +8,6 @@ from .permissions import permission_document_metadata_view
 
 
 class DocumentMetadataWidget(SourceColumnWidget):
-    """
-    A widget that displays the metadata for the given document.
-    """
     template_name = 'metadata/document_metadata_widget.html'
 
     def get_extra_context(self):

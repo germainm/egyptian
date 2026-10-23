@@ -16,9 +16,6 @@ class Menu(TemplateObjectMixin):
 
     @staticmethod
     def get_result_label(item):
-        """
-        Method to help sort results by label.
-        """
         if isinstance(item, ResolvedLink):
             return str(item.link.text)
         else:
@@ -70,17 +67,12 @@ class Menu(TemplateObjectMixin):
             self.link_positions[link] = position + link_index
 
     def add_proxy_exclusion(self, source):
-        # Avoid this source proxy model from binding to all links in the menu.
         self.proxy_exclusions.add(source)
 
     def add_unsorted_source(self, source):
         self.non_sorted_sources.append(source)
 
     def bind_links(self, links, exclude=None, sources=None, position=None):
-        """
-        Associate a link to a model, a view inside this menu.
-        - exclude: Avoid a proxy model from resolving the bound links.
-        """
         try:
             for source in sources:
                 self._map_links_to_source(
@@ -93,7 +85,6 @@ class Menu(TemplateObjectMixin):
                     position=position, source=source
                 )
         except TypeError:
-            # Links without a source are always displayed.
             self._map_links_to_source(
                 links=links, map_variable='bound_links',
                 position=position, source=sources
@@ -105,10 +96,6 @@ class Menu(TemplateObjectMixin):
     def do_matched_links_update(
         self, matched_links, bound_object, unbound_object, excluded_object
     ):
-        # Add bound links that match the object.
-        # Remove unbound links that match the object.
-        # Remove unbound global unbound links.
-        # Remove excluded links that match the object.
 
         matched_links.update(
             set(
@@ -144,7 +131,6 @@ class Menu(TemplateObjectMixin):
         try:
             mro = resolved_navigation_object_class.__mro__
         except AttributeError:
-            # Not a class, direct instance match.
             bound_object = resolved_navigation_object_class
             excluded_object = resolved_navigation_object_class
             unbound_object = resolved_navigation_object_class
@@ -154,10 +140,6 @@ class Menu(TemplateObjectMixin):
                 matched_links=matched_links, unbound_object=unbound_object
             )
         else:
-            # Get proxy results.
-            # Remove the results explicitly excluded.
-            # Execute after the root model results to allow
-            # a proxy to override an existing results.
             model = resolved_navigation_object_class
             try:
                 proxy_parent_model = model._meta.proxy_for_model
@@ -176,7 +158,6 @@ class Menu(TemplateObjectMixin):
                         unbound_object=unbound_object
                     )
             else:
-                # It is a model.
                 matched_links = self.do_matched_links_update(
                     bound_object=model,
                     excluded_object=model,
@@ -185,8 +166,6 @@ class Menu(TemplateObjectMixin):
                 )
 
                 if proxy_parent_model:
-                    # It is a model proxy. Add parent links except for
-                    # menu exclusions and bind excludes.
                     if model not in self.proxy_exclusions:
                         matched_links = self.do_matched_links_update(
                             bound_object=proxy_parent_model,
@@ -199,35 +178,27 @@ class Menu(TemplateObjectMixin):
 
     def get_navigation_object_class(self, resolved_navigation_object):
         if resolved_navigation_object is None:
-            # None means "always on" menu links.
             return None
         elif isinstance(resolved_navigation_object, str):
-            # It is a view name, return the value.
             return resolved_navigation_object
         else:
             try:
-                # Try it as a queryset.
                 resolved_navigation_object.query
             except AttributeError:
                 try:
-                    # Try it as a list.
                     item = resolved_navigation_object[0]
                 except TypeError:
                     try:
-                        # Try as a model instance or model.
                         model = resolved_navigation_object._meta.model
                     except AttributeError:
-                        # Must be a non model class instance, return the class.
                         return resolved_navigation_object.__class__
                     else:
                         return model
                 else:
-                    # It is a list, return the class of the first item.
                     return self.get_navigation_object_class(
                         resolved_navigation_object=item
                     )
             else:
-                # It is a queryset, return the model.
                 model = resolved_navigation_object.model
 
                 return self.get_navigation_object_class(
@@ -248,7 +219,6 @@ class Menu(TemplateObjectMixin):
                 'navigation_object_list: %s', navigation_object_list
             )
 
-            # Multiple objects
             for navigation_object in navigation_object_list:
                 try:
                     resolved_variable = Variable(
@@ -269,9 +239,6 @@ class Menu(TemplateObjectMixin):
         return resolved_navigation_object_list
 
     def get_result_position(self, item):
-        """
-        Method to help sort results by position.
-        """
         if isinstance(item, ResolvedLink):
             return self.link_positions.get(item.link, 0)
         else:
@@ -302,8 +269,6 @@ class Menu(TemplateObjectMixin):
         try:
             request = self.get_request(context=context, request=request)
         except VariableDoesNotExist:
-            # Cannot resolve any menus without a request object.
-            # Return an empty list.
             return result
 
         current_view_name = get_current_view_name(request=request)
@@ -331,7 +296,6 @@ class Menu(TemplateObjectMixin):
                 )
             )
 
-        # Resolve view links.
         navigation_object_class = self.get_navigation_object_class(
             resolved_navigation_object=current_view_name
         )
@@ -347,7 +311,6 @@ class Menu(TemplateObjectMixin):
             )
         )
 
-        # Resolve "always one" menu links.
         navigation_object_class = self.get_navigation_object_class(
             resolved_navigation_object=None
         )
@@ -363,7 +326,6 @@ class Menu(TemplateObjectMixin):
             )
         )
 
-        # Sort links.
         if result:
             unsorted_source = False
             for resolved_navigation_object in resolved_navigation_object_list:
@@ -400,7 +362,6 @@ class Menu(TemplateObjectMixin):
                 if condition:
                     object_resolved_links.append(link)
             else:
-                # "Always show" links.
                 resolved_link = link.resolve(**kwargs)
                 if resolved_link:
                     object_resolved_links.append(resolved_link)
@@ -416,12 +377,7 @@ class Menu(TemplateObjectMixin):
         return result
 
     def unbind_links(self, links, sources=None):
-        """
-        Allow unbinding links from sources. Used to allow 3rd party apps to
-        change the link binding of core apps without changing the core apps.
-        """
         if sources is None:
-            # Unsourced links display always.
             self._map_links_to_source(
                 links=links, source=None, map_variable='unbound_links'
             )

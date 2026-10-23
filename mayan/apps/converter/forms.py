@@ -66,8 +66,8 @@ class LayerTransformationForm(forms.ModelForm):
         self.transformation_template_name = transformation_class.get_template_name()
 
         if self.transformation_template_name:
-            self.fields['arguments'].widget.attrs['class'] = 'hidden'
-            self.fields['order'].widget.attrs['class'] = 'hidden'
+            self.fields['arguments'].widget.attrs['class'] = 'd-none'
+            self.fields['order'].widget.attrs['class'] = 'd-none'
         else:
             self.fields['arguments'].widget = form_widgets.HiddenInput()
 
@@ -79,12 +79,8 @@ class LayerTransformationForm(forms.ModelForm):
 
     def clean(self):
         if self.transformation_template_name:
-            # If the transformation specifies a template, take the values
-            # provided and just check for valid format.
-            # Allows compatibility with the redaction template and
-            # JavaScript.
             try:
-                yaml_load(
+                arguments = yaml_load(
                     stream=self.cleaned_data['arguments']
                 )
             except yaml.YAMLError:
@@ -93,13 +89,20 @@ class LayerTransformationForm(forms.ModelForm):
                         message='"%s" not a valid entry.'
                     ) % self.cleaned_data['arguments']
                 )
+
+            if isinstance(arguments, dict):
+                self.get_transformation_class().validate_arguments(
+                    arguments=arguments
+                )
         else:
-            # Otherwise grab the values from the dynamic form and create
-            # the argument JSON object.
             arguments = {}
 
             for argument in self.get_transformation_class().get_arguments():
                 if self.cleaned_data[argument] is not None:
                     arguments[argument] = self.cleaned_data[argument]
+
+            self.get_transformation_class().validate_arguments(
+                arguments=arguments
+            )
 
             self.cleaned_data['arguments'] = yaml_dump(data=arguments)

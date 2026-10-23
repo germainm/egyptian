@@ -17,7 +17,7 @@ from mayan.apps.databases.classes import ModelQueryFields
 from mayan.apps.views.generics import (
     FormView, SimpleView, SingleObjectDeleteView, SingleObjectListView
 )
-from mayan.apps.views.utils import resolve
+from mayan.apps.views.utils import get_request_referer, resolve
 from mayan.apps.views.view_mixins import ExternalObjectViewMixin
 
 from ..forms.document_version_page_forms import (
@@ -134,8 +134,8 @@ class DocumentVersionPageListRemapView(ExternalObjectViewMixin, FormView):
                 row.cleaned_data['target_page_number']
             )
             if page_number:
-                content_type = ContentType.objects.get(
-                    pk=row.cleaned_data['source_content_type']
+                content_type = ContentType.objects.get_for_id(
+                    id=row.cleaned_data['source_content_type']
                 )
                 content_object = content_type.get_object_for_this_type(
                     pk=row.cleaned_data['source_object_id']
@@ -189,6 +189,7 @@ class DocumentVersionPageListRemapView(ExternalObjectViewMixin, FormView):
             ),
             'no_results_title': _(message='No page sources available'),
             'object': self.external_object,
+            'submit_label': _(message='Remap'),
             'title': _(
                 message='Remap pages of document version: %s'
             ) % self.external_object
@@ -204,8 +205,6 @@ class DocumentVersionPageListRemapView(ExternalObjectViewMixin, FormView):
                 id=content_object_dictionary['object_id']
             )
 
-            # The same source object could have been assigned to multiple
-            # document version pages.
             document_version_pages = self.external_object.pages.filter(
                 content_type=content_object_dictionary['content_type'],
                 object_id=content_object_dictionary['object_id']
@@ -246,11 +245,7 @@ class DocumentVersionPageNavigationBase(
     external_object_queryset = DocumentVersionPage.valid.all()
 
     def get_redirect_url(self, *args, **kwargs):
-        """
-        Attempt to jump to the same kind of view but resolved to a new
-        object of the same kind.
-        """
-        previous_url = self.request.META.get('HTTP_REFERER', None)
+        previous_url = get_request_referer(request=self.request)
 
         if not previous_url:
             try:
@@ -260,8 +255,6 @@ class DocumentVersionPageNavigationBase(
 
         parsed_url = furl(url=previous_url)
 
-        # Obtain the view name to be able to resolve it back with new keyword
-        # arguments.
         resolver_match = resolve(
             path=str(parsed_url.path)
         )
@@ -269,16 +262,12 @@ class DocumentVersionPageNavigationBase(
         new_kwargs = self.get_new_kwargs()
 
         if set(new_kwargs) == set(resolver_match.kwargs):
-            # It is the same type of object, reuse the URL to stay in the
-            # same kind of view but pointing to a new object.
             url = reverse(
                 kwargs=new_kwargs, viewname=resolver_match.view_name
             )
         else:
             url = parsed_url.path
 
-        # Update just the path to retain the querystring in case there is
-        # transformation data.
         parsed_url.path = url
 
         return parsed_url.tostr()
@@ -335,7 +324,7 @@ class DocumentVersionPageView(ExternalObjectViewMixin, SimpleView):
     external_object_permission = permission_document_version_view
     external_object_pk_url_kwarg = 'document_version_page_id'
     external_object_queryset = DocumentVersionPage.valid.all()
-    template_name = 'appearance/form_container.html'
+    template_name = 'appearance/viewport_fill.html'
     view_icon = icon_document_version_page_detail
 
     def get_extra_context(self):
@@ -410,7 +399,6 @@ class DocumentVersionPageInteractiveTransformation(
         )
 
         self.transformation_function(query_dict=query_dict)
-        # Refresh query_dict to args reference.
         url.args = query_dict
 
         return url.tostr()

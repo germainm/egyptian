@@ -23,18 +23,6 @@ logger = logging.getLogger(name=__name__)
 class AccessControlList(
     AccessControlListBusinessLogicMixin, ExtraDataModelMixin, models.Model
 ):
-    """
-    ACL means Access Control List it is a more fine-grained method of
-    granting access to objects. In the case of ACLs, they grant access using
-    3 elements: actor, permission, object. In this case the actor is the role,
-    the permission is the Mayan permission and the object can be anything:
-    a document, a folder, an index, etc. This means = "Grant X permissions
-    to role Y for object Z". This model holds the permission, object, actor
-    relationship for one access control list.
-    Fields:
-    * Role - Custom role that is being granted a permission. Roles are created
-    in the Setup menu.
-    """
     _ordering_fields = ('object_id',)
 
     content_type = models.ForeignKey(

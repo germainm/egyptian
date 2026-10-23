@@ -17,6 +17,12 @@ class TaskTypeListView(SingleObjectListView):
     def get_extra_context(self):
         return {
             'hide_object': True,
+            'no_results_icon': icon_task_type_list,
+            'no_results_text': _(
+                message='Task types are the background operations the system '
+                'can perform asynchronously.'
+            ),
+            'no_results_title': _(message='No task types available'),
             'title': _(message='Task types')
         }
 
@@ -65,6 +71,12 @@ class QueueTaskTypeListView(TaskTypeListView):
 class WorkerListView(SingleObjectListView):
     extra_context = {
         'hide_object': True,
+        'no_results_icon': icon_worker_list,
+        'no_results_text': _(
+            message='Workers are the background processes that execute '
+            'queued tasks.'
+        ),
+        'no_results_title': _(message='No workers available'),
         'title': _(message='Background task workers')
     }
     view_icon = icon_worker_list
@@ -81,6 +93,11 @@ class WorkerQueueListView(SingleObjectListView):
     def get_extra_context(self):
         return {
             'hide_object': True,
+            'no_results_icon': icon_worker_queue_list,
+            'no_results_text': _(
+                message='Queues group the task types processed by a worker.'
+            ),
+            'no_results_title': _(message='No queues available'),
             'object': self.get_worker(),
             'title': _(message='Queues for worker: %s') % self.get_worker()
         }

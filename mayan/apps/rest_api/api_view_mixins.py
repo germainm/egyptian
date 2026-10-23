@@ -93,10 +93,6 @@ class CheckQuerysetAPIViewMixin:
 
 
 class ContentTypeAPIViewMixin:
-    """
-    This mixin makes it easier for API views to retrieve a content type from
-    the URL pattern.
-    """
     content_type_url_kw_args = {
         'app_label': 'app_label',
         'model_name': 'model_name'
@@ -132,9 +128,6 @@ class DynamicFieldListAPIViewMixin:
 
 
 class ExternalObjectAPIViewMixin(ExternalObjectBaseMixin):
-    """
-    Override get_external_object to use REST API get_object_or_404.
-    """
     def get_external_object(self):
         return get_object_or_404(
             queryset=self.get_external_object_queryset_filtered(),
@@ -153,10 +146,6 @@ class ExternalObjectAPIViewMixin(ExternalObjectBaseMixin):
         return permission
 
     def get_serializer_extra_context(self):
-        """
-        Add the external object to the serializer context. Useful for the
-        create action when there is no instance available.
-        """
         context = super().get_serializer_extra_context()
         if self.kwargs:
             context['external_object'] = self.get_external_object()
@@ -167,9 +156,6 @@ class ExternalObjectAPIViewMixin(ExternalObjectBaseMixin):
 class ExternalContentTypeObjectAPIViewMixin(
     ContentTypeAPIViewMixin, ExternalObjectAPIViewMixin
 ):
-    """
-    Mixin to retrieve an external object by content type from the URL pattern.
-    """
     external_object_pk_url_kwarg = 'object_id'
 
     def get_external_object_queryset(self):

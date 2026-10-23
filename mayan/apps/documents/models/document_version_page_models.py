@@ -71,7 +71,7 @@ class DocumentVersionPage(
         target='document_version'
     )
     def delete(self, *args, **kwargs):
-        self.cache_partition.delete()
+        self.cache_partition_delete()
         super().delete(*args, **kwargs)
 
     def get_absolute_url(self):

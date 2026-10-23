@@ -28,20 +28,10 @@ logger = logging.getLogger(name=__name__)
 
 
 class SignatureBaseModel(SignatureBaseModelBusinessLogicMixin, models.Model):
-    """
-    Fields:
-    * key_id - Key Identifier - This is what identifies uniquely a key. Not
-    two keys in the world have the same Key ID. The Key ID is also used to
-    locate a key in the key servers: http://pgp.mit.edu
-    * signature_id - Signature ID - Every time a key is used to sign something
-    it will generate a unique signature ID. No two signature IDs are the same,
-    even when using the same key.
-    """
     document_file = models.ForeignKey(
         editable=False, on_delete=models.CASCADE, related_name='signatures',
         to=DocumentFile, verbose_name=_(message='Document file')
     )
-    # Basic fields
     date_time = models.DateTimeField(
         blank=True, editable=False, null=True, verbose_name=_(
             message='Date and time signed'
@@ -52,7 +42,6 @@ class SignatureBaseModel(SignatureBaseModelBusinessLogicMixin, models.Model):
             message='ID of the key that will be used to sign the document.'
         ), max_length=40, verbose_name=_(message='Key ID')
     )
-    # With proper key
     signature_id = models.CharField(
         blank=True, editable=False, null=True, max_length=64,
         verbose_name=_(message='Signature ID')
@@ -129,14 +118,12 @@ class DetachedSignature(ExtraDataModelMixin, SignatureBaseModel):
                     signature_file=self.signature_file
                 )
             except VerificationError as exception:
-                # Not signed
                 logger.debug(
                     'detached signature verification error; %s', exception
                 )
             else:
                 self.signature_file.seek(0)
 
-                # Invalid signatures do not have a date attribute
                 self.date_time = getattr(verify_result, 'date_time', None)
                 self.key_id = verify_result.key_id
                 self.signature_id = verify_result.signature_id
@@ -166,7 +153,6 @@ class EmbeddedSignature(SignatureBaseModel):
                     file_object=file_object
                 )
             except VerificationError as exception:
-                # Not signed
                 logger.debug(
                     'embedded signature verification error; %s', exception
                 )
@@ -176,6 +162,4 @@ class EmbeddedSignature(SignatureBaseModel):
                 self.signature_id = verify_result.signature_id
                 self.public_key_fingerprint = verify_result.pubkey_fingerprint
 
-                # Return must be under the else: context to ensure that an
-                # embedded signature instance is created only when valid.
                 return super().save(*args, **kwargs)

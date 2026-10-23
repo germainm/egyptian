@@ -16,7 +16,7 @@ class MailDocumentLinkView(MailingObjectLinkSendView):
     success_message_plural = _(
         message='%(count)d document links queued for email delivery'
     )
-    title = 'Email document link'
-    title_document = 'Email link for document: %s'
-    title_plural = 'Email document links'
+    title = _(message='Email document link')
+    title_document = _(message='Email link for document: %s')
+    title_plural = _(message='Email document links')
     view_icon = icon_document_link_send_single

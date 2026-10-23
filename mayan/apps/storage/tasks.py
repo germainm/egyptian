@@ -44,9 +44,23 @@ def task_shared_upload_delete(self, shared_uploaded_file_id):
         app_label='storage', model_name='SharedUploadedFile'
     )
 
-    shared_uploaded_file = SharedUploadedFile.objects.get(
-        pk=shared_uploaded_file_id
-    )
+    try:
+        shared_uploaded_file = SharedUploadedFile.objects.get(
+            pk=shared_uploaded_file_id
+        )
+    except SharedUploadedFile.DoesNotExist:
+        logger.debug(
+            'Shared uploaded file with ID: %s no longer exists. Nothing '
+            'to delete.', shared_uploaded_file_id
+        )
+        return
+    except OperationalError as exception:
+        logger.warning(
+            'Operational error attempting to load shared upload file '
+            'with ID: %s; %s. Retrying.', shared_uploaded_file_id,
+            exception
+        )
+        raise self.retry(exc=exception)
 
     try:
         shared_uploaded_file.delete()

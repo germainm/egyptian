@@ -23,14 +23,17 @@ class FormDocumentTypeFileMetadataDriverConfiguration(forms.ModelForm):
         self.fields['arguments'].widget = form_widgets.HiddenInput()
 
     def clean(self):
-        # Otherwise grab the values from the dynamic form and create
-        # the argument JSON object.
+        cleaned_data = super().clean()
+
         result = {}
 
         argument_name_list = self.instance.stored_driver.driver_class.get_argument_name_list()
 
         for argument_name in argument_name_list:
-            if self.cleaned_data[argument_name] is not None:
-                result[argument_name] = self.cleaned_data[argument_name]
+            value = cleaned_data.get(argument_name)
+            if value is not None:
+                result[argument_name] = value
 
-        self.cleaned_data['arguments'] = yaml_dump(data=result)
+        cleaned_data['arguments'] = yaml_dump(data=result)
+
+        return cleaned_data

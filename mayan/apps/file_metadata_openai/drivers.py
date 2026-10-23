@@ -141,19 +141,24 @@ class FileMetadataDriverOpenAIResponseAPI(FileMetadataDriver):
         super().__init__(**kwargs)
 
         self.api_key = api_key
-        self.base_url = base_url
+        self.base_url = base_url or None
         self.input = yaml_load(stream=input)
         self.model = model
-        self.organization = organization
-        self.project = project
-        self.timeout = int(timeout)
+        self.organization = organization or None
+        self.project = project or None
+
+        if timeout:
+            self.timeout = int(timeout)
+        else:
+            self.timeout = None
 
     def _process(self, document_file):
         result = {}
 
         client = OpenAI(
             api_key=self.api_key, base_url=self.base_url,
-            organization=self.organization, project=self.project
+            organization=self.organization, project=self.project,
+            timeout=self.timeout
         )
 
         response = client.responses.create(

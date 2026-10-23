@@ -1,5 +1,5 @@
 import whoosh
-from whoosh import (  # NOQA Used to initialize the whoosh.fields module.
+from whoosh import (
     qparser
 )
 

@@ -21,9 +21,9 @@ class MailDocumentVersionAttachmentView(MailingObjectAttachmentSendView):
     success_message_plural = _(
         message='%(count)d document versions queued for email delivery'
     )
-    title = 'Email document version'
-    title_document = 'Email document version: %s'
-    title_plural = 'Email documents version'
+    title = _(message='Email document version')
+    title_document = _(message='Email document version: %s')
+    title_plural = _(message='Email documents version')
     view_icon = icon_document_version_attachment_send_single
 
 
@@ -36,7 +36,7 @@ class MailDocumentVersionLinkView(MailingObjectLinkSendView):
     success_message_plural = _(
         message='%(count)d document version links queued for email delivery'
     )
-    title = 'Email document version link'
-    title_document = 'Email link for document version: %s'
-    title_plural = 'Email document version links'
+    title = _(message='Email document version link')
+    title_document = _(message='Email link for document version: %s')
+    title_plural = _(message='Email document version links')
     view_icon = icon_document_version_link_send_single

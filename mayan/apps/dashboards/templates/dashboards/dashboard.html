@@ -1,12 +1,12 @@
 {% if not dashboard_skip_label %}
-    <h4>
+    <h4 class="mayan-h4">
         {{ dashboard.label }}
     </h4>
     <hr>
 {% endif %}
 
-<div class="well">
-    <div class="row">
+<div class="card card-body bg-body-secondary border-0">
+    <div class="row gy-4">
         {% for widget in widgets %}
             {{ widget }}
         {% endfor %}

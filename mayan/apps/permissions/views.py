@@ -112,8 +112,8 @@ class RoleListView(SingleObjectListView):
             'no_results_text': _(
                 message='Roles are authorization units. They contain '
                 'user groups which inherit the role permissions for the '
-                'entire system. Roles can also part of access '
-                'controls lists. Access controls list are permissions '
+                'entire system. Roles can also be part of access '
+                'control lists. Access control lists are permissions '
                 'granted to a role for specific objects which its group '
                 'members inherit.'
             ),
@@ -165,13 +165,11 @@ class RolePermissionAddRemoveView(AddRemoveView):
     def generate_choices(self, queryset):
         namespaces_dictionary = {}
 
-        # Sort permissions by their translatable label.
         object_list = sorted(
             queryset,
             key=lambda permission: str(permission)
         )
 
-        # Group permissions by namespace.
         for permission in object_list:
             namespaces_dictionary.setdefault(
                 str(permission.namespace_label), []
@@ -184,7 +182,6 @@ class RolePermissionAddRemoveView(AddRemoveView):
                 )
             )
 
-        # Sort permissions by their translatable namespace label.
         return sorted(
             namespaces_dictionary.items()
         )

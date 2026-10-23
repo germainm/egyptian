@@ -78,8 +78,6 @@ class SourceBackendMixinStoredFileUploadBase:
             if settings.DEBUG or settings.TESTING:
                 raise
 
-        # Instantiate a fake list view to populate the pagination data for
-        # the staging source file list.
         view = SourceBackendStoredFileSourceFileListView()
         view.kwargs = self.kwargs
         view.object_list = source_stored_file_list

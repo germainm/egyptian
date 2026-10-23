@@ -31,21 +31,6 @@ class QuotaBackendMetaclass(type):
 
 
 class QuotaBackendBase(AppsModuleLoaderMixin):
-    """
-    Base class for the mailing backends. This class is mainly a wrapper
-    for other Django backends that adds a few metadata to specify the
-    fields it needs to be instantiated at runtime.
-
-    The fields attribute is a list of dictionaries with the format:
-    {
-        'name': ''  # Field internal name
-        'label': ''  # Label to show to users
-        'class': ''  # Field class to use. Field classes are Python dot
-                       paths to Django's form fields.
-        'initial': ''  # Field initial value
-        'default': ''  # Default value.
-    }
-    """
     fields = {}
     signal = None
     widgets = {}
@@ -74,9 +59,7 @@ class QuotaBackend(QuotaBackendBase, metaclass=QuotaBackendMetaclass):
 
     @classmethod
     def _initialize(cls):
-        """
-        Allow the quota backend to run code when the app initializes.
-        """
+        pass
 
     @classmethod
     def create(cls, **kwargs):

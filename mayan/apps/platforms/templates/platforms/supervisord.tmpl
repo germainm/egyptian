@@ -2,11 +2,13 @@
 [supervisord]
 environment=
     PYTHONPATH="{{ user_settings_folder }}",
-    MAYAN_ALLOWED_HOSTS='["*"]',
+    MAYAN_ALLOWED_HOSTS="{{ ALLOWED_HOSTS }}",
     MAYAN_MEDIA_ROOT="{{ MEDIA_ROOT }}",
     MAYAN_INSTALLATION_PATH={{ INSTALLATION_PATH }},
     MAYAN_PYTHON_BIN_DIR={{ INSTALLATION_PATH }}bin/,
     MAYAN_GUNICORN_BIN={{ INSTALLATION_PATH }}bin/gunicorn,
+    MAYAN_GUNICORN_BIND_ADDRESS={{ GUNICORN_BIND_ADDRESS }},
+    MAYAN_GUNICORN_LOG_LEVEL={{ LOGGING_LEVEL|lower }},
     MAYAN_GUNICORN_LIMIT_REQUEST_LINE={{ GUNICORN_LIMIT_REQUEST_LINE }},
     MAYAN_GUNICORN_MAX_REQUESTS={{ GUNICORN_MAX_REQUESTS }},
     MAYAN_GUNICORN_REQUESTS_JITTER={{ GUNICORN_REQUESTS_JITTER }},
@@ -16,11 +18,15 @@ environment=
     MAYAN_GUNICORN_WORKERS={{ GUNICORN_WORKERS }},
     MAYAN_SETTINGS_MODULE=mayan.settings.production,
     MAYAN_SUPERVISOR_AUTORESTART={{ SUPERVISOR_AUTORESTART }},
+    MAYAN_BEAT_LOG_LEVEL={{ LOGGING_LEVEL }},
+    MAYAN_BEAT_NICE_LEVEL={{ BEAT_NICE_LEVEL }},
+    MAYAN_WORKER_LOG_LEVEL={{ LOGGING_LEVEL }},
     {% spaceless_plus %}
     {% for worker in workers %}
     MAYAN_{{ worker.name|upper }}_CONCURRENCY="{% if worker.concurrency %}--concurrency={{ worker.concurrency }}{% endif %}",
     MAYAN_{{ worker.name|upper }}_MAX_MEMORY_PER_CHILD="{% if worker.maximum_memory_per_child %}--max-memory-per-child={{ worker.maximum_memory_per_child }}{% endif %}",
     MAYAN_{{ worker.name|upper }}_MAX_TASKS_PER_CHILD="{% if worker.maximum_tasks_per_child %}--max-tasks-per-child={{ worker.maximum_tasks_per_child }}{% endif %}",
+    MAYAN_{{ worker.name|upper }}_NICE_LEVEL={{ worker.nice_level }},
     {% endfor %}
     _LAST_LINE=""
     {% endspaceless_plus %}

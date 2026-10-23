@@ -3,10 +3,6 @@ import django.db.models.deletion
 
 
 class AddFieldDynamicDefault(migrations.AddField):
-    """
-    Subclass of migrations.AddField to allow passing a calculated default
-    value from another model instance.
-    """
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         StoredDuplicateBackend = from_state.apps.get_model(
             app_label='duplicates', model_name='StoredDuplicateBackend'

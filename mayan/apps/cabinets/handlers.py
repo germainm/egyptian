@@ -17,7 +17,4 @@ def handler_index_document(sender, **kwargs):
 
 def handler_cabinet_pre_delete(sender, **kwargs):
     for document in kwargs['instance'].documents.all():
-        # Remove each of the related documents.
-        # Trigger the remove event for each document so they can be
-        # reindexed.
         kwargs['instance']._document_remove(document=document)

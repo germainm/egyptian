@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 from django.apps import apps
 from django.conf import settings
@@ -8,7 +8,7 @@ from django.contrib.admin.utils import (
 from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
 from django.db import models
 from django.forms import Form as DjangoForm, ModelForm as DjangoModelForm
-from django.forms.models import ModelFormMetaclass  # NOQA
+from django.forms.models import ModelFormMetaclass
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.common.utils import resolve_attribute
@@ -23,21 +23,18 @@ from .form_widgets import (
     DisableableSelectWidget, PlainWidget, RadioSelect, Select, SelectMultiple,
     TextAreaDiv, TextInput
 )
+from .literals import DEFAULT_CHOICE_FORM_SELECTION_SIZE
 
 
 class Form(FormMixinFieldsets, DjangoForm):
-    """Mayan's default form class."""
+    pass
 
 
 class ModelForm(FormMixinFieldsets, DjangoModelForm):
-    """Mayan's default model form class."""
+    pass
 
 
 class ChoiceForm(Form):
-    """
-    Form to be used in side by side templates used to add or remove
-    items from a many to many field.
-    """
     search = CharField(
         label=_(message='Search'), required=False,
         widget=TextInput(
@@ -70,8 +67,8 @@ class ChoiceForm(Form):
         self.fields['selection'].widget.disabled_choices = disabled_choices
         self.fields['selection'].widget.attrs.update(
             {
-                'class': 'full-height input-hotkey-double-click',
-                'data-height-difference': '495'
+                'class': 'input-hotkey-double-click',
+                'size': DEFAULT_CHOICE_FORM_SELECTION_SIZE
             }
         )
 
@@ -92,12 +89,9 @@ class DetailForm(ModelForm):
 
             if field:
                 if not label:
-                    # If label is not specified try to get it from the object
-                    # itself.
                     try:
                         fields = get_fields_from_path(model=obj, path=field)
                     except FieldDoesNotExist:
-                        # Might be property of a method.
                         attribute = getattr(obj.__class__, field)
 
                         label = getattr(attribute, 'short_description', field)
@@ -107,12 +101,9 @@ class DetailForm(ModelForm):
                         )
 
                 if not help_text:
-                    # If help_text is not specified try to get it from the
-                    # object itself.
                     try:
                         fields = get_fields_from_path(model=obj, path=field)
                     except FieldDoesNotExist:
-                        # Might be property of a method.
                         attribute = getattr(obj, field)
                         help_text = getattr(attribute, 'help_text', None)
                     else:
@@ -144,23 +135,22 @@ class DetailForm(ModelForm):
 
 
 class DynamicForm(FormMixinDynamicFields, Form):
-    """Normal dynamic form."""
+    pass
 
 
 class DynamicModelForm(FormMixinDynamicFields, ModelForm):
-    """Dynamic model form."""
+    pass
 
 
 class FileDisplayForm(Form):
-    DIRECTORY = None
+    DIRECTORY = ()
     FILENAME = None
 
     text = CharField(
         label='',
         widget=TextAreaDiv(
             attrs={
-                'class': 'full-height scrollable',
-                'data-height-difference': 270
+                'class': 'scrollable'
             }
         )
     )
@@ -168,18 +158,14 @@ class FileDisplayForm(Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.DIRECTORY or self.FILENAME:
-            file_path = os.path.join(
-                settings.BASE_DIR, os.sep.join(self.DIRECTORY), self.FILENAME
+            path_file = Path(
+                settings.BASE_DIR, *self.DIRECTORY, self.FILENAME
             )
-            with open(file=file_path) as file_object:
+            with open(file=path_file) as file_object:
                 self.fields['text'].initial = file_object.read()
 
 
 class FilteredSelectionForm(Form):
-    """
-    Form to select the from a list of choice filtered by access. Can be
-    configured to allow single or multiple selection.
-    """
     def __init__(self, *args, **kwargs):
         opts = FilteredSelectionFormOptions(
             form=self, kwargs=kwargs, options=getattr(self, 'Meta', None)

@@ -2,41 +2,37 @@
 
 {% load i18n %}
 
+{% load icons_tags %}
+
 {% block title %}{% trans 'Server error' %}{% endblock %}
 
 {% block content %}
-    <div class="appearance-div-error">
+    <div class="container d-flex justify-content-center align-items-center appearance-view-error">
         <div class="row">
-            <div class="col-xs-12">
+            <div class="col-12">
                 <div class="text-center">
-                    <span class="fa-stack fa-2x appearance-icon-error">
-                        <i class="fas fa-display fa-stack-2x"></i>
-                        <i class="fas fa-exclamation-triangle fa-stack-1x fa-2x" data-fa-transform="right-10 up-3"></i>
-                    </span>
+                    <div class="mayan-icon-6x">
+                        {% icons_get_icon 'mayan.apps.appearance.icons.icon_error_500' %}
+                    </div>
                 </div>
 
-                <h3 class="title text-center">{% trans 'Server error' %}</h3>
-                <div class="inner text-center">
+                <h3 class="text-center">{% trans 'Server error' %}</h3>
+                <div class="text-center mb-5">
                     <p>{% blocktrans %}There's been an unexpected error.{% endblocktrans %}</p>
                 </div>
 
-                <br>
-                <div class="row">
-                    <div class="col-xs-10 col-xs-offset-1 col-sm-8 col-sm-offset-2 col-md-6 col-md-offset-3 col-lg-4 col-lg-offset-4">
-                        <div class="panel panel-primary">
-                            <div class="panel-heading">
-                                <h3 class="panel-title text-center">{% trans 'What to do next?' %}</h3>
-                            </div>
-                            <div class="panel-body">
-                                <ul class="fa-ul">
-                                  <li><span class="fa-li"><i class="fas fa-sync"></i></span>{% blocktrans %}Refresh the page.{% endblocktrans %}</li>
-                                  <li><span class="fa-li"><i class="far fa-hourglass"></i></span>{% blocktrans %}Wait a bit. The system might be overloaded.{% endblocktrans %}</li>
-                                  <li><span class="fa-li"><i class="fas fa-phone"></i></span>{% blocktrans %}Contact your system administrator.{% endblocktrans %}</li>
-                                  <li><span class="fa-li"><i class="fas fa-scroll"></i></span>{% blocktrans %}Check the logs for messages with the tags "ERROR", "CRITICAL" or "FATAL".{% endblocktrans %}</li>
-                                  <li><span class="fa-li"><i class="fas fa-bug"></i></span>{% blocktrans with 'https://gitlab.com/mayan-edms/mayan-edms/-/issues' as issue_url %}Open a ticket using the <a href="{{ issue_url }}">issue tracker</a>.{% endblocktrans %}</li>
-                                </ul>
-                            </div>
-                        </div>
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <p class="mb-0 text-center">{% trans 'What to do next?' %}</p>
+                    </div>
+                    <div class="card-body">
+                        <ul class="fa-ul">
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_500_hint_refresh' %}</span>{% blocktrans %}Refresh the page.{% endblocktrans %}</li>
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_500_hint_wait' %}</span>{% blocktrans %}Wait a bit. The system might be overloaded.{% endblocktrans %}</li>
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_500_hint_administrator' %}</span>{% blocktrans %}Contact your system administrator.{% endblocktrans %}</li>
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_500_hint_logs' %}</span>{% blocktrans %}Check the logs for messages with the tags "ERROR", "CRITICAL" or "FATAL".{% endblocktrans %}</li>
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_500_hint_issue_tracker' %}</span>{% blocktrans with 'https://gitlab.com/mayan-edms/mayan-edms/-/issues' as issue_url %}Open a ticket using the <a href="{{ issue_url }}">issue tracker</a>.{% endblocktrans %}</li>
+                        </ul>
                     </div>
                 </div>
             </div>

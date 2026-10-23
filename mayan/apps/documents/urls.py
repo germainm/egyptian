@@ -20,9 +20,6 @@ from .api_views.document_version_api_views import (
     APIDocumentVersionModificationView, APIDocumentVersionPageDetailView,
     APIDocumentVersionPageImageView, APIDocumentVersionPageListView
 )
-from .api_views.favorite_document_api_views import (
-    APIFavoriteDocumentDetailView, APIFavoriteDocumentListView
-)
 from .api_views.recently_accessed_document_api_views import (
     APIRecentlyAccessedDocumentListView
 )
@@ -44,7 +41,8 @@ from .views.document_file_page_views import (
 from .views.document_file_views import (
     DocumentFileDeleteView, DocumentFileEditView, DocumentFileIntrospectView,
     DocumentFileListView, DocumentFilePreviewView, DocumentFilePrintFormView,
-    DocumentFilePrintView, DocumentFilePropertiesView,
+    DocumentFilePrintPDFView, DocumentFilePrintView,
+    DocumentFilePropertiesView,
     DocumentFileTransformationsClearView, DocumentFileTransformationsCloneView
 )
 from .views.document_type_retention_policy_views import (
@@ -71,15 +69,13 @@ from .views.document_version_views import (
     DocumentVersionDeleteView, DocumentVersionEditView,
     DocumentVersionListView, DocumentVersionModifyView,
     DocumentVersionPreviewView, DocumentVersionPrintFormView,
-    DocumentVersionPrintView, DocumentVersionTransformationsClearView,
+    DocumentVersionPrintPDFView, DocumentVersionPrintView,
+    DocumentVersionTransformationsClearView,
     DocumentVersionTransformationsCloneView
 )
 from .views.document_views import (
     DocumentListView, DocumentPreviewView, DocumentPropertiesEditView,
     DocumentPropertiesView, DocumentTypeChangeView
-)
-from .views.favorite_document_views import (
-    FavoriteAddView, FavoriteDocumentListView, FavoriteRemoveView
 )
 from .views.recently_accessed_document_views import (
     RecentlyAccessedDocumentListView
@@ -134,6 +130,11 @@ urlpatterns_document_files = [
     re_path(
         route=r'^documents/files/(?P<document_file_id>\d+)/print/$',
         name='document_file_print_view', view=DocumentFilePrintView.as_view()
+    ),
+    re_path(
+        route=r'^documents/files/(?P<document_file_id>\d+)/print/pdf/$',
+        name='document_file_print_pdf_view',
+        view=DocumentFilePrintPDFView.as_view()
     ),
     re_path(
         route=r'^documents/files/(?P<document_file_id>\d+)/properties/$',
@@ -316,6 +317,11 @@ urlpatterns_document_version = [
         view=DocumentVersionPrintView.as_view()
     ),
     re_path(
+        route=r'^documents/versions/(?P<document_version_id>\d+)/print/pdf/$',
+        name='document_version_print_pdf_view',
+        view=DocumentVersionPrintPDFView.as_view()
+    ),
+    re_path(
         route=r'^documents/versions/(?P<document_version_id>\d+)/transformations/clear/$',
         name='document_version_transformations_clear',
         view=DocumentVersionTransformationsClearView.as_view()
@@ -438,30 +444,6 @@ urlpatterns_documents = [
     )
 ]
 
-urlpatterns_favorite_documents = [
-    re_path(
-        route=r'^documents/favorites/$', name='document_favorite_list',
-        view=FavoriteDocumentListView.as_view()
-    ),
-    re_path(
-        route=r'^documents/(?P<document_id>\d+)/add_to_favorites/$',
-        name='document_favorite_add', view=FavoriteAddView.as_view()
-    ),
-    re_path(
-        route=r'^documents/multiple/add_to_favorites/$',
-        name='document_favorite_add_multiple', view=FavoriteAddView.as_view()
-    ),
-    re_path(
-        route=r'^documents/(?P<document_id>\d+)/remove_from_favorites/$',
-        name='document_favorite_remove', view=FavoriteRemoveView.as_view()
-    ),
-    re_path(
-        route=r'^documents/multiple/remove_from_favorites/$',
-        name='document_favorite_remove_multiple',
-        view=FavoriteRemoveView.as_view()
-    )
-]
-
 urlpatterns_trashed_documents = [
     re_path(
         route=r'^documents/(?P<document_id>\d+)/trash/$',
@@ -506,7 +488,6 @@ urlpatterns.extend(urlpatterns_document_types)
 urlpatterns.extend(urlpatterns_document_version_pages)
 urlpatterns.extend(urlpatterns_document_version)
 urlpatterns.extend(urlpatterns_documents)
-urlpatterns.extend(urlpatterns_favorite_documents)
 urlpatterns.extend(urlpatterns_trashed_documents)
 
 api_urls_documents = [
@@ -540,16 +521,6 @@ api_urls_documents = [
         route=r'^documents/created/$',
         name='recentlycreateddocument-list',
         view=APIRecentlyCreatedDocumentListView.as_view()
-    ),
-    re_path(
-        route=r'^documents/favorites/$',
-        name='favoritedocument-list',
-        view=APIFavoriteDocumentListView.as_view()
-    ),
-    re_path(
-        route=r'^documents/favorites/(?P<favorite_document_id>[0-9]+)/$',
-        name='favoritedocument-detail',
-        view=APIFavoriteDocumentDetailView.as_view()
     )
 ]
 

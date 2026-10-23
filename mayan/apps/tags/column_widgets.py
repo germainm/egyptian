@@ -7,9 +7,6 @@ from .permissions import permission_tag_view
 
 
 class DocumentTagWidget(SourceColumnWidget):
-    """
-    A tag widget that displays the tags for the given document.
-    """
     template_name = 'tags/document_tags_widget.html'
 
     def get_extra_context(self):

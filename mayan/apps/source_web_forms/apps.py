@@ -1,7 +1,9 @@
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.app_manager.apps import MayanAppConfig
-from mayan.apps.common.signals import signal_post_initial_setup
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import PROCESS_INITIAL_SETUP
+from mayan.apps.app_manager.runlevels import runlevel_bootstrap
 
 
 class SourceWebFormsApp(MayanAppConfig):
@@ -14,11 +16,12 @@ class SourceWebFormsApp(MayanAppConfig):
     def ready(self):
         super().ready()
 
-        # Hidden import to avoid errors attempting to load models before
-        # they are ready.
-        from .handlers import handler_create_default_document_source
+        from .initializers import initializer_create_default_document_source
 
-        signal_post_initial_setup.connect(
-            receiver=handler_create_default_document_source,
-            dispatch_uid='sources_web_forms_handler_create_default_document_source'
+        InitializationStep(
+            function=initializer_create_default_document_source,
+            label=_(message='Create the default document source'),
+            name='source_web_forms.create_default_document_source',
+            order=10, process=PROCESS_INITIAL_SETUP,
+            runlevel=runlevel_bootstrap
         )

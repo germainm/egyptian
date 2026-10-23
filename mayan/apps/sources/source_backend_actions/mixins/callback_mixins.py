@@ -1,5 +1,6 @@
+from django.apps import apps
+
 from mayan.apps.common.utils import get_class_full_name
-from mayan.apps.sources.models import Source
 
 
 class SourceBackendActionMixinCallbackBase:
@@ -16,6 +17,8 @@ class SourceBackendActionMixinCallbackBase:
         callback_kwargs.update(
             **self_get_callback_kwargs_method(task_kwargs=task_kwargs)
         )
+
+        Source = apps.get_model(app_label='sources', model_name='Source')
 
         callback_info = {
             'dotted_path': get_class_full_name(klass=Source),
@@ -86,15 +89,11 @@ class SourceBackendActionMixinCallbackDocumentUpload(
     SourceBackendActionMixinCallbackDocumentFileUploadBase,
     SourceBackendActionMixinCallbackBase
 ):
-    """
-    Base callback class for sources that upload documents.
-    """
+    pass
 
 
 class SourceBackendActionMixinCallbackDocumentFileUpload(
     SourceBackendActionMixinCallbackDocumentFileUploadBase,
     SourceBackendActionMixinCallbackBase
 ):
-    """
-    Base callback class for sources that upload document files.
-    """
+    pass

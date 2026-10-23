@@ -22,31 +22,20 @@ class BackendMetaclass(type):
 
         _loader_module_name = getattr(new_class, '_loader_module_name')
 
-        # Check if `_loader_module_name` is set as to not process the
-        # metaclass.
         if _loader_module_name and base_backend_class:
             if base_backend_class != new_class:
-                # Get this new child class full name, to be used as the
-                # registry key.
                 new_class_full_name = get_class_full_name(klass=new_class)
                 if _loader_module_name in new_class_full_name:
-                    # Only load classes defined in the loader module.
-                    # This ensures miscellaneous classes like `NullBackends`
-                    # are not registered.
                     base_backend_class.register(klass=new_class)
 
         return new_class
 
     @staticmethod
     def _get_base_backend_class(klass):
-        # Filter class hierarchy. Select only the class with App loader
-        # support. This means that is the class meant to work as the
-        # app's backend class.
         base_backend_class = [
             parent for parent in klass.mro() if '_loader_module_name' in parent.__dict__ and parent._loader_module_name
         ]
 
-        # No more than one app backend class should be returned.
         if len(base_backend_class) > 1:
             raise ImproperlyConfigured(
                 'More than one backend parent class was returned. Should be '
@@ -60,10 +49,6 @@ class BackendMetaclass(type):
 
 
 class BaseBackend(AppsModuleLoaderMixin, metaclass=BackendMetaclass):
-    """
-    is_visible: Controls whether the backend will show up as a selection
-                to the user.
-    """
     _backend_identifier = 'backend_class_path'
     _registry = {}
     is_visible = True
@@ -110,16 +95,12 @@ class BaseBackend(AppsModuleLoaderMixin, metaclass=BackendMetaclass):
 
     @classmethod
     def register(cls, klass):
-        # Initialize the app backend class registry.
         cls._registry.setdefault(
             cls, {}
         )
 
-        # Get this new child class full name, to be used as the
-        # registry key.
         registry_key = klass.backend_id
 
-        # Add the new child class to the app backend class registry.
         cls._registry[cls][registry_key] = klass
 
 
@@ -173,7 +154,4 @@ class StoredBaseBackend(BaseBackend):
 
 
 class DynamicFormModelBackend(DynamicFormBackendMixin, ModelBaseBackend):
-    """
-    Class that provides model stored backends which produce dynamic forms
-    for data entry.
-    """
+    pass

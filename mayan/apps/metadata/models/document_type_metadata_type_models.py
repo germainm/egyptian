@@ -15,10 +15,6 @@ from .metadata_type_models import MetadataType
 
 
 class DocumentTypeMetadataType(ExtraDataModelMixin, models.Model):
-    """
-    Model used to store the relationship between a metadata type and a
-    document type.
-    """
     document_type = models.ForeignKey(
         on_delete=models.CASCADE, related_name='metadata', to=DocumentType,
         verbose_name=_(message='Document type')

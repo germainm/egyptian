@@ -11,10 +11,6 @@ logger = logging.getLogger(name=__name__)
 
 
 class BackendModelMixin(models.Model):
-    """
-    Backends here represent drivers. This model allows storing multiple
-    instances of a single backend.
-    """
     _backend_model_null_backend = None
 
     backend_path = models.CharField(
@@ -32,9 +28,6 @@ class BackendModelMixin(models.Model):
         abstract = True
 
     def get_backend_class(self):
-        """
-        Retrieves the backend by importing the module and the class.
-        """
         try:
             return import_string(dotted_path=self.backend_path)
         except ModuleNotFoundError as exception:
@@ -61,11 +54,6 @@ class BackendModelMixin(models.Model):
                 raise
 
     def get_backend_class_label(self):
-        """
-        Return the label that the backend itself provides. The backend is
-        loaded but not initialized. As such the label returned is a class
-        property.
-        """
         try:
             backend_class = self.get_backend_class()
         except ModuleNotFoundError as exception:

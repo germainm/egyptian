@@ -2,46 +2,57 @@
 
 {% load appearance_tags %}
 {% load common_tags %}
+{% load icons_tags %}
 {% load navigation_tags %}
 
 {% spaceless %}
-    <nav class="navbar navbar-default navbar-fixed-top">
+    <nav class="navbar navbar-expand-md navbar-dark bg-primary fixed-top">
         <div class="container-fluid">
-            <div class="navbar-header">
-                <button aria-expanded="false" aria-controls="navbar" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" type="button">
-                    <span class="sr-only">{% trans 'Toggle navigation' %}</span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                </button>
-                <div id="ajax-spinner" style="display: none;"></div>
-                <a class="navbar-brand" href="{% url home_view %}"><span class="icon-mayan-edms-logo"></span> {% common_project_information '__title__' %}</a>
-            </div>
+            <button aria-controls="menu-main" aria-expanded="false" aria-label="{% trans 'Open main menu' %}" class="navbar-toggler" data-bs-target="#menu-main" data-bs-toggle="offcanvas" type="button">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-            <div class="collapse navbar-collapse" id="navbar">
-                <ul class="nav navbar-nav navbar-right">
-                    {% navigation_resolve_menu name='topbar' as topbar_menus_results %}
-                    {% for tobpar_menu_result in topbar_menus_results %}
-                        {% for link_group in tobpar_menu_result.link_groups %}
-                            {% for link in link_group.links %}
-                                {% with 'true' as as_li %}
-                                {% with 'true' as hide_active_anchor %}
-                                {% with 'active' as li_class_active %}
-                                {% with 'first' as li_class_first %}
-                                {% with ' ' as link_classes %}
-                                    {% include 'navigation/generic_subnavigation.html' %}
-                                {% endwith %}
-                                {% endwith %}
-                                {% endwith %}
-                                {% endwith %}
-                                {% endwith %}
+            <a class="mayan-navbar-brand navbar-brand" href="{% url home_view %}"><span class="appearance-navbar-brand-logo"><span class="icon-mayan-edms-logo"></span><span id="ajax-spinner" style="display: none;"></span></span> {% common_project_information '__title__' %}</a>
+
+            <button aria-controls="navbar" aria-expanded="false" aria-label="{% trans 'Open options menu' %}" class="navbar-toggler py-2" data-bs-target="#navbar" data-bs-toggle="offcanvas" type="button">
+                {% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_topbar' %}
+            </button>
+
+            <div aria-labelledby="navbar-offcanvas-label" class="offcanvas offcanvas-end text-bg-primary" id="navbar" tabindex="-1">
+                <div class="border-bottom border-1 offcanvas-header">
+                    <h5 class="offcanvas-title" id="navbar-offcanvas-label">{% trans 'Options' %}</h5>
+                    <button aria-label="{% trans 'Close' %}" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" type="button"></button>
+                </div>
+
+                <div class="offcanvas-body">
+                    {% appearance_app_templates template_name='topbar' %}
+
+                    <ul class="navbar-nav flex-md-row ms-auto">
+                        {% navigation_resolve_menu name='topbar' as topbar_menus_results %}
+                        {% for tobpar_menu_result in topbar_menus_results %}
+                            {% for link_group in tobpar_menu_result.link_groups %}
+                                {% for link in link_group.links %}
+                                    {% with 'true' as as_li %}
+                                    {% with 'true' as hide_active_anchor %}
+                                    {% with 'active' as li_class_active %}
+                                    {% with 'first' as li_class_first %}
+                                    {% with ' ' as link_classes %}
+                                    {% with 'dropdown-menu-end rounded-1' as dropdown_menu_extra_classes %}
+                                    {% with 'true' as show_menu_label %}
+
+                                        {% include 'navigation/generic_subnavigation.html' %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                    {% endwith %}
+                                {% endfor %}
                             {% endfor %}
                         {% endfor %}
-                    {% endfor %}
-                </ul>
-
-                {% appearance_app_templates template_name='topbar' %}
-
+                    </ul>
+                </div>
             </div>
         </div>
     </nav>

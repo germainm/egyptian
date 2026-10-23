@@ -7,10 +7,20 @@ from mayan.apps.events.classes import EventType
 
 
 class WorkflowManager(models.Manager):
+    def get_queryset_auto_launch(self, document_type):
+        queryset = self.filter(
+            auto_launch=True, document_types=document_type
+        )
+
+        return queryset
+
     def launch_for(self, document, user=None):
-        for workflow_template in document.document_type.workflows.all():
-            if workflow_template.auto_launch:
-                workflow_template.launch_for(document=document, user=user)
+        queryset_workflow_templates = self.get_queryset_auto_launch(
+            document_type=document.document_type
+        )
+
+        for workflow_template in queryset_workflow_templates:
+            workflow_template.launch_for(document=document, user=user)
 
 
 class WorkflowTransitionTriggerEventManager(models.Manager):
@@ -21,12 +31,35 @@ class WorkflowTransitionTriggerEventManager(models.Manager):
         WorkflowInstance = apps.get_model(
             app_label='document_states', model_name='WorkflowInstance'
         )
+        StoredEventType = apps.get_model(
+            app_label='events', model_name='StoredEventType'
+        )
         WorkflowTransition = apps.get_model(
             app_label='document_states', model_name='WorkflowTransition'
         )
 
+        stored_event_type_id = StoredEventType.objects.get_pk_for_name(
+            name=action.verb
+        )
+
+        if stored_event_type_id is None:
+            return
+
+        queryset_trigger_events = self.filter(
+            event_type_id=stored_event_type_id
+        )
+
+        queryset_trigger_events = queryset_trigger_events.order_by()
+
+        transition_id_list = list(
+            queryset_trigger_events.values_list('transition_id', flat=True)
+        )
+
+        if not transition_id_list:
+            return
+
         queryset_triggered_transitions = WorkflowTransition.objects.filter(
-            trigger_events__event_type__name=action.verb
+            pk__in=transition_id_list
         )
 
         if isinstance(action.target, Document):
@@ -47,8 +80,6 @@ class WorkflowTransitionTriggerEventManager(models.Manager):
         )
 
         for workflow_instance in queryset_workflow_instances:
-            # Select the first transition that is valid for this workflow
-            # state.
             queryset_valid_transitions = queryset_triggered_transitions & workflow_instance.get_queryset_valid_transitions()
 
             if queryset_valid_transitions.exists():

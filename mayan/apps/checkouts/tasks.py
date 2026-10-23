@@ -25,7 +25,10 @@ def task_check_expired_check_outs():
             name=lock_id, timeout=CHECKOUT_EXPIRATION_LOCK_EXPIRE
         )
         logger.debug('acquired lock: %s', lock_id)
-        DocumentCheckout.objects.check_in_expired_check_outs()
-        lock.release()
     except LockError:
         logger.debug(msg='unable to obtain lock')
+    else:
+        try:
+            DocumentCheckout.objects.check_in_expired_check_outs()
+        finally:
+            lock.release()

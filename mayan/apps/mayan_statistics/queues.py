@@ -8,7 +8,7 @@ queue_statistics = CeleryQueue(
     worker=worker_c
 )
 
-task_execute_statistic = queue_statistics.add_task_type(
+queue_task_execute_statistic = queue_statistics.add_task_type(
     label=_(message='Execute statistic'),
     dotted_path='mayan.apps.mayan_statistics.tasks.task_execute_statistic'
 )

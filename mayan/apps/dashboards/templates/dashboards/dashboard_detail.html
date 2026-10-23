@@ -1,0 +1,9 @@
+{% extends 'appearance/base.html' %}
+
+{% load dashboards_tags %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+    {% dashboards_render_dashboard stored_dashboard=object %}
+{% endblock %}

@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.task_manager.classes import CeleryQueue
-from mayan.apps.task_manager.workers import worker_b, worker_d
+from mayan.apps.task_manager.workers import worker_b, worker_c
 
 from .literals import (
     TASK_DOWNLOAD_FILE_STALE_INTERVAL, TASK_SHARED_UPLOADS_STALE_INTERVAL
@@ -14,7 +14,7 @@ queue_storage = CeleryQueue(
 )
 queue_storage_periodic = CeleryQueue(
     label=_(message='Storage periodic'), name='storage_periodic', transient=True,
-    worker=worker_d
+    worker=worker_c
 )
 
 queue_storage.add_task_type(

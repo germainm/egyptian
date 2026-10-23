@@ -1,5 +1,7 @@
-from furl import furl
+import shutil
 from zipfile import ZipFile
+
+from furl import furl
 
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
@@ -25,15 +27,16 @@ class DocumentFileCompressor:
                 document_file._event_action_object = _event_action_object
                 document_file._event_actor = _event_actor
                 with document_file.open(mode='rb', raw=True) as entry_file_object:
-                    archive.write(
-                        arcname=str(document_file),
-                        filename=entry_file_object.name
-                    )
+                    archive_name = str(document_file)
+                    with archive.open(name=archive_name, mode='w') as archive_member_file_object:
+                        shutil.copyfileobj(
+                            fsrc=entry_file_object,
+                            fdst=archive_member_file_object
+                        )
 
     def compress_to_download_file(
         self, organization_installation_url='', filename=None, user=None
     ):
-        # Hidden import
         from .settings import (
             setting_message_body_template, setting_message_subject_template
         )

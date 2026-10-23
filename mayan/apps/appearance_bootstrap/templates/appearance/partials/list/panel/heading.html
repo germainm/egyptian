@@ -1,25 +1,26 @@
 {% load navigation_tags %}
+{% load smart_settings_tags %}
 
-<div class="panel-heading">
-    <div class="form-group">
-        <div class="checkbox">
-            <label style="cursor: auto;">
+{% smart_setting 'APPEARANCE_BOOTSTRAP_CARD_LABEL_LINE_COUNT_MAXIMUM' as card_label_line_count_maximum %}
+
+<div class="card-header text-bg-primary mayan-text-decoration-none px-2 py-2">
+    <div class="mb-0">
+        <div class="form-check">
+            <label class="form-check-label" style="cursor: auto;">
                 {% if links_multi_menus_results and not hide_multi_item_actions %}
-                    <input class="form-multi-object-action-checkbox check-all-slave checkbox" name="pk_{{ object.pk }}" style="cursor: pointer;" type="checkbox" />
+                    <input class="form-multi-object-action-checkbox check-all-slave form-check-input" name="pk_{{ object.pk }}" style="cursor: pointer;" type="checkbox" />
                 {% endif %}
 
-                <span style="color: white; word-break: break-all; overflow-wrap: break-word;">
-                    {% if not hide_object %}
-                        {% if not hide_link %}
-                            <a href="{{ object.get_absolute_url }}">{{ object }}</a>
-                        {% else %}
-                            {{ object }}
-                        {% endif %}
+                {% if not hide_object %}
+                    {% if not hide_link %}
+                        <a class="mayan-card-item-label{% if card_label_line_count_maximum %} mayan-line-clamp{% endif %}"{% if card_label_line_count_maximum %} style="--mayan-line-clamp-line-count: {{ card_label_line_count_maximum }};"{% endif %} href="{{ object.get_absolute_url }}" title="{{ object }}">{{ object }}</a>
                     {% else %}
-                        {% navigation_source_column_resolve column=source_columns_identifier.0 as column_value %}
-                        {{ column_value }}
+                        <span class="mayan-card-item-label{% if card_label_line_count_maximum %} mayan-line-clamp{% endif %}"{% if card_label_line_count_maximum %} style="--mayan-line-clamp-line-count: {{ card_label_line_count_maximum }};"{% endif %} title="{{ object }}">{{ object }}</span>
                     {% endif %}
-                </span>
+                {% else %}
+                    {% navigation_source_column_resolve column=source_columns_identifier.0 as column_value %}
+                    <span class="mayan-card-item-label{% if card_label_line_count_maximum %} mayan-line-clamp{% endif %}"{% if card_label_line_count_maximum %} style="--mayan-line-clamp-line-count: {{ card_label_line_count_maximum }};"{% endif %} title="{{ column_value|striptags }}">{{ column_value }}</span>
+                {% endif %}
             </label>
         </div>
     </div>

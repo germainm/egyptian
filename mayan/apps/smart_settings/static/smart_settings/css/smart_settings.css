@@ -1,0 +1,27 @@
+.smart_settings-item-surface:hover {
+    box-shadow: 2px 2px 18px rgba(0, 0, 0, .2);
+    transition: all .2s ease;
+}
+
+
+.smart_settings-value-box {
+    background-color: var(--bs-tertiary-bg);
+    max-height: 9rem;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+
+.smart_settings-cell-measure {
+    max-width: clamp(8rem, 24vw, 30rem);
+}
+
+
+.smart_settings-flex-truncate {
+    min-width: 0;
+}
+
+
+.smart_settings-measure {
+    max-width: 78ch;
+}

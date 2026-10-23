@@ -10,15 +10,9 @@ logger = logging.getLogger(name=__name__)
 
 class ModelMixinFileFieldOpen:
     def open(self, **kwargs):
-        # Some storage class do not provide a file mode attribute.
-        # In that case default to read only in binary mode.
-        # Python's default is read only in text format which does not work
-        # for this use case.
-        # https://docs.python.org/3/library/functions.html#open
 
         field_file = getattr(self, 'file')
 
-        # Ensure the caller cannot specify an alternate filename.
         name = kwargs.pop('name', None)
 
         if name:
@@ -31,7 +25,6 @@ class ModelMixinFileFieldOpen:
         try:
             getattr(field_file.file, 'mode', None)
         except AttributeError:
-            # Storage does not support mode. Discard caller supplied mode.
             kwargs.pop('mode', None)
 
         name = field_file.name
@@ -40,9 +33,6 @@ class ModelMixinFileFieldOpen:
 
         open_kwargs.update(**kwargs)
 
-        # Close the self.file object as Django generates a new descriptor
-        # when the file field is accessed.
-        # From django/db/models/fields/files.py.
         """
         The descriptor for the file attribute on the model instance. Return a
         FieldFile when accessed so you can write code like::

@@ -1,0 +1,39 @@
+{% extends 'appearance/base.html' %}
+
+{% load i18n %}
+
+{% load icons_tags %}
+
+{% block title %}{% trans 'Session expired' %}{% endblock %}
+
+{% block content %}
+    <div class="container d-flex justify-content-center align-items-center appearance-view-error">
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center">
+                    <div class="mayan-icon-6x">
+                        {% icons_get_icon 'mayan.apps.appearance.icons.icon_error_403_csrf' %}
+                    </div>
+                </div>
+
+                <h3 class="text-center">{% trans 'Session expired' %}</h3>
+                <div class="text-center mb-5">
+                    <p>{% blocktrans %}The form could not be submitted because its security token is no longer valid.{% endblocktrans %}</p>
+                </div>
+
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <p class="mb-0 text-center">{% trans 'What to do next?' %}</p>
+                    </div>
+                    <div class="card-body">
+                        <ul class="fa-ul">
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_403_csrf_hint_reload' %}</span>{% blocktrans %}Reload the page and submit the form again.{% endblocktrans %}</li>
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_403_csrf_hint_login' %}</span>{% blocktrans %}Log in again if the session was closed in another tab.{% endblocktrans %}</li>
+                          <li><span class="fa-li">{% icons_get_icon 'mayan.apps.appearance.icons.icon_error_403_csrf_hint_cookies' %}</span>{% blocktrans %}Allow cookies for this site; the security token is stored in one.{% endblocktrans %}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

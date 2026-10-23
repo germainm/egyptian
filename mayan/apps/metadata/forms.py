@@ -36,7 +36,6 @@ class DocumentMetadataForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Set form fields initial values.
         if 'initial' in kwargs:
             self.metadata_type = kwargs['initial']['metadata_type']
             self.document_type = kwargs['initial']['document_type']
@@ -106,8 +105,6 @@ class DocumentMetadataForm(forms.Form):
                 document_type=self.document_type
             )
 
-            # Enforce required only if the metadata has no previous value or
-            # if a value was added but the "update" checkmark is not enabled.
             if required and not self.initial.get('value_existing'):
                 if not self.cleaned_data.get('update') or not self.cleaned_data.get('value'):
                     raise ValidationError(

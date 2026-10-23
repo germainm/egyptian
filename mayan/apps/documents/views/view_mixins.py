@@ -1,8 +1,4 @@
 class RecentDocumentViewMixin:
-    """
-    View mixin that automatically add a document for the view as the
-    latest recently accessed document.
-    """
     recent_document_view_document_property_name = 'object'
 
     def dispatch(self, request, *args, **kwargs):

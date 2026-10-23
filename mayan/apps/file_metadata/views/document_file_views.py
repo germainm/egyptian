@@ -47,7 +47,7 @@ class DocumentFileMetadataDriverListView(
                 'the same as the document metadata, which are user defined '
                 'and reside in the database.'
             ),
-            'no_results_title': _(message='No file metadata available.'),
+            'no_results_title': _(message='No file metadata available'),
             'object': self.external_object,
             'title': _(
                 message='File metadata drivers for: %s'
@@ -55,7 +55,11 @@ class DocumentFileMetadataDriverListView(
         }
 
     def get_source_queryset(self):
-        return self.external_object.file_metadata_drivers.all()
+        queryset_driver_entries = self.external_object.file_metadata_drivers.select_related(
+            'driver'
+        )
+
+        return queryset_driver_entries
 
 
 class DocumentFileMetadataDriverAttributeListView(
@@ -82,7 +86,7 @@ class DocumentFileMetadataDriverAttributeListView(
                 'any metadata field for the file type of this document.'
             ),
             'no_results_title': _(
-                message='No file metadata available for this driver.'
+                message='No file metadata available for this driver'
             ),
             'object': self.external_object.document_file,
             'title': _(
@@ -101,7 +105,11 @@ class DocumentFileMetadataDriverAttributeListView(
         )
 
     def get_source_queryset(self):
-        return self.external_object.entries.all()
+        queryset_entries = self.external_object.entries.select_related(
+            'document_file_driver_entry__driver'
+        )
+
+        return queryset_entries
 
 
 class DocumentFileMetadataSubmitView(MultipleObjectConfirmActionView):
@@ -122,6 +130,7 @@ class DocumentFileMetadataSubmitView(MultipleObjectConfirmActionView):
         queryset = self.object_list
 
         result = {
+            'submit_label': _(message='Submit'),
             'title': ngettext(
                 singular='Submit the selected document file to the file metadata queue?',
                 plural='Submit the selected documents files to the file metadata queue?',

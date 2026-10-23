@@ -23,7 +23,6 @@ def condition_is_not_root_node(context, resolved_object):
     return not resolved_object.is_root_node()
 
 
-# Document type
 
 link_document_index_instance_list = Link(
     args='resolved_object.pk', icon=icon_document_index_instance_list,
@@ -37,7 +36,6 @@ link_document_type_index_templates = Link(
     text=_(message='Index templates'), view='indexing:document_type_index_templates'
 )
 
-# Index instance
 
 link_index_instance_menu = Link(
     condition=factory_condition_queryset_access(
@@ -70,7 +68,6 @@ link_index_instances_reset = Link(
     view='indexing:index_instances_reset'
 )
 
-# Index template
 
 link_index_template_create = Link(
     icon=icon_index_template_create,
@@ -110,7 +107,6 @@ link_index_template_setup = Link(
     view='indexing:index_template_list'
 )
 
-# Index template node
 
 link_index_template_node_tree_view = Link(
     args='resolved_object.pk', icon=icon_index_template_node_tree_view,

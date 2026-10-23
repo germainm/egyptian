@@ -1,11 +1,11 @@
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.views import (
     PasswordResetCompleteView, PasswordResetConfirmView,
     PasswordResetDoneView, PasswordResetView
 )
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
-
-from stronghold.views import StrongholdPublicMixin
+from django.utils.decorators import method_decorator
 
 import mayan
 from mayan.apps.common.settings import setting_home_view
@@ -26,9 +26,9 @@ class MayanPasswordResetRedirectMixin:
         return super().post(*args, **kwargs)
 
 
+@method_decorator(login_not_required, name='dispatch')
 class MayanPasswordResetCompleteView(
-    MayanPasswordResetRedirectMixin, StrongholdPublicMixin,
-    PasswordResetCompleteView
+    MayanPasswordResetRedirectMixin, PasswordResetCompleteView
 ):
     extra_context = {
         'appearance_type': 'plain'
@@ -36,9 +36,9 @@ class MayanPasswordResetCompleteView(
     template_name = 'authentication/password_reset_complete.html'
 
 
+@method_decorator(login_not_required, name='dispatch')
 class MayanPasswordResetConfirmView(
-    MayanPasswordResetRedirectMixin, StrongholdPublicMixin,
-    PasswordResetConfirmView
+    MayanPasswordResetRedirectMixin, PasswordResetConfirmView
 ):
     extra_context = {
         'appearance_type': 'plain'
@@ -49,9 +49,9 @@ class MayanPasswordResetConfirmView(
     template_name = 'authentication/password_reset_confirm.html'
 
 
+@method_decorator(login_not_required, name='dispatch')
 class MayanPasswordResetDoneView(
-    MayanPasswordResetRedirectMixin, StrongholdPublicMixin,
-    PasswordResetDoneView
+    MayanPasswordResetRedirectMixin, PasswordResetDoneView
 ):
     extra_context = {
         'appearance_type': 'plain'
@@ -59,8 +59,9 @@ class MayanPasswordResetDoneView(
     template_name = 'authentication/password_reset_done.html'
 
 
+@method_decorator(login_not_required, name='dispatch')
 class MayanPasswordResetView(
-    MayanPasswordResetRedirectMixin, StrongholdPublicMixin, PasswordResetView
+    MayanPasswordResetRedirectMixin, PasswordResetView
 ):
     email_template_name = 'authentication/password_reset_email.html'
     extra_context = {
@@ -72,10 +73,6 @@ class MayanPasswordResetView(
     )
     template_name = 'authentication/password_reset_form.html'
 
-    # Hardcoded overloaded method to allow adding extra email context from
-    # a method and not just the Django provided `self.extra_email_context`.
-    # On each new Django version, verify if this method has changed and
-    # update this overloading.
     def form_valid(self, form):
         opts = {
             'email_template_name': self.email_template_name,
@@ -88,8 +85,6 @@ class MayanPasswordResetView(
             'use_https': self.request.is_secure()
         }
         form.save(**opts)
-        # Specify the super class `PasswordResetView` explicitly to avoid
-        # executing `form_valid` again.
         return super(PasswordResetView, self).form_valid(form=form)
 
     def get_extra_email_context(self):

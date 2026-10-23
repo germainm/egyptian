@@ -13,12 +13,12 @@
 
 {% block content %}
     <div class="row">
-        <div class="col-xs-12 col-sm-12 col-md-12 col-lg-2" style="margin-right: -25px;">{# Remove gutter #}
-            <h4>{% trans 'Navigation:' %}</h4>
+        <div class="col-12 col-sm-12 col-md-12 col-lg-2" style="margin-inline-end: -25px;">
+            <h4 class="mayan-h4">{% trans 'Navigation:' %}</h4>
             <div id="jstree"></div>
         </div>
 
-        <div class="col-xs-12 col-sm-12 col-md-12 col-lg-10">
+        <div class="col-12 col-sm-12 col-md-12 col-lg-10">
             {% if list_as_items %}
                 {% include 'appearance/partials/list/panels.html' %}
             {% else %}

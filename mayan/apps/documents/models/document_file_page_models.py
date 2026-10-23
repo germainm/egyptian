@@ -18,9 +18,6 @@ __all__ = ('DocumentFilePage', 'DocumentFilePageSearchResult')
 class DocumentFilePage(
     DocumentFilePageBusinessLogicMixin, PagedModelMixin, models.Model
 ):
-    """
-    Model that describes a document file page.
-    """
     _paged_model_parent_field = 'document_file'
 
     document_file = models.ForeignKey(
@@ -44,10 +41,6 @@ class DocumentFilePage(
         return self.get_label()
 
     def delete(self, *args, **kwargs):
-        """
-        When a document file page is deleted also delete any document version
-        page referencing it.
-        """
         content_type = ContentType.objects.get_for_model(
             model=self
         )
@@ -55,7 +48,7 @@ class DocumentFilePage(
             content_type=content_type, object_id=self.pk
         )
 
-        self.cache_partition.delete()
+        self.cache_partition_delete()
 
         for document_version_page in queryset_document_version_page:
             document_version_page._event_actor = getattr(

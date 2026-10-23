@@ -1,0 +1,82 @@
+{% load i18n %}
+
+{% load icons_tags %}
+{% load views_tags %}
+
+{% views_calculate_title as title_result %}
+
+<div class="modal-header">
+    
+    {% if is_modal and title_result.title %}
+        <h3 class="mayan-h3 modal-title" title="{{ title_result.title_full }}">{{ title_result.title }}</h3>
+    {% else %}
+        <h3 class="mayan-h3 modal-title">{% trans 'Are you sure?' %}</h3>
+    {% endif %}
+</div>
+{% if message or object_list_display %}
+    <div class="modal-body">
+        {% if message %}
+            <p>{{ message }}</p>
+        {% endif %}
+
+        {% if object_list_display %}
+            <ul class="list-group mayan-confirm-object-list">
+                {% for object_list_display_entry in object_list_display %}
+                    <li class="list-group-item">{{ object_list_display_entry }}</li>
+                {% endfor %}
+            </ul>
+
+            {% if object_list_display_excess_count %}
+                <p class="mb-0 mt-2">
+                    <small>{% blocktrans count counter=object_list_display_excess_count %}And {{ counter }} more object.{% plural %}And {{ counter }} more objects.{% endblocktrans %}</small>
+                </p>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endif %}
+<div class="modal-footer">
+    <form action="{{ modal_form_action|default:'' }}" class="form login" method="post">{% csrf_token %}
+        {% if next %}
+            <input name="next" type="hidden" value="{{ next }}" />
+        {% endif %}
+
+        {% if previous %}
+            <input name="previous" type="hidden" value="{{ previous }}" />
+        {% endif %}
+
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            <button class="btn btn-danger py-2 rounded-1" data-bs-dismiss="modal" type="submit">
+                {% if submit_icon %}
+                    {{ submit_icon.render }}
+                {% else %}
+                    {% icons_get_icon 'mayan.apps.views.icons.icon_confirm_form_submit' %}
+                {% endif %}
+                {% if submit_label %}{{ submit_label }}{% else %}{% trans 'Yes' %}{% endif %}
+            </button>
+
+            {% if is_modal %}
+                <button class="btn btn-secondary py-2 rounded-1" data-bs-dismiss="modal" type="button">
+                    {% if cancel_icon %}
+                        {{ cancel_icon.render }}
+                    {% else %}
+                        {% icons_get_icon 'mayan.apps.views.icons.icon_confirm_form_cancel' %}
+                    {% endif %}
+                    {% trans 'No' %}
+                </button>
+            {% elif previous %}
+                <a class="btn btn-secondary py-2 rounded-1" onclick='history.back();'>
+                {% if cancel_icon %}
+                    {{ cancel_icon.render }}
+                {% else %}
+                    {% icons_get_icon 'mayan.apps.views.icons.icon_confirm_form_cancel' %}
+                {% endif %}
+                {% trans 'No' %}</a>
+            {% endif %}
+        </div>
+
+        <div class="form-check">
+            <input class="form-check-input" id="confirm-remember" name="remember" type="checkbox">
+            <label class="form-check-label" for="confirm-remember">{% trans 'Do not ask me again.' %}</label>
+        </div>
+    </form>
+</div>

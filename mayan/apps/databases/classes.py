@@ -41,10 +41,7 @@ class ModelAttribute:
         try:
             return cls._model_registry[cls.class_name][model]
         except KeyError:
-            # We were passed a model instance, try again using the model of
-            # the instance.
 
-            # If we are already in the model class, exit with an error.
             if model.__class__ == models.base.ModelBase:
                 return []
 
@@ -217,8 +214,11 @@ class ModelQueryFields:
         else:
             manager = self.model._meta.default_manager
 
-        queryset = manager.all()
+        return self.get_queryset_apply(
+            queryset=manager.all()
+        )
 
+    def get_queryset_apply(self, queryset):
         if self.select_related_fields:
             queryset = queryset.select_related(*self.select_related_fields)
 
@@ -329,8 +329,8 @@ class QuerysetParametersSerializer:
             app_label='contenttypes', model_name='ContentType'
         )
 
-        model = ContentType.objects.get(
-            pk=decomposed_queryset['model_content_type_id']
+        model = ContentType.objects.get_for_id(
+            id=decomposed_queryset['model_content_type_id']
         ).model_class()
 
         queryset = getattr(
@@ -345,8 +345,8 @@ class QuerysetParametersSerializer:
 
         for parameter in parameter_list:
             if 'content_type_id' in parameter:
-                content_type = ContentType.objects.get(
-                    pk=parameter['content_type_id']
+                content_type = ContentType.objects.get_for_id(
+                    id=parameter['content_type_id']
                 )
                 value = content_type.get_object_for_this_type(
                     pk=parameter['object_id']

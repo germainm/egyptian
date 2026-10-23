@@ -1,9 +1,10 @@
 {% load i18n %}
 {% load static %}
 
+{% load appearance_tags %}
 {% load authentication_tags %}
 
-{# appearance_app_template_nocache #}
+{% appearance_app_template_cache_disable %}
 
 {% authentication_impersonation_check as impersonated_user %}
 
@@ -13,7 +14,7 @@
             {% blocktrans with impersonated_user.full_name|default:impersonated_user as user %}
                 Impersonating user "{{ user }}".
             {% endblocktrans %}
-            <a class="btn btn-primary btn-xs" href="{% url 'authentication:user_impersonate_end' %}">{% trans 'Click here when finished' %}</a>
+            <a class="btn btn-primary btn-sm py-0 small" href="{% url 'authentication:user_impersonate_end' %}">{% trans 'Click here when finished' %}</a>
         </p>
     </div>
 {% endif %}

@@ -12,6 +12,7 @@ from mayan.apps.common.menus import (
 )
 from mayan.apps.databases.classes import ModelFieldRelated
 from mayan.apps.events.classes import EventModelRegistry, ModelEventType
+from mayan.apps.navigation.column_widgets import SourceColumnDateTimeWidget
 from mayan.apps.navigation.source_columns import SourceColumn
 from mayan.apps.rest_api.fields import DynamicSerializerField
 
@@ -28,7 +29,7 @@ from .permissions import (
     permission_signature_capture_create, permission_signature_capture_delete,
     permission_signature_capture_edit, permission_signature_capture_view
 )
-from .transformations import *  # NOQA
+from .transformations import *
 
 
 class SignatureCapturesApp(MayanAppConfig):
@@ -107,15 +108,15 @@ class SignatureCapturesApp(MayanAppConfig):
             model=SignatureCapture, related='document'
         )
 
-        # SignatureCapture
 
         SourceColumn(
             attribute='date_time_created', is_identifier=True,
-            is_sortable=True, source=SignatureCapture
+            is_sortable=True, source=SignatureCapture,
+            widget=SourceColumnDateTimeWidget
         )
         SourceColumn(
             attribute='date_time_edited', is_sortable=True,
-            source=SignatureCapture
+            source=SignatureCapture, widget=SourceColumnDateTimeWidget
         )
         SourceColumn(
             attribute='text', is_sortable=True,
@@ -130,7 +131,6 @@ class SignatureCapturesApp(MayanAppConfig):
             source=SignatureCapture
         )
 
-        # Document
 
         menu_list_facet.bind_links(
             links=(link_signature_capture_list,), sources=(Document,)
@@ -157,5 +157,5 @@ class SignatureCapturesApp(MayanAppConfig):
 
         post_migrate.connect(
             dispatch_uid='signature_captures_handler_signature_capture_cache_create',
-            receiver=handler_signature_capture_cache_create
+            receiver=handler_signature_capture_cache_create, sender=self
         )

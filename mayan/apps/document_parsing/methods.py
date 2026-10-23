@@ -15,7 +15,6 @@ def method_document_content(self):
 
 def method_document_parsing_submit(self, user=None):
     latest_file = self.file_latest
-    # Don't error out if document has no file.
     if latest_file:
         latest_file.submit_for_parsing(user=user)
 

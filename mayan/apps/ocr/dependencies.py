@@ -24,6 +24,6 @@ BinaryDependency(
         implied. See the License for the specific language governing
         permissions and limitations under the License.
     ''', help_text=_(message='Free Open Source OCR Engine'),
-    label='Tesseract', module=__name__, name='tesseract',
+    label=_(message='Tesseract'), module=__name__, name='tesseract',
     path=tesseract.tesseract_binary_path
 )

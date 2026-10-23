@@ -1,3 +1,0 @@
-.. _`Dublin core`: http://dublincore.org/metadata-basics/
-.. _`ISO 23081`: https://www.iso.org/standard/73172.html
-

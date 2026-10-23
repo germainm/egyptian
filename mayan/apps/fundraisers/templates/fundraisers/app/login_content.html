@@ -1,28 +1,37 @@
 {% load i18n %}
 
+{% load appearance_tags %}
 {% load autoadmin_tags %}
 {% load fundraiser_tags %}
 
-{% autoadmin_properties %}
+{% appearance_app_template_cache_disable %}
 
-{# appearance_app_template_nocache #}
+{% autoadmin_properties %}
 
 {% if autoadmin_properties.account %}
     {% fundraiser_message_fetch path='/locations/login/' as message %}
 
     {% if message %}
-        <div class="row">
-            <div class="col-xs-12 col-sm-10 col-sm-offset-1 col-md-10 col-md-offset-1 col-lg-6 col-lg-offset-3">
+        <div class="row justify-content-center">
+            <div class="col-11 col-sm-10 col-md-9 col-lg-7">
                 <br>
-                <div class="panel panel-primary">
-                    <div class="panel-heading">
-                        <h3 class="text-center panel-title">{{ message.title }}</h3>
-                    </div>
-                    <div class="panel-body">
-                        <div class="content">
-                            {{ message.body }}
+                
+                
+                
+                
+                <div class="card border-primary mb-3">
+                    {% if message.title %}
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="text-center mb-0">{{ message.title }}</h5>
                         </div>
-                    </div>
+                    {% endif %}
+                    {% if message.body %}
+                        <div class="card-body">
+                            <div class="content">
+                                {{ message.body }}
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>

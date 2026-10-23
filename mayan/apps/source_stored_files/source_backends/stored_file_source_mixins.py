@@ -59,10 +59,7 @@ class SourceBackendMixinStoredFileInteractive(
     SourceBackendMixinStoredFileList,
     SourceBackendMixinStoredFileSourceBase
 ):
-    """
-    Class for sources with stored files that support uploading documents and
-    document files.
-    """
+    pass
 
 
 class SourceBackendMixinStoredFileInteractiveNot(

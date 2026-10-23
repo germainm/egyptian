@@ -1,4 +1,3 @@
-from distutils import util
 from functools import reduce
 import itertools
 import logging
@@ -41,7 +40,6 @@ class ProgressBar:
             f'\r{self.prefix} |{bar}| {percent}% {self.suffix}',
             end=self.print_end
         )
-        # Print New Line on Complete
         if index == self.total:
             print()
 
@@ -164,7 +162,6 @@ class ResolverRelatedManager(Resolver):
         field = self.obj._meta.get_field(field_name=self.attribute)
 
         if field.many_to_one:
-            # Many to one.
             queryset = field.related_model._meta.default_manager.filter(
                 **{field.remote_field.name: self.obj.pk}
             )
@@ -174,7 +171,6 @@ class ResolverRelatedManager(Resolver):
 
             return queryset
         elif field.many_to_many:
-            # Many to many from the parent side.
             if hasattr(field, 'get_filter_kwargs_for_object'):
                 queryset = getattr(self.obj, field.attname)
 
@@ -185,9 +181,6 @@ class ResolverRelatedManager(Resolver):
 
                 return queryset
 
-        # Many to many from the child side.
-        # One to many.
-        # One to one.
         queryset = field.remote_field.model._meta.default_manager.filter(
             **{field.remote_field.name: self.obj.pk}
         )
@@ -216,11 +209,22 @@ class ResolverPipelineModelAttribute(ResolverPipelineObjectAttribute):
 
 
 def any_to_bool(value):
-    if not isinstance(value, bool):
-        value = bool(
-            util.strtobool(val=value)
+    if isinstance(value, bool):
+        return value
+
+    normalized_value = str(value).lower()
+
+    true_value_list = ('1', 'on', 't', 'true', 'y', 'yes')
+    false_value_list = ('0', 'f', 'false', 'n', 'no', 'off')
+
+    if normalized_value in true_value_list:
+        return True
+    elif normalized_value in false_value_list:
+        return False
+    else:
+        raise ValueError(
+            'Invalid truth value `{}`.'.format(value)
         )
-    return value
 
 
 def comma_splitter(string):
@@ -345,6 +349,8 @@ def get_related_field(model, related_field_name):
 def group_iterator(iterable, group_size=None):
     group_size = group_size or 1
 
+    iterable = iter(iterable)
+
     if group_size > 1:
         while True:
             chunk = tuple(
@@ -357,65 +363,75 @@ def group_iterator(iterable, group_size=None):
         yield from iterable
 
 
+def interval_iterator(interval_list):
+    for start, stop in interval_list:
+        if stop > start:
+            step = 1
+        else:
+            step = -1
+
+        yield from range(start, stop + step, step)
+
+
 def parse_range(range_string):
+    interval_list = []
+
     for part in range_string.split(','):
         part = part.strip()
 
+        if not part:
+            continue
+
         if '-' in part:
-            part_range = part.split('-')
-            start = int(
-                part_range[0].strip()
-            )
-            stop = int(
-                part_range[1].strip()
-            )
+            component_list = part.split('-')
 
-            if stop > start:
-                step = 1
-            else:
-                step = -1
+            if len(component_list) != 2:
+                raise ValueError(
+                    'Invalid range `{}`; a range is a start number and a '
+                    'stop number separated by a single dash.'.format(part)
+                )
 
-            yield from range(start, stop + step, step)
+            start_string = component_list[0].strip()
+            stop_string = component_list[1].strip()
         else:
-            try:
-                value = int(part)
-            except ValueError:
-                return
-            else:
-                yield value
+            start_string = part
+            stop_string = part
+
+        try:
+            start = int(start_string)
+            stop = int(stop_string)
+        except ValueError:
+            raise ValueError(
+                'Invalid range `{}`; it must be a number or two numbers '
+                'separated by a dash.'.format(part)
+            )
+
+        interval_list.append(
+            (start, stop)
+        )
+
+    return interval_iterator(interval_list=interval_list)
 
 
 def resolve_attribute(attribute, obj, kwargs=None):
-    """
-    Resolve the attribute of an object. Behaves like the Python REPL but with
-    an unified dotted path schema regardless of the attribute type.
-    Supports callables, dictionaries, properties, related model fields.
-    """
     if not kwargs:
         kwargs = {}
 
-    # Try as a callable
     try:
         return attribute(obj, **kwargs)
     except TypeError:
-        # Try as a dictionary
         try:
             return obj[attribute]
         except TypeError:
             try:
-                # If there are dots in the attribute name, traverse them
-                # to the final attribute
                 result = reduce(
                     getattr, attribute.split('.'), obj
                 )
                 try:
-                    # Try it as a method
                     return result(**kwargs)
                 except (TypeError, ValueError):
-                    # Try it as a property
                     return result
             except AttributeError:
-                # Try as a related model field
                 if LOOKUP_SEP in attribute:
                     attribute_replaced = attribute.replace(LOOKUP_SEP, '.')
                     return resolve_attribute(
@@ -446,11 +462,6 @@ def return_attrib(obj, attrib, arguments=None):
 
 
 def return_related(instance, related_field):
-    """
-    This functions works in a similar method to return_attrib but is
-    meant for related models. Support multiple levels of relationship
-    using double underscore.
-    """
     return reduce(
         getattr, related_field.split(LOOKUP_SEP), instance
     )

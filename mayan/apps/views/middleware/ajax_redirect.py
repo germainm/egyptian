@@ -1,22 +1,28 @@
-from django.http import HttpResponseRedirect
 from django.utils.deprecation import MiddlewareMixin
 
-from mayan.apps.appearance.settings import setting_ajax_redirection_code
-
+from ..literals import HEADER_NAME_REDIRECT_LOCATION, REDIRECT_STATUS_CODES
 from ..utils import request_is_ajax
 
 
 class AjaxRedirect(MiddlewareMixin):
-    def process_request(self, request):
-        ajax_referer = request.META.get('HTTP_X_ALT_REFERER')
-
-        if ajax_referer:
-            request.META['HTTP_REFERER'] = ajax_referer
-
-        return None
-
     def process_response(self, request, response):
-        if request_is_ajax(request=request):
-            if isinstance(response, HttpResponseRedirect):
-                response.status_code = setting_ajax_redirection_code.value
+        if not request_is_ajax(request=request):
+            return response
+
+        status_code = getattr(response, 'status_code', None)
+
+        if status_code not in REDIRECT_STATUS_CODES:
+            return response
+
+        location = response.get('Location', None)
+
+        if not location:
+            return response
+
+        response[HEADER_NAME_REDIRECT_LOCATION] = location
+        del response['Location']
+
+        response.status_code = 200
+        response.content = b''
+
         return response

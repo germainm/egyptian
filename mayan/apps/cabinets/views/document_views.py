@@ -41,7 +41,9 @@ class DocumentCabinetAddView(MultipleObjectFormActionView):
     view_icon = icon_document_cabinet_add
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Add')
+        }
 
         if self.object_list.count() == 1:
             context.update(
@@ -139,7 +141,9 @@ class DocumentCabinetRemoveView(MultipleObjectFormActionView):
     view_icon = icon_document_cabinet_remove
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Remove')
+        }
 
         if self.object_list.count() == 1:
             context.update(

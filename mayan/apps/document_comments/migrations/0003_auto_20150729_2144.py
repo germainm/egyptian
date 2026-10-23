@@ -3,14 +3,10 @@ from django.db import migrations
 
 
 def code_migrate_old_comments(apps, schema_editor):
-    # https://code.djangoproject.com/ticket/24282
-    # If someone has a better solution until Django 1.8, would appreciate
-    # a pull-request :)
 
     try:
         from django.contrib.comments.models import Comment as OldComment
     except ImportError:
-        # Django > 1.7
         pass
     else:
 
@@ -45,5 +41,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(code=code_migrate_old_comments)
+        migrations.RunPython(
+            code=code_migrate_old_comments,
+            reverse_code=migrations.RunPython.noop, elidable=True
+        )
     ]

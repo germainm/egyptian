@@ -36,8 +36,6 @@ class DetachedSignatureManager(models.Manager):
             instance._event_ignore = True
             instance.save()
 
-            # Release the descriptor opened by Django when assigning the
-            # `signature_file` field content.
             instance.signature_file.file.close()
 
             event_detached_signature_created.commit(
@@ -76,16 +74,11 @@ class EmbeddedSignatureManager(models.Manager):
             except Exception:
                 raise
             else:
-                # The result of key.sign_file does not contain the
-                # signature ID.
-                # Verify the signed file to obtain the signature ID.
                 temporary_file_object.seek(0)
                 result = Key.objects.verify_file(
                     file_object=temporary_file_object
                 )
 
-                # Reset the file pointer and use it to create the new
-                # signed document file.
                 temporary_file_object.seek(0)
                 document_file.document.files_upload(
                     file_object=temporary_file_object,

@@ -1,5 +1,0 @@
-- Complete event tracking system.
-
-  - Every action performed in the system is recorded, perfect for auditing.
-  - Users and other apps can subscribe to events to perform actions or
-    provide notifications.

@@ -13,9 +13,6 @@ class ViewMixinDynamicTransformationFormClass:
         transformation_has_form_or_template = TransformationForm or transformation_class.get_template_name()
 
         if not transformation_has_form_or_template:
-            # Transformation does not specify a form and does not have
-            # a template either. Create a dynamic form based on the argument
-            # list.
             class TransformationForm(forms.Form):
                 def __init__(self, *args, **kwargs):
                     super().__init__(*args, **kwargs)
@@ -27,7 +24,6 @@ class ViewMixinDynamicTransformationFormClass:
         class MergedTransformationForm(
             TransformationForm, LayerTransformationForm
         ):
-            """Model form merged with the specific transformation fields."""
             view = self
 
         return MergedTransformationForm

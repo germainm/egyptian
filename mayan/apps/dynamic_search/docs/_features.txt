@@ -1,6 +1,0 @@
-- Full text searching.
-
-  - Documents can be searched by their text content, their metadata or any
-    other file attribute such as name, extension, etc. Multiple search
-    engines are supported.
-

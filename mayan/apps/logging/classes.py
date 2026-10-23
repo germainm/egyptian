@@ -1,6 +1,9 @@
+import logging
+
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_save
+from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.acls.classes import ModelPermission
 from mayan.apps.common.menus import menu_list_facet
@@ -12,6 +15,35 @@ from .literals import DEFAULT_ERROR_LOG_PARTITION_ENTRY_LIMIT
 from .permissions import (
     permission_error_log_entry_delete, permission_error_log_entry_view
 )
+
+logger = logging.getLogger(name=__name__)
+
+
+class ErrorLogPartitionEntryNull:
+    def __init__(self, instance):
+        self.instance = instance
+
+    def __getattr__(self, name):
+        ErrorLogPartitionEntry = apps.get_model(
+            app_label='logging', model_name='ErrorLogPartitionEntry'
+        )
+
+        queryset = ErrorLogPartitionEntry.objects.none()
+
+        return getattr(queryset, name)
+
+    def clear(self, user=None):
+        pass
+
+    def create(self, **kwargs):
+        model_label = self.instance._meta.label
+        text = kwargs.get('text')
+
+        logger.warning(
+            'Discarding the error log entry of an object of type: %s with '
+            'id: %s, that is not stored in the database; %s', model_label,
+            self.instance.pk, text
+        )
 
 
 class ErrorLog:
@@ -40,8 +72,38 @@ class ErrorLog:
     def __str__(self):
         return str(self.app_config.verbose_name)
 
+    def _model_partition_relation_add(self, model):
+        from django.contrib.contenttypes.fields import GenericRelation
+
+        ErrorLogPartition = apps.get_model(
+            app_label='logging', model_name='ErrorLogPartition'
+        )
+
+        model.add_to_class(
+            name='error_log_partitions', value=GenericRelation(
+                to=ErrorLogPartition, verbose_name=_(
+                    message='Error log partitions'
+                )
+            )
+        )
+
+        model_subclass_list = model.__subclasses__()
+
+        for model_subclass in model_subclass_list:
+            if model_subclass._meta.proxy:
+                self._model_partition_relation_add(model=model_subclass)
+
     def register_model(self, model, register_permission=True):
         error_log_instance = self
+
+        if model._meta.proxy:
+            raise ImproperlyConfigured(
+                'Model `{}` is a proxy model. Register the concrete model '
+                '`{}` instead. The proxy models of a registered model are '
+                'connected to the error log automatically.'.format(
+                    model, model._meta.concrete_model
+                )
+            )
 
         if getattr(model, 'error_log', None):
             raise ImproperlyConfigured(
@@ -54,6 +116,14 @@ class ErrorLog:
             ContentType = apps.get_model(
                 app_label='contenttypes', model_name='ContentType'
             )
+
+            if self.pk is None:
+                return ErrorLogPartitionEntryNull(instance=self)
+
+            queryset_instance = model._base_manager.filter(pk=self.pk)
+
+            if not queryset_instance.exists():
+                return ErrorLogPartitionEntryNull(instance=self)
 
             content_type = ContentType.objects.get_for_model(
                 model=self
@@ -84,6 +154,8 @@ class ErrorLog:
             name='error_log_instance', value=error_log_instance
         )
 
+        self._model_partition_relation_add(model=model)
+
         menu_list_facet.bind_links(
             links=(link_object_error_log_entry_list,), sources=(model,)
         )
@@ -95,21 +167,6 @@ class ErrorLog:
                     permission_error_log_entry_view
                 )
             )
-
-        def handler_model_instance_delete_partition(
-            sender, instance, **kwargs
-        ):
-            ContentType = apps.get_model(
-                app_label='contenttypes', model_name='ContentType'
-            )
-
-            content_type = ContentType.objects.get_for_model(
-                model=instance
-            )
-
-            return self.stored_error_log.partitions.filter(
-                content_type=content_type, object_id=instance.pk
-            ).delete()
 
         def handler_model_instance_create_partition(
             sender, instance, **kwargs
@@ -135,11 +192,6 @@ class ErrorLog:
             receiver=handler_model_instance_create_partition,
             sender=model, weak=False
         )
-        pre_delete.connect(
-            dispatch_uid='logging_handler_model_instance_delete_partition',
-            receiver=handler_model_instance_delete_partition,
-            sender=model, weak=False
-        )
 
     @property
     def stored_error_log(self):
@@ -151,7 +203,6 @@ class ErrorLog:
                 name=self.app_config.name
             )
         except StoredErrorLog.MultipleObjectsReturned:
-            # Self heal previously repeated entries.
             StoredErrorLog.objects.filter(name=self.app_config.name).delete()
             stored_error_log, created = StoredErrorLog.objects.get_or_create(
                 name=self.app_config.name

@@ -18,11 +18,6 @@ class IndexTemplateEventTriggerRelationshipForm(forms.Form):
             attrs={'readonly': 'readonly'}
         )
     )
-    namespace = form_fields.CharField(
-        label=_(message='Namespace'), required=False, widget=form_widgets.TextInput(
-            attrs={'readonly': 'readonly'}
-        )
-    )
     label = form_fields.CharField(
         label=_(message='Label'), required=False, widget=form_widgets.TextInput(
             attrs={'readonly': 'readonly'}
@@ -51,9 +46,6 @@ class IndexTemplateFilteredForm(forms.FilteredSelectionForm):
 
 
 class IndexTemplateNodeForm(forms.ModelForm):
-    """
-    A standard model form to allow users to create a new index template node
-    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['index'].widget = form_widgets.HiddenInput()

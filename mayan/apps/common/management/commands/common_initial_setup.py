@@ -1,33 +1,28 @@
 from django.core import management
+from django.utils.translation import gettext_lazy as _
 
-from ..base import CommonAppManagementCommand
+from mayan.apps.app_manager.classes import (
+    InitializationStep, ManagementCommandInitializationReporter
+)
+from mayan.apps.app_manager.literals import PROCESS_INITIAL_SETUP
 
 
 class Command(management.BaseCommand):
     help = 'Initializes an install and gets it ready to be used.'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            '--force', action='store_true', dest='force',
-            help='Force execution of the initialization process.',
-        )
-        parser.add_argument(
-            '--no-dependencies', action='store_true', dest='no_dependencies',
-            help='Don\'t download dependencies.',
+        InitializationStep.do_add_arguments(
+            parser=parser, process=PROCESS_INITIAL_SETUP
         )
 
     def handle(self, *args, **options):
-        instance = CommonAppManagementCommand()
+        reporter = ManagementCommandInitializationReporter(
+            command=self, title=_(message='Initial setup')
+        )
 
-        try:
-            instance.do_initial_setup(
-                force=options.get('force', False),
-                no_dependencies=options.get('no_dependencies', False)
-            )
-        except Exception as exception:
-            self.stderr.write(
-                msg=self.style.NOTICE(
-                    str(exception)
-                )
-            )
+        errors = InitializationStep.do_process(
+            options=options, process=PROCESS_INITIAL_SETUP, reporter=reporter
+        )
+
+        if errors:
             exit(1)

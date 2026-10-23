@@ -16,15 +16,6 @@ JavaScriptDependency(
     module=__name__, name='jquery-form', version_string='=4.3.0'
 )
 JavaScriptDependency(
-    environments=(environment_production,),
-    label=_(message='JQuery Match Height'), module=__name__,
-    name='jquery-match-height', version_string='=0.7.2'
-)
-JavaScriptDependency(
     environments=(environment_production,), label=_(message='Select 2'),
     module=__name__, name='select2', version_string='=4.0.13'
-)
-JavaScriptDependency(
-    environments=(environment_production,), label=_(message='Toastr'),
-    module=__name__, name='toastr', version_string='=2.1.4'
 )

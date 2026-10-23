@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import contenttypes
+from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
 import mptt
@@ -167,16 +168,13 @@ class ModelCopy:
 
         new_model_dictionary = {}
 
-        # Static values.
         for field, value in self.field_values.items():
             new_model_dictionary[field] = value
 
-        # Static values templates.
         for field, value in self.field_value_templates.items():
             result = value.format(**context) or None
             new_model_dictionary[field] = result
 
-        # Base fields whose values are copied.
         for field in self.fields_copy:
             value = values.get(
                 field, getattr(instance, field)
@@ -187,7 +185,6 @@ class ModelCopy:
             )
             new_model_dictionary[field] = value
 
-        # Base fields with unique values.
         for field in self.fields_unique:
             base_value = getattr(instance, field)
             counter = 1
@@ -207,7 +204,6 @@ class ModelCopy:
             )
             new_model_dictionary[field] = value
 
-        # Foreign keys.
         for field in self.fields_foreign_keys:
             value = values.get(
                 field, getattr(instance, field)
@@ -218,7 +214,6 @@ class ModelCopy:
             )
             new_model_dictionary[field] = value
 
-        # Fields that are given an unique value if a condition is met.
         for field in self.unique_conditional:
             if self.unique_conditional[field](
                 instance=instance,
@@ -251,19 +246,16 @@ class ModelCopy:
             new_instance = self.model(**new_model_dictionary)
             new_instance.save()
 
-        # Many to many fields added after instance creation.
         for field in self.fields_many_to_many:
             getattr(new_instance, field).set(
                 getattr(instance, field).all()
             )
 
-        # Many to many reverse related fields added after instance creation.
         for field in self.fields_many_to_many_reverse_related:
             getattr(new_instance, field).set(
                 getattr(instance, field).all()
             )
 
-        # Reverse related.
         for field in self.fields_reverse_related:
             related_field = self.model._meta.get_field(field_name=field)
             related_field_name = related_field.field.name
@@ -276,7 +268,6 @@ class ModelCopy:
                     values=values
                 )
 
-        # Reverse related one to one.
         for field in self.fields_related_one_to_one:
             related_field = self.model._meta.get_field(field_name=field)
             related_field_name = related_field.field.name
@@ -285,7 +276,6 @@ class ModelCopy:
                 values={related_field_name: new_instance}
             )
 
-        # Generic relations.
         for field in self.fields_generic_related:
             related_field = self.model._meta.get_field(field_name=field)
             related_field_name = 'content_object'
@@ -343,11 +333,6 @@ class MissingItem:
 
 
 class PropertyHelper:
-    """
-    Makes adding fields using __class__.add_to_class easier.
-    Each subclass must implement the `constructor` and the `get_result`
-    method.
-    """
     @staticmethod
     @property
     def constructor(source_object):
@@ -360,22 +345,56 @@ class PropertyHelper:
         return self.get_result(name=name)
 
     def get_result(self, name):
-        """
-        The method that produces the actual result. Must be implemented
-        by each subclass.
-        """
         raise NotImplementedError
 
 
 class UpstreamSetting:
-    def __init__(self, name, default):
+    def __init__(
+        self, name, default, data_type=None, validation_function=None
+    ):
+        self.data_type = data_type
         self.default = default
         self.name = name
         self.upstream_setting_collection = None
+        self.validation_function = validation_function
 
     def do_kwargs_capture(self, **kwargs):
-        value = kwargs.pop(self.name.lower(), self.default)
+        value_raw = kwargs.pop(self.name.lower(), self.default)
+        value = self.do_value_validate(value=value_raw)
+
         setattr(settings, self.name, value)
+
+    def do_value_validate(self, value):
+        value_coerced = self.get_value_coerced(value=value)
+
+        if self.validation_function:
+            return self.validation_function(
+                raw_value=value_coerced, setting=self
+            )
+
+        return value_coerced
+
+    def get_value_coerced(self, value):
+        if self.data_type is None or value is None:
+            return value
+
+        if isinstance(value, bool) and self.data_type is not bool:
+            raise ImproperlyConfigured(
+                'Setting `{}` must be a {}, not a boolean.'.format(
+                    self.name, self.data_type.__name__
+                )
+            )
+
+        try:
+            value_coerced = self.data_type(value)
+        except (TypeError, ValueError) as exception:
+            raise ImproperlyConfigured(
+                'Unable to read setting `{}` as a {}; value is `{}`.'.format(
+                    self.name, self.data_type.__name__, value
+                )
+            ) from exception
+
+        return value_coerced
 
 
 class UpstreamSettingCollection:

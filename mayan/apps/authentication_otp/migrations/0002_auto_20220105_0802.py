@@ -20,5 +20,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(code=code_user_otp_data_initialize)
+        migrations.RunPython(
+            code=code_user_otp_data_initialize,
+            reverse_code=migrations.RunPython.noop, elidable=True
+        )
     ]

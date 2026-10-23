@@ -1,5 +1,0 @@
-- Multilingual user interface.
-
-  - Mayan EDMS being written using the Django_ framework, can be translated
-    to practically any language spoken in the world. For a list of translated
-    languages have a look at the Transifex_ project location.

@@ -115,7 +115,6 @@ class LinkingApp(MayanAppConfig):
             model=SmartLinkCondition, related='smart_link',
         )
 
-        # ResolvedSmartLink
 
         SourceColumn(
             attribute='get_label_for', is_identifier=True,
@@ -123,7 +122,6 @@ class LinkingApp(MayanAppConfig):
             source=ResolvedSmartLink
         )
 
-        # SmartLink
 
         source_column_smart_link_label = SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -139,7 +137,6 @@ class LinkingApp(MayanAppConfig):
             source=SmartLink, widget=column_widgets.TwoStateWidget
         )
 
-        # ResolvedSmartLink
         source_column_smart_link_dynamic_label.add_exclude(
             source=ResolvedSmartLink
         )
@@ -147,7 +144,6 @@ class LinkingApp(MayanAppConfig):
             source=ResolvedSmartLink
         )
 
-        # SmartLinkCondition
 
         SourceColumn(
             attribute='get_full_label', is_identifier=True,
@@ -158,14 +154,12 @@ class LinkingApp(MayanAppConfig):
             source=SmartLinkCondition, widget=column_widgets.TwoStateWidget
         )
 
-        # Document
 
         menu_list_facet.bind_links(
             links=(link_document_smart_link_instance_list,),
             sources=(Document,)
         )
 
-        # Document type
 
         menu_list_facet.bind_links(
             links=(link_document_type_smart_links,), sources=(DocumentType,)
@@ -178,14 +172,12 @@ class LinkingApp(MayanAppConfig):
             )
         )
 
-        # Resolved smart link
 
         menu_object.bind_links(
             links=(link_smart_link_instance_view,),
             sources=(ResolvedSmartLink,)
         )
 
-        # Smart link
 
         menu_list_facet.bind_links(
             exclude=(ResolvedSmartLink,),
@@ -222,7 +214,6 @@ class LinkingApp(MayanAppConfig):
             )
         )
 
-        # Smart link condition
 
         menu_object.bind_links(
             links=(
@@ -240,7 +231,6 @@ class LinkingApp(MayanAppConfig):
             )
         )
 
-        # Setup
 
         menu_setup.bind_links(
             links=(link_smart_link_setup,)

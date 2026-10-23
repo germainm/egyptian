@@ -5,7 +5,6 @@ from mayan.apps.dynamic_search.search_models import SearchModel
 
 from .permissions import permission_tag_view
 
-# Document
 
 search_model_document.add_model_field(
     field='tags__color', label=_(message='Tag color')
@@ -18,7 +17,6 @@ search_model_document.add_model_field(
     field='tags__label', label=_(message='Tag label')
 )
 
-# Tag
 
 search_model_tag = SearchModel(
     app_label='tags', model_name='Tag',

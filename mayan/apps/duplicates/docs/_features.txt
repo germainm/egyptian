@@ -1,5 +1,0 @@
-- Automatic duplicate document scanning.
-
-  - Extensible system to allow for specific duplication search criteria. By
-    default, backends are supplied to scan for documents with exact files and
-    exact labels.

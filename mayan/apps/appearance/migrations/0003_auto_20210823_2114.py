@@ -4,9 +4,6 @@ from django.db import migrations
 
 
 def code_sanitize_themes(apps, schema_editor):
-    """
-    Sanitize all theme stylesheets.
-    """
     Theme = apps.get_model(
         app_label='appearance', model_name='Theme'
     )

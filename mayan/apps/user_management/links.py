@@ -22,7 +22,6 @@ from .permissions import (
 )
 from .utils import get_user_label_text
 
-# Current user
 
 link_current_user_details = Link(
     args='request.user.id',
@@ -31,7 +30,6 @@ link_current_user_details = Link(
     view='user_management:user_details'
 )
 
-# Group
 
 link_group_create = Link(
     icon=icon_group_create, permission=permission_group_create,
@@ -70,7 +68,6 @@ link_group_user_list = Link(
     view='user_management:group_members'
 )
 
-# User
 
 link_user_create = Link(
     condition=condition_user_is_authenticated, icon=icon_user_create,
@@ -117,5 +114,5 @@ link_user_setup = Link(
 separator_user_label = Separator()
 
 text_user_label = Text(
-    html_extra_classes='menu-user-name', text=get_user_label_text
+    html_extra_classes='text-secondary', text=get_user_label_text
 )

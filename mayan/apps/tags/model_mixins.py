@@ -8,6 +8,7 @@ from mayan.apps.events.event_managers import EventManagerMethodAfter
 
 from .events import event_tag_attached, event_tag_removed
 from .html_widgets import widget_single_tag
+from .utils import get_color_contrast
 
 
 class TagBusinessLogicMixin:
@@ -34,19 +35,15 @@ class TagBusinessLogicMixin:
     def attach_to(self, document, user):
         return self._attach_to(document=document, user=user)
 
+    def get_color_contrast(self):
+        return get_color_contrast(color=self.color)
+
     def get_document_count(self, user):
-        """
-        Return the numeric count of documents that have this tag attached.
-        The count is filtered by access.
-        """
         return self.get_documents(
             permission=permission_document_view, user=user
         ).count()
 
     def get_documents(self, user, permission):
-        """
-        Return a filtered queryset documents that have this tag attached.
-        """
         queryset = Document.valid.filter(
             pk__in=self.documents.all()
         )

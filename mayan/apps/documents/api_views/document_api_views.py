@@ -1,5 +1,6 @@
 import logging
 
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
@@ -117,11 +118,34 @@ class APIDocumentChangeTypeView(generics.ObjectActionAPIView):
         )
 
 
+DOCUMENT_UPLOAD_API_VIEW_SUNSET = 'Thu, 01 Jul 2027 00:00:00 GMT'
+DOCUMENT_UPLOAD_API_VIEW_DEPRECATION_LINK = 'https://docs.mayan-edms.com/'
+
+
+@extend_schema_view(
+    post=extend_schema(deprecated=True)
+)
 class APIDocumentUploadView(generics.CreateAPIView):
     """
-    post: Create a new document and a new document file.
+    post: Create a new document and a new document file. Deprecated: use the
+    sources app action execute endpoint (POST
+    /sources/{source_id}/actions/{action_name}/execute/) as the canonical
+    document capture entry point. This endpoint is scheduled for removal in
+    Mayan EDMS 5.0.
     """
     serializer_class = DocumentUploadSerializer
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(
+            request, response, *args, **kwargs
+        )
+        response['Deprecation'] = 'true'
+        response['Sunset'] = DOCUMENT_UPLOAD_API_VIEW_SUNSET
+        link_header = '<{}>; rel="deprecation"; type="text/html"'.format(
+            DOCUMENT_UPLOAD_API_VIEW_DEPRECATION_LINK
+        )
+        response['Link'] = link_header
+        return response
 
     def perform_create(self, serializer):
         queryset = DocumentType.objects.all()

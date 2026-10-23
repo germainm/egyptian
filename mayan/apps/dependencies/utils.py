@@ -14,9 +14,6 @@ from .versions import Version
 
 class PyPIClient:
     class ExceptionAheadOfUpstream(DependenciesException):
-        """
-        The installed version is more recent than the upstream version.
-        """
         def __init__(self, version_local, version_server):
             self.version_local = version_local
             self.version_server = version_server
@@ -28,9 +25,6 @@ class PyPIClient:
             super().__init__(self.message)
 
     class ExceptionNotLatestVersion(DependenciesException):
-        """
-        The installed version is not the latest available version.
-        """
         def __init__(self, version_local, version_server):
             self.version_local = version_local
             self.version_server = version_server
@@ -42,9 +36,6 @@ class PyPIClient:
             super().__init__(self.message)
 
     class ExceptionUnknownLatestVersion(DependenciesException):
-        """
-        It is not possible to determine what is the latest upstream version.
-        """
         def __init__(self):
             self.message = MESSAGE_UNKNOWN_VERSION
 

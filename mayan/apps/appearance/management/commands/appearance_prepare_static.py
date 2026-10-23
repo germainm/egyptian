@@ -8,10 +8,6 @@ class Command(DjangoCommand):
     help = 'Call the collectstatic command with some specific defaults.'
 
     def handle(self, **options):
-        """
-        Collect static_media_ignore_patterns from all apps. The pattern
-        matches anything after "/<app name>/static/"
-        """
         self.verbosity = options['verbosity']
 
         for key, data in apps.app_configs.items():
@@ -21,11 +17,11 @@ class Command(DjangoCommand):
                 )
             )
 
-        if options['verbosity'] >= 1:
+        if options['verbosity'] >= 2:
             self.log(
                 'Ignore patterns: {}'.format(
                     options['ignore_patterns']
-                ), level=1
+                ), level=2
             )
 
         return super().handle(**options)

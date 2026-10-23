@@ -30,14 +30,16 @@ class Command(BaseCommand):
             exit(1)
 
         try:
-            id_range = parse_range(range_string=id_range_string)
-        except Exception as exception:
+            parse_range(range_string=id_range_string)
+        except ValueError as exception:
             self.stderr.write(
                 msg='Unknown or invalid range format `{}`; {}'.format(
                     id_range_string, exception
                 )
             )
             exit(1)
+
+        count_queued = 0
 
         for id_list in search_model.get_id_groups(range_string=id_range_string):
             task_index_instances.apply_async(
@@ -47,10 +49,8 @@ class Command(BaseCommand):
                 }
             )
 
+            count_queued = count_queued + len(id_list)
+
         self.stdout.write(
-            msg='\nInstances queued for indexing: {}'.format(
-                len(
-                    list(id_range)
-                )
-            )
+            msg='\nInstances queued for indexing: {}'.format(count_queued)
         )

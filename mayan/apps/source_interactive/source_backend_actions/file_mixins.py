@@ -16,9 +16,6 @@ from .arguments import (
 
 
 class SourceBackendActionMixinFileUser:
-    """
-    Process a user supplied file object for upload.
-    """
     accept_files = True
 
     class Interface:

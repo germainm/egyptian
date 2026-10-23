@@ -362,7 +362,6 @@ class DocumentStatesApp(MayanAppConfig):
             model=WorkflowInstance, variable_name='workflow_instance'
         )
 
-        # Workflow template
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -393,7 +392,6 @@ class DocumentStatesApp(MayanAppConfig):
             include_label=True, source=Workflow
         )
 
-        # Workflow runtime template
 
         column_workflow_get_state_final.add_exclude(
             source=WorkflowRuntimeProxy
@@ -413,7 +411,6 @@ class DocumentStatesApp(MayanAppConfig):
             order=99, source=WorkflowRuntimeProxy
         )
 
-        # Workflow instance
 
         SourceColumn(
             attribute='state_active', include_label=True,
@@ -443,7 +440,6 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowInstance
         )
 
-        # Workflow template log entry
 
         SourceColumn(
             attribute='datetime', is_identifier=True,
@@ -455,16 +451,20 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowInstanceLogEntry
         )
         SourceColumn(
-            attribute='transition__origin_state', include_label=True,
-            is_sortable=True, source=WorkflowInstanceLogEntry
+            attribute='get_origin_state', include_label=True,
+            is_sortable=True, label=_(message='Origin state'),
+            sort_field='transition__origin_state',
+            source=WorkflowInstanceLogEntry
         )
         SourceColumn(
             attribute='transition', include_label=True, is_sortable=True,
             source=WorkflowInstanceLogEntry
         )
         SourceColumn(
-            attribute='transition__destination_state', include_label=True,
-            is_sortable=True, source=WorkflowInstanceLogEntry
+            attribute='get_destination_state', include_label=True,
+            is_sortable=True, label=_(message='Destination state'),
+            sort_field='transition__destination_state',
+            source=WorkflowInstanceLogEntry
         )
         SourceColumn(
             attribute='comment', include_label=True, is_sortable=True,
@@ -476,7 +476,6 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowInstanceLogEntry, widget=WorkflowLogExtraDataWidget
         )
 
-        # Workflow template state
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -503,7 +502,6 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowState
         )
 
-        # Workflow template state runtime proxy
 
         column_workflow_actions.add_exclude(
             source=WorkflowStateRuntimeProxy
@@ -518,7 +516,6 @@ class DocumentStatesApp(MayanAppConfig):
             order=99, source=WorkflowStateRuntimeProxy
         )
 
-        # Workflow template state action
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -541,7 +538,6 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowStateAction, widget=column_widgets.TwoStateWidget
         )
 
-        # Workflow template state escalation
 
         SourceColumn(
             attribute='priority', is_identifier=True, is_sortable=True,
@@ -568,7 +564,6 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowStateEscalation, widget=column_widgets.TwoStateWidget
         )
 
-        # Workflow template transition
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -599,7 +594,6 @@ class DocumentStatesApp(MayanAppConfig):
             widget=WorkflowTemplateTransitionTriggerColumnWidget
         )
 
-        # Workflow template transition field
 
         SourceColumn(
             attribute='name', is_identifier=True, is_sortable=True,
@@ -635,7 +629,6 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowTransitionField
         )
 
-        # Workflow instance
 
         menu_list_facet.bind_links(
             links=(link_workflow_instance_list,), sources=(Document,)
@@ -660,7 +653,6 @@ class DocumentStatesApp(MayanAppConfig):
             )
         )
 
-        # Workflow runtime proxy
 
         menu_list_facet.bind_links(
             links=(
@@ -674,7 +666,6 @@ class DocumentStatesApp(MayanAppConfig):
             ), sources=(WorkflowStateRuntimeProxy,)
         )
 
-        # Workflow template
 
         menu_main.bind_links(
             links=(link_workflow_runtime_proxy_list,), position=20
@@ -751,7 +742,6 @@ class DocumentStatesApp(MayanAppConfig):
             links=(link_tool_launch_workflows,)
         )
 
-        # Workflow template escalation
 
         menu_object.bind_links(
             links=(
@@ -760,7 +750,6 @@ class DocumentStatesApp(MayanAppConfig):
             ), sources=(WorkflowStateEscalation,)
         )
 
-        # Workflow template state
 
         menu_list_facet.bind_links(
             exclude=(WorkflowStateRuntimeProxy,),
@@ -790,7 +779,6 @@ class DocumentStatesApp(MayanAppConfig):
             )
         )
 
-        # Workflow template state action
 
         menu_object.bind_links(
             links=(
@@ -799,7 +787,6 @@ class DocumentStatesApp(MayanAppConfig):
             ), sources=(WorkflowStateAction,)
         )
 
-        # Workflow template transition
 
         menu_object.bind_links(
             links=(
@@ -812,7 +799,6 @@ class DocumentStatesApp(MayanAppConfig):
             sources=(WorkflowTransition,)
         )
 
-        # Workflow template transition field
 
         menu_object.bind_links(
             links=(
@@ -830,7 +816,7 @@ class DocumentStatesApp(MayanAppConfig):
 
         post_migrate.connect(
             dispatch_uid='workflows_handler_create_workflow_image_cache',
-            receiver=handler_create_workflow_image_cache
+            receiver=handler_create_workflow_image_cache, sender=self
         )
         post_save.connect(
             dispatch_uid='workflows_handler_launch_workflow_on_create',
@@ -843,7 +829,6 @@ class DocumentStatesApp(MayanAppConfig):
             sender=Document
         )
 
-        # Indexing, general
 
         post_save.connect(
             dispatch_uid='workflows_handler_transition_trigger',
@@ -851,7 +836,6 @@ class DocumentStatesApp(MayanAppConfig):
             sender=Action
         )
 
-        # Indexing, Workflow template
 
         post_save.connect(
             dispatch_uid='workflows_handler_workflow_template_post_edit',
@@ -859,7 +843,6 @@ class DocumentStatesApp(MayanAppConfig):
             sender=Workflow
         )
 
-        # Indexing, Workflow template state
 
         post_save.connect(
             dispatch_uid='workflows_handler_workflow_template_state_post_edit',
@@ -872,7 +855,6 @@ class DocumentStatesApp(MayanAppConfig):
             sender=WorkflowState
         )
 
-        # Indexing, Workflow template transition
 
         post_save.connect(
             dispatch_uid='workflows_handler_workflow_template_transition_post_edit',

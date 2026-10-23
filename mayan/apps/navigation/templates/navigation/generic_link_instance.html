@@ -1,44 +1,17 @@
 {% load navigation_tags %}
 
 {% if link.separator %}
-    <li role="separator" class="divider"></li>
+    <li><hr class="dropdown-divider"></li>
 {% elif link.text_span %}
     <li class="text-center link-text-span {{ link.html_extra_classes }}" >{{ link.text }}</li>
 {% else %}
     {% navigation_link_get_icon link=link as link_icon %}
 
     {% if link.disabled %}
-        <a class="{{ link.html_extra_classes }} {% if link_classes %}{{ link_classes }} {% else %}btn {% if 'dangerous' in link.tags %}btn-danger{% else %}btn-primary{% endif %} btn-xs{% endif %} {% if link.active %}{{ link_class_active }}{% endif %} {% if 'new_window' in link.tags %}new_window{% endif %} disabled" disabled='disabled' style="cursor: default;" href="#">{% if link_icon %}{{ link_icon.render }}{% endif %} {{ link.text }}{% if link.error %} - {{ link.error }}{% endif %}</a>
+        <a class="{{ link.html_extra_classes }} {% if link_classes %}{{ link_classes }} {% if 'dangerous' in link.tags %}text-danger{% endif %} {% else %}btn {% if 'dangerous' in link.tags %}btn-danger{% else %}btn-primary{% endif %} btn-sm fs-7 py-0 px-1{% endif %} {% if link.active %}{{ link_class_active }}{% endif %} {% if 'new_window' in link.tags %}new_window{% endif %} disabled" disabled='disabled' style="cursor: default;" href="#">{% if link_icon %}{{ link_icon.render }}{% endif %} {{ link.text }}{% if link.error %} - {{ link.error }}{% endif %}</a>
     {% else %}
-        {% if link.method == 'get' %}
-            <a
-                class="{{ link.html_extra_classes }} {% if link_classes %}{{ link_classes }} {% else %}btn {% if 'dangerous' in link.tags %}btn-danger{% else %}btn-primary{% endif %} btn-xs{% endif %} {% if link.active %}{{ link_class_active }}{% endif %} {% if 'new_window' in link.tags %}new_window{% endif %}"
-                {% for key,value in link.html_data.items %}
-                    data-{{ key }}={{ value }}
-                {% endfor %}
-            {% if link.url %}href="{{ link.url }}"{% endif %}
-            {% if link.title %}title="{{ link.title }}"{% endif %}
-            >{% if link_icon and not hide_icon %}{{ link_icon.render }}{% endif %}
-            {{ link.text|default:'' }}{% if link.badge_text %}&nbsp;<span class="badge">{{ link.badge_text }}</span>
-            {% endif %}{% if link.error %} - {{ link.error }}{% endif %}
-            </a>
-        {% elif link.method == 'post' %}
-            <form action="{{ link.url }}" method="{{ link.method }}" style="display: inline;">
-                <!--mayan-templating-hash-exclude-start-->
-                {% csrf_token %}
-                <!--mayan-templating-hash-exclude-end-->
-                <button
-                    class="{{ link.html_extra_classes }} {% if link_classes %}{{ link_classes }} {% else %}btn {% if 'dangerous' in link.tags %}btn-danger{% else %}btn-primary{% endif %} btn-xs{% endif %} {% if link.active %}{{ link_class_active }}{% endif %}"
-                    {% for key,value in link.html_data.items %}
-                        data-{{ key }}={{ value }}
-                    {% endfor %}
-                    {% if link.title %}title="{{ link.title }}"{% endif %}
-                    type="submit"
-                >{% if link_icon and not hide_icon %}{{ link_icon.render }}{% endif %}
-                {{ link.text|default:'' }}{% if link.badge_text %}&nbsp;<span class="badge">{{ link.badge_text }}</span>
-                {% endif %}{% if link.error %} - {{ link.error }}{% endif %}
-                </button>
-            </form>
-        {% endif %}
+        {% with 'display: inline;' as link_form_style %}
+            {% include 'navigation/link_instance_element.html' %}
+        {% endwith %}
     {% endif %}
 {% endif %}

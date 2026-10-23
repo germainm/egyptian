@@ -1,5 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.converter.relations import ImageURLField
 from mayan.apps.rest_api import serializers
 from mayan.apps.rest_api.relations import MultiKwargHyperlinkedIdentityField
 
@@ -20,7 +21,7 @@ class DocumentFilePageSerializer(serializers.HyperlinkedModelSerializer):
             }
         ), view_name='rest_api:documentfile-detail'
     )
-    image_url = MultiKwargHyperlinkedIdentityField(
+    image_url = ImageURLField(
         label=_(message='Image URL'), view_kwargs=(
             {
                 'lookup_field': 'document_file.document.pk',

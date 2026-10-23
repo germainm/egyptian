@@ -3,14 +3,14 @@
 {% load icons_tags %}
 {% load navigation_tags %}
 
-{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_views' extra_context__html_data__style='pointer-events: none;' extra_context__icon_css_classes_extra='mayan-icon-padding-none' as icon_menu_views %}
+{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_views' extra_context__html_data__style='pointer-events: none;' as icon_menu_views %}
 
 {% trans 'Views' as text_views %}
 
 {% navigation_resolved_menus_is_single_link resolved_menus=facet_menus_link_results as resolved_menus_is_single_link %}
 {% if resolved_menus_is_single_link %}
     {% with facet_menus_link_results.0.link_groups.0.links.0 as link %}
-    {% with 'btn btn-default btn-xs btn-outline' as link_classes %}
+    {% with 'btn btn-outline btn-secondary btn-sm py-0 px-1' as link_classes %}
         {% include 'navigation/generic_link_instance.html' %}
     {% endwith %}
     {% endwith %}
@@ -19,7 +19,7 @@
         <div class="btn-group">
             <div class="dropdown">
                 {% with 'appearance-dropdown-menu-slim' as navigation_action_dropdown_menu_css_classes_extra %}
-                {% with 'btn btn-default btn-xs btn-invisible' as action_dropdown_classes %}
+                {% with 'btn btn-secondary btn-invisible py-0 px-1' as action_dropdown_classes %}
                 {% with 'true' as action_menu_disable_labels %}
                 {% with text_views as action_dropdown_label %}
                 {% with icon_menu_views as action_dropdown_icon %}

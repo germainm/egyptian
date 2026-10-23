@@ -15,147 +15,6 @@ from .literals import BULK_CREATE_BATCH_SIZE
 logger = logging.getLogger(name=__name__)
 
 
-class StoredDuplicateBackendManager(models.Manager):
-    def scan_document(self, document):
-        """
-        Find duplicates of document based on each registered backend's logic.
-        """
-        lock_name = 'duplicates__scan_document-{}'.format(document.pk)
-        try:
-            logger.debug('trying to acquire lock: %s', lock_name)
-            lock = LockingBackend.get_backend().acquire_lock(name=lock_name)
-            logger.debug('acquired lock: %s', lock_name)
-            try:
-                DuplicateBackendEntry = apps.get_model(
-                    app_label='duplicates', model_name='DuplicateBackendEntry'
-                )
-
-                for backend_path, backend_class in DuplicateBackend.get_all():
-                    if backend_class.verify(document=document):
-
-                        stored_backend, created = self.get_or_create(
-                            backend_path=backend_path
-                        )
-                        duplicates = stored_backend.get_backend_instance().process(
-                            document=document
-                        )
-
-                        if duplicates.exists():
-                            duplicates_entry, created = stored_backend.duplicate_entries.get_or_create(
-                                document=document
-                            )
-
-                            bulk_create_list = (
-                                duplicates_entry.documents.through(
-                                    duplicatebackendentry_id=duplicates_entry.pk,
-                                    document=duplicate
-                                ) for duplicate in duplicates
-                            )
-
-                            while True:
-                                batch = list(
-                                    islice(
-                                        bulk_create_list,
-                                        BULK_CREATE_BATCH_SIZE
-                                    )
-                                )
-
-                                if not batch:
-                                    break
-
-                                duplicates_entry.documents.through.objects.bulk_create(
-                                    batch_size=BULK_CREATE_BATCH_SIZE,
-                                    ignore_conflicts=True, objs=batch
-                                )
-
-                            # Create empty duplicate entries for the
-                            # duplicates as source that do not have one.
-                            bulk_create_list = (
-                                DuplicateBackendEntry(
-                                    stored_backend=stored_backend,
-                                    document=duplicate,
-                                ) for duplicate in duplicates.filter(
-                                    duplicates__stored_backend=None
-                                )
-                            )
-
-                            while True:
-                                batch = list(
-                                    islice(
-                                        bulk_create_list,
-                                        BULK_CREATE_BATCH_SIZE
-                                    )
-                                )
-
-                                if not batch:
-                                    break
-
-                                DuplicateBackendEntry.objects.bulk_create(
-                                    batch_size=BULK_CREATE_BATCH_SIZE,
-                                    ignore_conflicts=True, objs=batch
-                                )
-
-                            # Get all duplicate entries for the duplicates as
-                            # source.
-                            duplicate_entries = stored_backend.duplicate_entries.filter(
-                                document__in=duplicates
-                            )
-
-                            # Create the many to many entries for this
-                            # document as a target.
-                            bulk_create_list = (
-                                document.as_duplicate.through(
-                                    duplicatebackendentry_id=duplicate_entry.pk,
-                                    document_id=document.pk
-                                ) for duplicate_entry in duplicate_entries
-                            )
-
-                            while True:
-                                batch = list(
-                                    islice(
-                                        bulk_create_list,
-                                        BULK_CREATE_BATCH_SIZE
-                                    )
-                                )
-
-                                if not batch:
-                                    break
-
-                                document.as_duplicate.through.objects.bulk_create(
-                                    batch_size=BULK_CREATE_BATCH_SIZE,
-                                    ignore_conflicts=True, objs=batch
-                                )
-                        else:
-                            # Document has no duplicates for this backend.
-                            # Delete any existing entry for where this
-                            # document is the source for the backend.
-                            stored_backend.duplicate_entries.filter(
-                                document=document
-                            ).delete()
-
-                            # Delete any existing entry for where this
-                            # document is a duplicate for the backend.
-                            document.as_duplicate.filter(
-                                stored_backend=stored_backend
-                            ).delete()
-                    else:
-                        # Document cannot be scanned for duplicates for this
-                        # backend. Delete any existing entries for the
-                        # backend where the document is a source or target.
-                        stored_backend.duplicate_entries.filter(
-                            documents=document
-                        ).delete()
-
-                        document.as_duplicate.filter(
-                            stored_backend=stored_backend
-                        ).delete()
-            finally:
-                lock.release()
-        except LockError:
-            logger.debug('unable to obtain lock: %s' % lock_name)
-            raise
-
-
 class DuplicateBackendEntryManager(models.Manager):
     def clean_empty_duplicate_lists(self):
         self.filter(documents=None).delete()
@@ -219,3 +78,127 @@ class DuplicateBackendEntryManager(models.Manager):
             )
 
         return queryset
+
+
+class StoredDuplicateBackendManager(models.Manager):
+    def scan_document(self, document):
+        lock_name = 'duplicates__scan_document-{}'.format(document.pk)
+        try:
+            logger.debug('trying to acquire lock: %s', lock_name)
+            lock = LockingBackend.get_backend().acquire_lock(name=lock_name)
+            logger.debug('acquired lock: %s', lock_name)
+            try:
+                DuplicateBackendEntry = apps.get_model(
+                    app_label='duplicates', model_name='DuplicateBackendEntry'
+                )
+
+                for backend_path, backend_class in DuplicateBackend.get_all():
+                    if backend_class.verify(document=document):
+
+                        stored_backend, created = self.get_or_create(
+                            backend_path=backend_path
+                        )
+                        duplicates = stored_backend.get_backend_instance().process(
+                            document=document
+                        )
+
+                        if duplicates.exists():
+                            duplicates_entry, created = stored_backend.duplicate_entries.get_or_create(
+                                document=document
+                            )
+
+                            bulk_create_list = (
+                                duplicates_entry.documents.through(
+                                    duplicatebackendentry_id=duplicates_entry.pk,
+                                    document=duplicate
+                                ) for duplicate in duplicates
+                            )
+
+                            while True:
+                                batch = list(
+                                    islice(
+                                        bulk_create_list,
+                                        BULK_CREATE_BATCH_SIZE
+                                    )
+                                )
+
+                                if not batch:
+                                    break
+
+                                duplicates_entry.documents.through.objects.bulk_create(
+                                    batch_size=BULK_CREATE_BATCH_SIZE,
+                                    ignore_conflicts=True, objs=batch
+                                )
+
+                            bulk_create_list = (
+                                DuplicateBackendEntry(
+                                    stored_backend=stored_backend,
+                                    document=duplicate,
+                                ) for duplicate in duplicates.filter(
+                                    duplicate_backend_entries__stored_backend=None
+                                )
+                            )
+
+                            while True:
+                                batch = list(
+                                    islice(
+                                        bulk_create_list,
+                                        BULK_CREATE_BATCH_SIZE
+                                    )
+                                )
+
+                                if not batch:
+                                    break
+
+                                DuplicateBackendEntry.objects.bulk_create(
+                                    batch_size=BULK_CREATE_BATCH_SIZE,
+                                    ignore_conflicts=True, objs=batch
+                                )
+
+                            duplicate_entries = stored_backend.duplicate_entries.filter(
+                                document__in=duplicates
+                            )
+
+                            bulk_create_list = (
+                                document.as_duplicate.through(
+                                    duplicatebackendentry_id=duplicate_entry.pk,
+                                    document_id=document.pk
+                                ) for duplicate_entry in duplicate_entries
+                            )
+
+                            while True:
+                                batch = list(
+                                    islice(
+                                        bulk_create_list,
+                                        BULK_CREATE_BATCH_SIZE
+                                    )
+                                )
+
+                                if not batch:
+                                    break
+
+                                document.as_duplicate.through.objects.bulk_create(
+                                    batch_size=BULK_CREATE_BATCH_SIZE,
+                                    ignore_conflicts=True, objs=batch
+                                )
+                        else:
+                            stored_backend.duplicate_entries.filter(
+                                document=document
+                            ).delete()
+
+                            document.as_duplicate.filter(
+                                stored_backend=stored_backend
+                            ).delete()
+                    else:
+                        stored_backend.duplicate_entries.filter(
+                            documents=document
+                        ).delete()
+
+                        document.as_duplicate.filter(
+                            stored_backend=stored_backend
+                        ).delete()
+            finally:
+                lock.release()
+        except LockError:
+            logger.debug('unable to obtain lock: %s' % lock_name)
+            raise

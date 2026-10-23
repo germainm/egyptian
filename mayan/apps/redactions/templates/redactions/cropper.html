@@ -9,26 +9,8 @@
 {% block title %}{{ title }}{% endblock title %}
 
 {% block stylesheets %}
-    <link href="{% static 'redactions/node_modules/cropperjs/dist/cropper.css' %}" rel="stylesheet">
-
-    <style>
-        .cropper-invisible {
-            background: #000;
-            opacity: 1;
-        }
-
-        .cropper-main {
-            width: 100%;
-        }
-
-        .cropper-main img {
-            max-width: 100%;
-        }
-
-        .cropper-modal {
-            opacity: 0;
-        }
-    </style>
+    <link href="{% static 'redactions/node_modules/cropperjs/dist/cropper.css' %}" media="screen" rel="stylesheet" type="text/css" />
+    <link href="{% static 'redactions/css/redactions.css' %}" media="screen" rel="stylesheet" type="text/css" />
 {% endblock %}
 
 {% block content %}

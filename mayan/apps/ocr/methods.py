@@ -1,9 +1,6 @@
 from django.apps import apps
 
-from mayan.apps.converter.settings import setting_image_generation_timeout
-
 from .events import event_ocr_document_version_submitted
-from .literals import TASK_DOCUMENT_VERSION_PAGE_OCR_TIMEOUT
 from .tasks import task_document_version_ocr_process
 
 
@@ -18,7 +15,6 @@ def method_document_ocr_content(self):
 
 def method_document_ocr_submit(self, user=None):
     version_active = self.version_active
-    # Don't error out if document has no version.
     if version_active:
         version_active.submit_for_ocr(user=user)
 
@@ -28,7 +24,9 @@ def method_document_version_ocr_content(self):
         app_label='ocr', model_name='DocumentVersionPageOCRContent'
     )
 
-    for page in self.pages.all():
+    queryset = self.pages.select_related('ocr_content')
+
+    for page in queryset:
         try:
             page_content = page.ocr_content.content
         except DocumentVersionPageOCRContent.DoesNotExist:
@@ -43,13 +41,6 @@ def method_document_version_ocr_submit(self, user=None):
     else:
         user_id = None
 
-    # Timeout calculation logic:
-    # Total timeout for the document version task should be the
-    # file page render timeout + the version page timeout + version page OCR
-    # timeout x the total version pages. This decreases the probability of
-    # the OCR task getting killed before the document file and version page
-    # rendering finishes.
-
     event_ocr_document_version_submitted.commit(
         action_object=self.document, actor=user, target=self
     )
@@ -57,7 +48,5 @@ def method_document_version_ocr_submit(self, user=None):
     task_document_version_ocr_process.apply_async(
         kwargs={
             'document_version_id': self.pk, 'user_id': user_id
-        }, timeout=(
-            TASK_DOCUMENT_VERSION_PAGE_OCR_TIMEOUT + setting_image_generation_timeout.value * 2
-        ) * self.pages.count()
+        }
     )

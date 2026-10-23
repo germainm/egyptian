@@ -1,2 +1,10 @@
-class LockError(Exception):
-    """Raised when it is not possible to acquire a lock."""
+class LockManagerError(Exception):
+    pass
+
+
+class LockError(LockManagerError):
+    pass
+
+
+class LockBackendError(LockError):
+    pass

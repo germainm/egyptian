@@ -1,14 +1,21 @@
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import PROCESS_INITIAL_SETUP
+from mayan.apps.app_manager.runlevels import runlevel_core
 from mayan.apps.common.menus import (
     menu_list_facet, menu_object, menu_return, menu_secondary, menu_setup
 )
 from mayan.apps.forms import column_widgets
 from mayan.apps.navigation.source_columns import SourceColumn
+from mayan.apps.views.template_cache_sources import (
+    TemplateCacheSourceRegistry
+)
 
 from .classes import Setting
 from .column_widgets import WidgetSettingValue
+from .initializers import initializer_settings_save
 from .links import (
     link_setting_cluster_configuration_save,
     link_setting_cluster_namespace_list, link_setting_edit,
@@ -24,6 +31,7 @@ from .widgets import setting_widget
 class SmartSettingsApp(MayanAppConfig):
     app_namespace = 'settings'
     app_url = 'settings'
+    has_static_media = True
     has_tests = True
     name = 'mayan.apps.smart_settings'
     verbose_name = _(message='Smart settings')
@@ -32,6 +40,19 @@ class SmartSettingsApp(MayanAppConfig):
         super().ready()
 
         SettingCluster.load_modules()
+
+        UpdatedStoredSetting = self.get_model(
+            model_name='UpdatedStoredSetting'
+        )
+
+        TemplateCacheSourceRegistry.register_model(model=UpdatedStoredSetting)
+
+        InitializationStep(
+            function=initializer_settings_save,
+            label=_(message='Save the settings configuration'),
+            name='smart_settings.save', order=10,
+            process=PROCESS_INITIAL_SETUP, runlevel=runlevel_core
+        )
 
         SourceColumn(
             func=lambda context: len(

@@ -51,6 +51,4 @@ class SourceBackendActionMixinDocumentFileUploadInteractive(
     SourceBackendActionMixinUserInteractive,
     SourceBackendActionMixinDocumentFileUploadInteractiveBase
 ):
-    """
-    Mixin for a complete action that uploads document files.
-    """
+    pass

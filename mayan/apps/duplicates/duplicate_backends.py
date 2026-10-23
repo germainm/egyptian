@@ -1,5 +1,4 @@
 from django.apps import apps
-from django.db.models import F, Max
 from django.utils.translation import gettext_lazy as _
 
 from .classes import DuplicateBackend
@@ -17,14 +16,9 @@ class DuplicateBackendFileChecksum(DuplicateBackend):
             app_label='documents', model_name='Document'
         )
 
-        # Get the documents whose latest file matches the checksum
-        # of the current document and exclude the current document
 
-        return Document.objects.annotate(
-            max_timestamp=Max('files__timestamp')
-        ).filter(
-            files__timestamp=F('max_timestamp'),
-            files__checksum=document.file_latest.checksum
+        return Document.valid.filter(
+            file_latest__checksum=document.file_latest.checksum
         ).exclude(pk=document.pk)
 
 

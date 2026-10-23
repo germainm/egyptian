@@ -18,9 +18,6 @@ from .model_mixins import CommentBusinessLogicMixin
 
 
 class Comment(CommentBusinessLogicMixin, ExtraDataModelMixin, models.Model):
-    """
-    Model to store one comment per document per user per date & time.
-    """
     _event_created_event = event_document_comment_created
     _event_edited_event = event_document_comment_created
     _ordering_fields = ('submit_date',)

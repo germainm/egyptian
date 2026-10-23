@@ -1,4 +1,5 @@
 import logging
+from io import BytesIO
 
 from furl import furl
 
@@ -13,8 +14,12 @@ from mayan.apps.converter.settings import setting_image_generation_timeout
 from mayan.apps.converter.transformations import BaseTransformation
 from mayan.apps.file_caching.models import CachePartitionFile
 from mayan.apps.lock_manager.backends.base import LockingBackend
+from mayan.apps.lock_manager.exceptions import LockError
 
-from ..literals import IMAGE_ERROR_DOCUMENT_VERSION_PAGE_TRANSFORMATION_ERROR
+from ..literals import (
+    ERROR_LOG_DOMAIN_NAME,
+    IMAGE_ERROR_DOCUMENT_VERSION_PAGE_TRANSFORMATION_ERROR
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -23,9 +28,54 @@ class DocumentVersionPageBusinessLogicMixin:
     @cached_property
     def cache_partition(self):
         partition, created = self.document_version.cache.partitions.get_or_create(
-            name=self.uuid
+            name=self.cache_partition_name
         )
         return partition
+
+    @property
+    def cache_partition_name(self):
+        return self.uuid
+
+    def cache_partition_delete(self):
+        for partition in self.document_version.cache.partitions.filter(
+            name=self.cache_partition_name
+        ):
+            partition.delete()
+
+    def _do_transformation_list_apply(
+        self, converter_instance, transformation_instance_list
+    ):
+        try:
+            for transformation in transformation_instance_list:
+                converter_instance.transform(transformation=transformation)
+        except Exception as exception:
+            logger.error(
+                'Error applying transformation to document version page '
+                '%d; %s', self.page_number, exception, exc_info=True
+            )
+            error_log_text = _(
+                message='Error applying transformation to page '
+                '%(page_number)d; %(exception)s'
+            ) % {
+                'exception': exception, 'page_number': self.page_number
+            }
+
+            self.error_log.create(
+                domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
+            )
+            raise
+
+        return converter_instance.get_page()
+
+    def get_image_cache_filename(
+        self, maximum_layer_order=None, transformation_instance_list=None,
+        user=None
+    ):
+        return self.get_combined_cache_filename(
+            maximum_layer_order=maximum_layer_order,
+            transformation_instance_list=transformation_instance_list,
+            user=user
+        )
 
     def generate_image(
         self, _acquire_lock=True, maximum_layer_order=None,
@@ -67,8 +117,6 @@ class DocumentVersionPageBusinessLogicMixin:
             except Exception:
                 raise
             else:
-                # Second try block to release the lock even on fatal errors
-                # inside the block.
                 try:
                     try:
                         self.cache_partition.get_file(
@@ -101,34 +149,30 @@ class DocumentVersionPageBusinessLogicMixin:
 
     def get_api_image_url(
         self, maximum_layer_order=None, transformation_instance_list=None,
-        user=None, viewname=None, view_kwargs=None
+        user=None, viewname=None, view_kwargs=None,
+        _stored_transformation_list=None
     ):
-        """
-        Create an unique URL combining:
-        - the page's image URL
-        - the interactive argument
-        - a hash from the server side and interactive transformations
-        The purpose of this unique URL is to allow client side caching
-        if document page images.
-        """
         if not self.content_object:
             return '#'
 
         transformation_instance_list = transformation_instance_list or ()
 
-        # Source object transformations first.
-        transformation_list = LayerTransformation.objects.get_for_object(
-            as_classes=True, maximum_layer_order=maximum_layer_order,
-            obj=self.content_object, user=user
-        )
-
-        transformation_list.extend(
-            self.get_combined_transformation_list(
-                maximum_layer_order=maximum_layer_order,
-                transformation_instance_list=transformation_instance_list,
-                user=user
+        if _stored_transformation_list is None:
+            _stored_transformation_list = LayerTransformation.objects.get_for_object(
+                as_classes=True, maximum_layer_order=maximum_layer_order,
+                obj=self.content_object, user=user
             )
-        )
+
+            _stored_transformation_list.extend(
+                LayerTransformation.objects.get_for_object(
+                    as_classes=True, maximum_layer_order=maximum_layer_order,
+                    obj=self, user=user
+                )
+            )
+
+        transformation_list = list(_stored_transformation_list)
+
+        transformation_list.extend(transformation_instance_list)
         try:
             transformations_hash = BaseTransformation.combine(
                 transformations=transformation_list
@@ -149,7 +193,6 @@ class DocumentVersionPageBusinessLogicMixin:
                 kwargs=view_kwargs,
                 viewname=viewname or 'rest_api:documentversionpage-image'
             )
-            # Remove leading '?' character.
             final_url.query = BaseTransformation.list_as_query_string(
                 transformation_instance_list=transformation_instance_list
             )[1:]
@@ -184,14 +227,8 @@ class DocumentVersionPageBusinessLogicMixin:
         self, maximum_layer_order=None, transformation_instance_list=None,
         user=None
     ):
-        """
-        Return a list of transformation containing the server side
-        transformations for this object as well as transformations
-        created from the arguments as transient interactive transformation.
-        """
         result = []
 
-        # Stored transformations first.
         result.extend(
             LayerTransformation.objects.get_for_object(
                 as_classes=True, maximum_layer_order=maximum_layer_order,
@@ -199,7 +236,6 @@ class DocumentVersionPageBusinessLogicMixin:
             )
         )
 
-        # Interactive transformations second.
         result.extend(
             transformation_instance_list or []
         )
@@ -236,48 +272,50 @@ class DocumentVersionPageBusinessLogicMixin:
 
                     page_image = converter_instance.get_page()
 
-                    # Since open "wb+" doesn't create versions, create it
-                    # explicitly.
                     with self.cache_partition.create_file(filename=cache_filename) as file_object:
                         file_object.write(
                             page_image.getvalue()
                         )
 
-                    # Apply runtime transformations.
-                    for transformation in transformation_instance_list or ():
-                        converter_instance.transform(
-                            transformation=transformation
-                        )
-
-                    return converter_instance.get_page()
+            except LockError:
+                raise
             except Exception as exception:
-                # Cleanup in case of error.
                 logger.error(
                     'Error creating document version page cache file '
                     'named "%s"; %s', cache_filename, exception,
                     exc_info=True
                 )
                 raise
+            else:
+                if transformation_instance_list:
+                    return self._do_transformation_list_apply(
+                        converter_instance=converter_instance,
+                        transformation_instance_list=transformation_instance_list
+                    )
+                else:
+                    page_image.seek(0)
+                    return page_image
         else:
             logger.debug('Page cache version "%s" found', cache_filename)
 
-            with cache_file.open() as file_object:
-                converter_class = ConverterBase.get_converter_class()
-                converter_instance = converter_class(
-                    file_object=file_object
-                )
-
-                converter_instance.seek_page(page_number=0)
-
-                # This code is also repeated below to allow using a context
-                # manager with cache_version.open and close it automatically.
-                # Apply runtime transformations.
-                for transformation in transformation_instance_list or ():
-                    converter_instance.transform(
-                        transformation=transformation
+            if transformation_instance_list:
+                with cache_file.open() as file_object:
+                    converter_class = ConverterBase.get_converter_class()
+                    converter_instance = converter_class(
+                        file_object=file_object
                     )
 
-                return converter_instance.get_page()
+                    converter_instance.seek_page(page_number=0)
+
+                    return self._do_transformation_list_apply(
+                        converter_instance=converter_instance,
+                        transformation_instance_list=transformation_instance_list
+                    )
+            else:
+                with cache_file.open() as file_object:
+                    return BytesIO(
+                        file_object.read()
+                    )
 
     def get_label(self):
         return _(
@@ -312,8 +350,4 @@ class DocumentVersionPageBusinessLogicMixin:
 
     @property
     def uuid(self):
-        """
-        Make cache UUID a mix of version ID and page ID to avoid using stale
-        images.
-        """
         return '{}-{}'.format(self.document_version.uuid, self.pk)

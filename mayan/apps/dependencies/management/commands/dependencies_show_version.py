@@ -8,12 +8,20 @@ class Command(management.BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            '--build-revision', action='store_true', dest='build_revision',
+            help='Show the commit the installed copy was built from.',
+        )
+        parser.add_argument(
             '--build-string', action='store_true', dest='build_string',
             help='Show build string.',
         )
 
     def handle(self, *args, **options):
-        if options['build_string']:
+        if options['build_revision']:
+            self.stdout.write(
+                msg='{}\n'.format(mayan.__build_revision__)
+            )
+        elif options['build_string']:
             self.stdout.write(
                 msg='{}\n'.format(mayan.__build_string__)
             )

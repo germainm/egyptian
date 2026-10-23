@@ -37,8 +37,6 @@ class DocumentEmailAction(ObjectEmailActionMixin, WorkflowAction):
 
         if self.kwargs.get('attachment', False):
             if document.version_active:
-                # Document must have a version active in order to be able
-                # to export and attach.
                 obj = document.version_active
                 result.update(
                     {

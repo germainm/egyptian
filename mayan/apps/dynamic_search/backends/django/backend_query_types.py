@@ -69,41 +69,77 @@ class BackendQueryTypeExact(BackendQueryType):
 class BackendQueryFuzzy(BackendQueryType):
     query_type = QueryTypeFuzzy
 
-    def do_resolve(self):
-        fuzzy_options = []
+    def _get_fuzzy_option_iterator(self):
+        value = self.value
 
-        if self.value is not None:
-            permutation_list = list(
-                set(
-                    [
-                        ''.join(letters) for letters in itertools.permutations(self.value)
-                    ]
-                )
+        yield value
+
+        seen_option_set = {value}
+
+        position_list = range(
+            len(value)
+        )
+
+        for displaced_count in range(2, DEFAULT_FUZZY_SLOP + 1):
+            position_combination_iterator = itertools.combinations(
+                position_list, displaced_count
             )
 
-            for permutation in permutation_list:
-                difference_count = sum(1 for a, b in zip(self.value, permutation) if a != b)
+            for position_tuple in position_combination_iterator:
+                letter_list = [
+                    value[position] for position in position_tuple
+                ]
 
-                if difference_count <= DEFAULT_FUZZY_SLOP:
-                    fuzzy_options.append(permutation)
-
-            result = None
-            for entry in fuzzy_options[:MAXIMUM_FUZZY_OPTIONS]:
-                backend_query_type = BackendQueryTypeExact(
-                    is_quoted_value=self.is_quoted_value,
-                    search_backend=self.search_field,
-                    search_field=self.search_field, value=entry,
-                    extra_kwargs=self.extra_kwargs
+                letter_permutation_iterator = itertools.permutations(
+                    letter_list
                 )
 
-                query = backend_query_type.do_resolve()
+                for letter_tuple in letter_permutation_iterator:
+                    is_fully_displaced = all(
+                        letter != letter_list[index] for index, letter in enumerate(letter_tuple)
+                    )
 
-                if result is None:
-                    result = query
-                else:
-                    result |= query
+                    if not is_fully_displaced:
+                        continue
 
-            return result
+                    character_list = list(value)
+
+                    for index, position in enumerate(position_tuple):
+                        character_list[position] = letter_tuple[index]
+
+                    option = ''.join(character_list)
+
+                    if option not in seen_option_set:
+                        seen_option_set.add(option)
+
+                        yield option
+
+    def do_resolve(self):
+        if self.value is None:
+            return
+
+        fuzzy_option_iterator = itertools.islice(
+            self._get_fuzzy_option_iterator(), MAXIMUM_FUZZY_OPTIONS
+        )
+
+        result = None
+
+        for entry in fuzzy_option_iterator:
+            backend_query_type = BackendQueryTypeExact(
+                is_quoted_value=self.is_quoted_value,
+                search_backend=self.search_backend,
+                search_field=self.search_field, value=entry,
+                extra_kwargs=self.extra_kwargs
+            )
+
+            query = backend_query_type.do_resolve()
+
+            if result is None:
+                result = query
+            else:
+                result |= query
+
+        return result
 
 
 class BackendQueryTypeGreaterThan(BackendQueryType):

@@ -128,7 +128,9 @@ class APIIndexTemplateNodeDetailView(
     lookup_url_kwarg = 'index_template_node_id'
 
     def get_source_queryset(self):
-        return self.get_index_template().index_template_nodes.all()
+        return self.get_index_template().index_template_nodes.exclude(
+            parent=None
+        )
 
 
 class APIIndexTemplateRebuildView(generics.ObjectActionAPIView):

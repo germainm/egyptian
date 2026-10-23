@@ -123,7 +123,6 @@ class APIDocumentCheckoutView(
 
         obj = queryset.first()
 
-        # Trigger a 404 error if no results are found.
         if obj:
             pk = obj.pk
         else:

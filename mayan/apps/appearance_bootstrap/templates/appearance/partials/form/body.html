@@ -17,6 +17,10 @@
     {% endfor %}
 {% endfor %}
 
+
+
+
+
 {% if form_display_mode_table %}
     {% for field in form.hidden_fields %}
         {{ field }}
@@ -24,19 +28,42 @@
     <tr>
     {% for field in form.visible_fields %}
         <td title="{% if field.errors %}{% for error in field.errors %}{{ error }}{% if not forloop.last %} | {% endif %}{% endfor %}{% else %}{{ field.help_text }}{% endif %}">
-            {% if field.errors %}<div class="has-error">{% endif %}
                 {% if field|widget_type == 'radioselect' %}
-                    <div class="btn-group" data-toggle="buttons">
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    <div class="btn-group" role="group">
                         {% for option in field %}
-                            <label class="btn btn-default {% if field.value == option.data.value %}active{% endif %}" for="{{ option.data.id }}">
-                                <input type="radio" name="{{ option.data.name }}" id="{{ option.data.id }}" value="{{ option.data.value }}" {% if field.value == option.data.value %}checked{% endif %}> {{ option.data.label }}
-                            </label>
+                            <input autocomplete="off" class="btn-check" id="{{ option.id_for_label }}" name="{{ option.data.name }}" type="radio" value="{{ option.data.value }}" {% if option.data.selected %}checked{% endif %}>
+                            <label class="btn btn-secondary" for="{{ option.id_for_label }}">{{ option.data.label }}</label>
                         {% endfor %}
                     </div>
+                {% elif field|widget_type == 'checkboxinput' %}
+                    
+                    
+                    
+                    
+                    
+                    
+                    
+                    {{ field|add_class:"form-check-input"|add_error_class:"is-invalid" }}
+                {% elif field|widget_type == 'select' %}
+                    
+                    
+                    
+                    {{ field|add_class:"form-select"|add_error_class:"is-invalid" }}
                 {% else %}
-                    {% render_field field class+="form-control" %}
+                    {{ field|add_class:"form-control"|add_error_class:"is-invalid" }}
                 {% endif %}
-            {% if field.errors %}</div>{% endif %}
         </td>
     {% endfor %}
     </tr>
@@ -63,7 +90,7 @@
             </fieldset>
         {% endif %}
     {% empty %}
-        {# Non fieldset form. Retain compatibility. #}
+        
         {% for field in form.visible_fields %}
             {% include 'appearance/partials/form/field.html' %}
         {% endfor %}

@@ -3,7 +3,7 @@
 {% load icons_tags %}
 {% load navigation_tags %}
 
-{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_actions' extra_context__html_data__style='pointer-events: none;' extra_context__icon_css_classes_extra='mayan-icon-padding-none' as icon_menu_actions %}
+{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_actions' extra_context__html_data__style='pointer-events: none;' as icon_menu_actions %}
 
 {% navigation_resolved_menus_is_single_link resolved_menus=object_menus_link_results as resolved_menus_is_single_link %}
 {% if resolved_menus_is_single_link %}
@@ -17,7 +17,7 @@
         <div class="btn-group">
             <div class="dropdown">
                 {% with 'appearance-dropdown-menu-slim' as navigation_action_dropdown_menu_css_classes_extra %}
-                {% with 'btn btn-default btn-xs btn-invisible' as action_dropdown_classes %}
+                {% with 'btn btn-invisible btn-secondary py-0 px-1' as action_dropdown_classes %}
                 {% with 'true' as action_menu_disable_labels %}
                 {% with icon_menu_actions as action_dropdown_icon %}
                     {% include 'navigation/actions_dropdown.html' %}

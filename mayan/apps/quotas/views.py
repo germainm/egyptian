@@ -24,6 +24,7 @@ from .permissions import (
 
 class QuotaBackendSelectionView(FormView):
     extra_context = {
+        'submit_label': _(message='Next'),
         'title': _(message='New quota backend selection')
     }
     form_class = QuotaBackendSelectionForm
@@ -139,7 +140,7 @@ class QuotaListView(SingleObjectListView):
                 context=RequestContext(request=self.request)
             ),
             'no_results_text': _(
-                message='Quotas restrict usage of system resources. '
+                message='Quotas restrict usage of system resources.'
             ),
             'no_results_title': _(message='No quotas available'),
             'title': _(message='Quotas')

@@ -4,6 +4,7 @@ from django.apps import apps
 from django.core.exceptions import ObjectDoesNotExist
 
 from mayan.apps.lock_manager.exceptions import LockError
+from mayan.apps.task_manager.task_classes import DeduplicatedTask
 from mayan.celery import app
 
 from .exceptions import DynamicSearchException, DynamicSearchRetry
@@ -40,7 +41,7 @@ def task_deindex_instance(self, app_label, model_name, object_id):
 
 
 @app.task(
-    bind=True, ignore_result=True,
+    base=DeduplicatedTask, bind=True, ignore_result=True,
     max_retries=TASK_INDEX_INSTANCE_MAX_RETRIES, retry_backoff=True,
     retry_backoff_max=TASK_INDEX_INSTANCE_RETRY_BACKOFF_MAX
 )
@@ -132,8 +133,6 @@ def task_index_related_instance_m2m(
         app_label=instance_app_label, model_name=instance_model_name
     )
 
-    # The task can run before the transaction that triggered the many to
-    # many change commits. Retry on a missing instance instead of failing.
     try:
         instance = InstanceModel._meta.default_manager.get(
             pk=instance_object_id

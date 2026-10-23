@@ -1,0 +1,28 @@
+{% load icons_tags %}
+
+
+
+{% if 'app_image_error_image' in object_image_data %}
+    <span class="instance-image-widget">
+        
+        <style>
+            a .fa-stack {
+                width: 2.4em;
+            }
+        </style>
+        
+        <span style="white-space: nowrap;">
+            {% include object_image_data.app_image_error_image.template_name %}
+        </span>
+    </span>
+{% else %}
+    
+    <div
+        class="carousel-item-image-slot carousel-item-image-slot-empty"
+        data-image-url="{{ object_image_data.url }}"
+    >
+        <span class="lazyload-spinner-container text-body">
+            {% icons_get_icon 'mayan.apps.documents.icons.icon_document_image_loading' extra_context__html_data__class='mayan-icon-2x' %}
+        </span>
+    </div>
+{% endif %}

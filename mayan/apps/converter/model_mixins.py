@@ -36,15 +36,19 @@ class AssetBusinessLogicMixin:
         )
         return partition
 
+    def get_image_cache_filename(
+        self, maximum_layer_order=None, transformation_instance_list=None,
+        user=None
+    ):
+        return '{}'.format(
+            self.get_hash()
+        )
+
     def generate_image(
         self, maximum_layer_order=None, transformation_instance_list=None,
         user=None
     ):
-        # The parameters 'maximum_layer_order',
-        # `transformation_instance_list`, `user` are not used, but added
-        # to retain interface compatibility.
-        hash_result = self.get_hash()
-        cache_filename = '{}'.format(hash_result)
+        cache_filename = self.get_image_cache_filename()
 
         try:
             self.cache_partition.get_file(filename=cache_filename)
@@ -76,10 +80,22 @@ class AssetBusinessLogicMixin:
         return final_url.tostr()
 
     def get_hash(self):
+        if not self.file_hash:
+            self.hash_update()
+
+        return self.file_hash
+
+    def hash_update(self, save=True):
         with self.open() as file_object:
             hash_object = chunk_hash_file_object(file_object=file_object)
 
-        return hash_object.hexdigest()
+        self.file_hash = hash_object.hexdigest()
+
+        if save and self.pk:
+            queryset = self.__class__.objects.filter(pk=self.pk)
+            queryset.update(file_hash=self.file_hash)
+
+        return self.file_hash
 
     def get_image(self):
         with self.open() as file_object:

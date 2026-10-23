@@ -97,7 +97,7 @@ class CredentialBackendGoogleServiceAccount(CredentialBackend):
                 }
             ),
             (
-                _(message='Indentity'), {
+                _(message='Identity'), {
                     'fields': ('client_email', 'client_id', 'auth_uri')
                 }
             ),

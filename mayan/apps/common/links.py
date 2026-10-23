@@ -7,7 +7,7 @@ from .icons import (
     icon_about, icon_book, icon_documentation, icon_forum,
     icon_knowledge_base, icon_license, icon_mailing_list, icon_object_copy,
     icon_release_notes, icon_setup, icon_source_code, icon_store,
-    icon_support, icon_tools
+    icon_support, icon_tools, icon_trademark_policy
 )
 from .literals import (
     URL_BOOK, URL_DOCUMENTATION, URL_FORUM, URL_KNOWLEDGE_BASE,
@@ -18,7 +18,6 @@ from .permissions import permission_object_copy
 
 
 def object_copy_conditional_disable(context, resolved_object):
-    # Hidden import.
     from .classes import ModelCopy
 
     if not resolved_object:
@@ -54,9 +53,13 @@ link_knowledge_base = Link(
 link_license = Link(
     icon=icon_license, text=_(message='License'), view='common:license_view'
 )
+link_trademark_policy = Link(
+    icon=icon_trademark_policy, text=_(message='Trademark policy'),
+    view='common:trademark_policy_view'
+)
 link_mailing_list = Link(
-    icon=icon_mailing_list, text=_(message='Mailing list'),
-    url=URL_MAILING_LIST
+    icon=icon_mailing_list, tags='new_window',
+    text=_(message='Mailing list'), url=URL_MAILING_LIST
 )
 link_object_copy = Link(
     condition=object_copy_conditional_disable,

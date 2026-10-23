@@ -1,17 +1,20 @@
-from django.utils.translation import gettext_lazy as _
+from typing import get_type_hints
 
-from drf_yasg import openapi
+from drf_spectacular.openapi import AutoSchema as SpectacularAutoSchema
+from drf_spectacular.plumbing import build_basic_type, get_override
+from drf_spectacular.types import OpenApiTypes
 
-import mayan
 
-from .literals import API_VERSION
+class AutoSchema(SpectacularAutoSchema):
+    def _map_response_type_hint(self, method):
+        override = get_override(method, 'field')
 
-openapi_info_default_version = 'v{}'.format(API_VERSION)
-openapi_info_title = _(message='%s API') % mayan.__title__
-openapi_license = openapi.License(name=mayan.__license__)
+        try:
+            type_hint = get_type_hints(method).get('return')
+        except Exception:
+            type_hint = None
 
-openapi_info = openapi.Info(
-    default_version=openapi_info_default_version,
-    description=mayan.__description__, license=openapi_license,
-    title=openapi_info_title
-)
+        if override is None and type_hint is None:
+            return build_basic_type(OpenApiTypes.STR)
+
+        return super()._map_response_type_hint(method)

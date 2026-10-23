@@ -53,3 +53,7 @@ class SourceColumnWidget:
 
 class SourceColumnLinkWidget(SourceColumnWidget):
     template_name = 'navigation/source_column_link_widget.html'
+
+
+class SourceColumnDateTimeWidget(SourceColumnWidget):
+    template_name = 'navigation/source_column_date_time_widget.html'

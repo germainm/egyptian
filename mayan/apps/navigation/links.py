@@ -6,16 +6,38 @@ from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.template import RequestContext, Variable, VariableDoesNotExist
 from django.template.defaulttags import URLNode
-from django.urls import resolve, reverse
+from django.urls import Resolver404, get_script_prefix, resolve, reverse
 from django.utils.encoding import force_str
 
 from mayan.apps.common.settings import setting_home_view
 from mayan.apps.permissions.classes import Permission
+from mayan.apps.views.utils import get_request_referer
 
 from .class_mixins import TemplateObjectMixin
-from .literals import DEFAULT_HTTP_METHOD
+from .literals import DEFAULT_HTTP_METHOD, TEXT_HTML_CLASS_MODAL_LINK
 
 logger = logging.getLogger(name=__name__)
+
+UNKNOWN_VIEW_CLASS = object()
+
+
+def get_url_view_class(url):
+    if not url or url == '#':
+        return None
+
+    path = str(
+        furl(url=url).path
+    )
+    path = '/{}'.format(
+        path.replace(get_script_prefix(), '', 1)
+    )
+
+    try:
+        resolver_match = resolve(path=path)
+    except Resolver404:
+        return None
+
+    return getattr(resolver_match.func, 'view_class', None)
 
 
 class Link(TemplateObjectMixin):
@@ -37,9 +59,9 @@ class Link(TemplateObjectMixin):
         self, text=None, view=None, args=None, badge_text=None,
         condition=None, conditional_active=None, conditional_disable=None,
         description=None, html_data=None, html_extra_classes=None, icon=None,
-        keep_query=False, kwargs=None, method=DEFAULT_HTTP_METHOD, name=None,
-        permission=None, query=None, remove_from_query=None, tags=None,
-        title=None, url=None
+        keep_query=False, kwargs=None, method=DEFAULT_HTTP_METHOD,
+        modal_fragment=None, name=None, permission=None, query=None,
+        remove_from_query=None, tags=None, title=None, url=None
     ):
         self.args = args or []
         self.badge_text = badge_text
@@ -54,6 +76,8 @@ class Link(TemplateObjectMixin):
         self.keep_query = keep_query
         self._kwargs = kwargs or {}
         self.method = method
+        self.modal_fragment = modal_fragment
+        self._modal_fragment_view_class = UNKNOWN_VIEW_CLASS
         self.name = name
         self._permission = permission
         self.query = query or {}
@@ -70,11 +94,32 @@ class Link(TemplateObjectMixin):
     def get_icon(self, context=None):
         return self._icon
 
+    def get_modal_fragment(self, resolved_link):
+        if self.modal_fragment is not None:
+            return self.modal_fragment
+
+        if self._modal_fragment_view_class is UNKNOWN_VIEW_CLASS:
+            view_class = get_url_view_class(url=resolved_link.url)
+            if view_class is None:
+                return False
+            self._modal_fragment_view_class = view_class
+
+        method = getattr(
+            self._modal_fragment_view_class, 'get_modal_fragment_capable',
+            None
+        )
+
+        if callable(method):
+            return bool(
+                method()
+            )
+
+        return False
+
     def get_kwargs(self, context):
         try:
             return self._kwargs(context)
         except TypeError:
-            # Is not a callable.
             return self._kwargs
 
     def get_permission_object(self, context):
@@ -113,18 +158,11 @@ class Link(TemplateObjectMixin):
         if not resolved_object:
             resolved_object = self.get_resolved_object(context=context)
 
-        # If we were passed an instance of the view context object we are
-        # resolving, inject it into the context. This helps resolve links for
-        # object lists.
         if resolved_object:
             context['resolved_object'] = resolved_object
 
-        # ACL is tested against the resolved_object, {{ object }}
-        # or a custom object returned by the link subclass.
         permission_object = self.get_permission_object(context=context) or resolved_object
 
-        # If this link has a required permission check that the user has it
-        # too.
         permission = self.get_permission(context=context)
 
         if permission:
@@ -144,9 +182,6 @@ class Link(TemplateObjectMixin):
                 except PermissionDenied:
                     return None
 
-        # Check to see if link has conditional display function and only
-        # display it if the result of the conditional display function is
-        # True.
         if not self.check_condition(context=context, resolved_object=resolved_object):
             return None
 
@@ -173,7 +208,6 @@ class Link(TemplateObjectMixin):
                 key: Variable(var=value) for key, value in kwargs.items()
             }
 
-            # Use Django's exact {% url %} code to resolve the link.
             node = URLNode(
                 view_name=view_name, args=args, kwargs=kwargs, asvar=None
             )
@@ -208,8 +242,6 @@ class Link(TemplateObjectMixin):
 
             self.html_data_resolved = result
 
-        # This is for links that should be displayed but that are not
-        # clickable.
         if self.conditional_disable:
             resolved_link.disabled = self.conditional_disable(
                 context=context
@@ -217,14 +249,13 @@ class Link(TemplateObjectMixin):
         else:
             resolved_link.disabled = False
 
-        # Lets a new link keep the same URL query string of the current URL.
         if self.keep_query:
-            # Sometimes we are required to remove a key from the URL query.
+            request_referer = get_request_referer(
+                default=reverse(setting_home_view.value), request=request
+            )
             parsed_url = furl(
                 force_str(
-                    s=request.get_full_path() or request.META.get(
-                        'HTTP_REFERER', reverse(setting_home_view.value)
-                    )
+                    s=request.get_full_path() or request_referer
                 )
             )
 
@@ -234,7 +265,6 @@ class Link(TemplateObjectMixin):
                 except KeyError:
                     pass
 
-            # Use the link's URL but with the previous URL querystring.
             new_url = furl(url=resolved_link.url)
             new_url.args = parsed_url.querystr
             resolved_link.url = new_url.url
@@ -257,6 +287,10 @@ class Link(TemplateObjectMixin):
 
             resolved_link.url = new_url.url
 
+        resolved_link.modal_fragment = self.get_modal_fragment(
+            resolved_link=resolved_link
+        )
+
         resolved_link.context = context
 
         return resolved_link
@@ -268,6 +302,7 @@ class ResolvedLink:
         self.current_view_name = current_view_name
         self.disabled = False
         self.link = link
+        self.modal_fragment = False
         self.request = None
         self.url = '#'
 
@@ -300,7 +335,14 @@ class ResolvedLink:
 
     @property
     def html_extra_classes(self):
-        return self.link.html_extra_classes or ''
+        classes = self.link.html_extra_classes or ''
+
+        if self.modal_fragment and self.method == 'get':
+            classes = '{} {}'.format(
+                classes, TEXT_HTML_CLASS_MODAL_LINK
+            ).strip()
+
+        return classes
 
     @property
     def method(self):
@@ -330,9 +372,6 @@ class ResolvedLink:
 
 
 class Separator(Link):
-    """
-    Menu separator. Renders to an <hr> tag.
-    """
     def __init__(self, *args, **kwargs):
         self._icon = None
         self.text = None
@@ -345,9 +384,6 @@ class Separator(Link):
 
 
 class Text(Link):
-    """
-    Menu text. Renders to a plain <li> tag.
-    """
     def __init__(self, *args, **kwargs):
         self.html_extra_classes = kwargs.get('html_extra_classes', '')
         self._icon = None

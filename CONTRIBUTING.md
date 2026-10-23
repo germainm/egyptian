@@ -36,13 +36,11 @@ following branches:
     a. **series/X.Y:** There will be a **series** branch for each major version
     release (1.0, 2.0). The **master** branch will be in sync with the latest
     **series** branch.
-    a. **development:** Unstable branch where the development for the next minor or
-    major release is happening.
-    a. **feature/X:** These are branches dealing with a specific bug or feature
+    a. **features/X.Y/:** These are branches dealing with a specific bug or feature
     that is not yet ready to be merged.
-    a. The **master** and **series** branches are stable and not braking changes
-    must be submitted or merged. The **development** and **feature** branches
-    are unstable and should not be used in production.
+    a. The **master** and **series** branches are stable and not breaking changes
+    must be submitted or merged. The **features** branches are unstable and
+    should not be used in production.
 
 1. Start making your changes in your own separate branch.
 1. Write a test which shows that the bug was fixed or that the feature works as
@@ -70,7 +68,7 @@ understand the concepts behind your idea if it is to be implemented.
 
 Translations
 ------------
-- Translations are handled using [Transifex](https://www.transifex.com/rosarior/mayan-edms/).
+- Translations are handled using [Transifex](https://explore.transifex.com/rosarior/mayan-edms/).
 - Join an existing team for the language to which you wish to contribute,
 if there is no team for your language, request for one to be created.
 - Don't request the creation of a new language and expect others to do all the
@@ -79,5 +77,5 @@ translation. Language teams that don't see activity for a while are deleted.
 
 Code style
 ----------
-- Refer to the [Development](https://docs.mayan-edms.com/topics/development.html)
+- Refer to the [Development](https://docs.mayan-edms.com/chapters/development/index.html)
 chapter for information and examples of the code style.

@@ -111,7 +111,6 @@ def condition_source_supports_dry_run(context, resolved_object):
         return issubclass(backend_class, SourceBackendMixinPeriodic)
 
 
-# Document
 
 link_document_upload_wizard = Link(
     condition=condition_document_creation_access,
@@ -125,7 +124,6 @@ link_document_file_upload = Link(
     view='sources:document_file_upload'
 )
 
-# Document file
 
 link_document_file_source_metadata_list = Link(
     kwargs={'document_file_id': 'resolved_object.pk'},
@@ -133,7 +131,6 @@ link_document_file_source_metadata_list = Link(
     view='sources:document_file_source_metadata_list'
 )
 
-# Source
 
 link_source_backend_selection = Link(
     icon=icon_source_backend_selection,

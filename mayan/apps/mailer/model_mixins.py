@@ -17,11 +17,6 @@ from .utils import split_recipient_list
 
 class UserMailerBusinessLogicMixin:
     def get_connection(self):
-        """
-        Establishes a reusable connection to the server by loading the
-        backend, initializing it, and the using the backend instance to get
-        a connection.
-        """
         backend_instance = self.get_backend_instance()
         connection_kwargs = backend_instance.get_connection_kwargs()
 
@@ -33,11 +28,6 @@ class UserMailerBusinessLogicMixin:
         self, to, _event_action_object=None, attachments=None, bcc=None,
         body='', cc=None, reply_to=None, subject='', user=None
     ):
-        """
-        Send a simple email. There is no document or template knowledge.
-        attachments is a list of dictionaries with the keys:
-        filename, content, and mimetype.
-        """
         recipient_list = split_recipient_list(
             recipients=[to]
         )
@@ -82,31 +72,17 @@ class UserMailerBusinessLogicMixin:
 
             email_message.attach_alternative(body, 'text/html')
 
-        try:
-            email_message.send()
+        email_message.send()
 
-        except Exception as exception:
-            error_log_text = '{}; {}'.format(
-                exception.__class__.__name__, exception
-            )
-
-            self.error_log.create(
-                domain_name=ERROR_LOG_DOMAIN_NAME, text=error_log_text
-            )
-        else:
-            event_email_sent.commit(
-                action_object=_event_action_object, actor=user,
-                target=self
-            )
+        event_email_sent.commit(
+            action_object=_event_action_object, actor=user, target=self
+        )
 
     def send_object(
         self, obj, to, as_attachment=False, bcc=None, body='', cc=None,
         object_name=None, organization_installation_url='', reply_to=None,
         subject='', user=None
     ):
-        """
-        Send an object file using this user mailing profile.
-        """
         if as_attachment:
             action_name = 'attachment'
         else:
@@ -121,7 +97,9 @@ class UserMailerBusinessLogicMixin:
                 obj.get_absolute_url()
             ).tostr(),
             'object': obj,
-            'object_name': object_name
+            'object_name': object_name,
+            'project_title': mayan.__title__,
+            'project_website': mayan.__website__
         }
 
         body_template = Template(template_string=body)
@@ -147,6 +125,7 @@ class UserMailerBusinessLogicMixin:
                     'mime_type_function_dotted_path'
                 ]
             )
+
             mime_type = mime_type_function(obj=obj)
 
             with content_function(obj=obj) as file_object:
@@ -165,10 +144,6 @@ class UserMailerBusinessLogicMixin:
         )
 
     def test(self, to, user=None):
-        """
-        Send a test message to make sure the mailing profile settings are
-        correct.
-        """
         try:
             self.send(
                 subject=_(message='Test email from %s') % mayan.__title__,

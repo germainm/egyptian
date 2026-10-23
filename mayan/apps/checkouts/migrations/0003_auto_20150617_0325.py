@@ -2,9 +2,6 @@ from django.db import migrations
 
 
 def code_move_from_content_type_user_to_foreign_key_field_user(apps, schema_editor):
-    # The model references the use who checked out the document using a
-    # generic.GenericForeignKey. This migrations changes that to a simpler
-    # ForeignKey to the User model
 
     DocumentCheckout = apps.get_model(
         app_label='checkouts', model_name='DocumentCheckout'
@@ -22,6 +19,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(
-            code=code_move_from_content_type_user_to_foreign_key_field_user
+            code=code_move_from_content_type_user_to_foreign_key_field_user,
+            reverse_code=migrations.RunPython.noop, elidable=True
         )
     ]

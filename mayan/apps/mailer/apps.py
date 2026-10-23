@@ -158,7 +158,6 @@ class MailerApp(MayanAppConfig):
             source=UserMailer
         )
 
-        # Document
 
         menu_multi_item.bind_links(
             links=(
@@ -172,7 +171,6 @@ class MailerApp(MayanAppConfig):
             ), sources=(Document,)
         )
 
-        # Document file
 
         menu_multi_item.bind_links(
             links=(
@@ -188,7 +186,6 @@ class MailerApp(MayanAppConfig):
             ), sources=(DocumentFile,)
         )
 
-        # Document version
 
         menu_multi_item.bind_links(
             links=(
@@ -204,7 +201,6 @@ class MailerApp(MayanAppConfig):
             ), sources=(DocumentVersion,)
         )
 
-        # Mailing profile
 
         menu_object.bind_links(
             links=(

@@ -14,16 +14,9 @@ logger = logging.getLogger(name=__name__)
 
 class RoleBusinessLogicMixin:
     def get_group_count(self, user):
-        """
-        Return the numeric count of groups that have this role contains.
-        The count is filtered by access.
-        """
         return self.get_groups(user=user).count()
 
     def get_groups(self, user):
-        """
-        Return a filtered queryset groups that have this role contains.
-        """
         AccessControlList = apps.get_model(
             app_label='acls', model_name='AccessControlList'
         )
@@ -35,10 +28,6 @@ class RoleBusinessLogicMixin:
     get_group_count.short_description = _(message='Group count')
 
     def get_permission_count(self):
-        """
-        Return the numeric count of permissions that have this role
-        has granted. The count is filtered by access.
-        """
         return self.permissions.count()
     get_permission_count.short_description = _(message='Permission count')
 
@@ -105,12 +94,6 @@ class StoredPermissionBusinessLogicMixin:
             return permission_namespace.label
 
     def user_has_this(self, user):
-        """
-        Helper method to check if a user has been granted this permission.
-        The check is done sequentially over all of the user's groups and
-        roles. The check is interrupted at the first positive result.
-        The check always returns True for super users or staff users.
-        """
         Role = apps.get_model(app_label='permissions', model_name='Role')
 
         if user.is_superuser or user.is_staff:
@@ -134,16 +117,8 @@ class StoredPermissionBusinessLogicMixin:
 
     @cached_property
     def volatile_permission(self):
-        """
-        Returns the real class of the permission represented by this model
-        instance.
-        """
         return Permission.get(pk=self.volatile_permission_id)
 
     @cached_property
     def volatile_permission_id(self):
-        """
-        Return the identifier of the real permission class represented by
-        this model instance.
-        """
         return '{}.{}'.format(self.namespace, self.name)

@@ -36,14 +36,13 @@ def code_purge_and_delete_file_cache(apps, schema_editor):
 def code_purge_and_delete_file_cache_reverse(apps, schema_editor):
     Cache = apps.get_model(app_label='file_caching', model_name='Cache')
 
-    # Protect against future rename of setting_document_cache_maximum_size
     setting_document_cache_maximum_size = getattr(
         settings, 'setting_document_cache_maximum_size', None
     )
     if setting_document_cache_maximum_size:
         document_cache_maximum_size = setting_document_cache_maximum_size.value
     else:
-        document_cache_maximum_size = 500 * 2 ** 20  # 500MB default
+        document_cache_maximum_size = 500 * 2 ** 20
 
     Cache.objects.create(
         defined_storage_name=STORAGE_NAME_DOCUMENT_IMAGE,

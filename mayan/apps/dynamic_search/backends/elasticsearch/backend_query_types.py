@@ -21,7 +21,6 @@ class BackendQueryTypeExact(BackendQueryType):
                 template = '{}'
 
             if not self.value:
-                # Empty values cannot be quoted.
                 template = '{}'
 
                 if self.is_quoted_value:

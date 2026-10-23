@@ -23,19 +23,13 @@ def handler_post_document_type_change_metadata(sender, instance, **kwargs):
     logger.debug('received signal_post_document_type_change')
     logger.debug('instance: %s', instance)
 
-    # Delete existing document metadata types not found in the new document
-    # type
 
-    # First get the existing metadata types not found in the new document
-    # type
     unneeded_metadata = instance.metadata.exclude(
         metadata_type__in=instance.document_type.metadata.values(
             'metadata_type'
         )
     )
 
-    # Remove the document metadata whose types are not found in the new
-    # document type
     for metadata in unneeded_metadata:
         metadata.delete(enforce_required=False)
 
@@ -43,10 +37,6 @@ def handler_post_document_type_change_metadata(sender, instance, **kwargs):
         app_label='metadata', model_name='DocumentMetadata'
     )
 
-    # Add the metadata types of the new document type to the document
-    # excluding existing document metadata
-    # get_or_create is not used to avoid a possible triggering of indexes
-    # or workflow on document change by metadata save signal
     new_document_type_metadata_types = instance.document_type.metadata.filter(
         required=True
     ).exclude(
@@ -89,7 +79,4 @@ def handler_post_document_type_metadata_type_delete(
 
 def handler_pre_metadata_type_delete(sender, **kwargs):
     for metadata in kwargs['instance'].documentmetadata_set.all():
-        # Remove each of the documents.
-        # Trigger the remove event for each document so they can be
-        # reindexed.
         metadata.delete()

@@ -118,9 +118,9 @@ class SearchFilterEnabledListViewMixin(
 
 
 class SearchModelViewMixin:
-    def dispatch(self, *args, **kwargs):
+    def dispatch(self, request, *args, **kwargs):
         self.search_model = self.get_search_model()
-        return super().dispatch(*args, **kwargs)
+        return super().dispatch(request=request, *args, **kwargs)
 
     def get_search_model_name(self):
         search_model_name = self.kwargs.get(

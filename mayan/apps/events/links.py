@@ -24,7 +24,6 @@ from .permissions import (
 
 
 def condition_can_be_cleared(context, resolved_object):
-    # Hidden import.
     from mayan.apps.acls.classes import ModelPermission
     return permission_events_clear.stored_permission in ModelPermission.get_for_instance(
         instance=context['resolved_object']
@@ -32,7 +31,6 @@ def condition_can_be_cleared(context, resolved_object):
 
 
 def condition_can_be_exported(context, resolved_object):
-    # Hidden import.
     from mayan.apps.acls.classes import ModelPermission
     return permission_events_export.stored_permission in ModelPermission.get_for_instance(
         instance=context['resolved_object']

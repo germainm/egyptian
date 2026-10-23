@@ -147,6 +147,7 @@ class DocumentFileSubmitView(MultipleObjectConfirmActionView):
         queryset = self.object_list
 
         result = {
+            'submit_label': _(message='Submit'),
             'title': ngettext(
                 singular='Submit %(count)d document file to the parsing queue?',
                 plural='Submit %(count)d documents files to the parsing queue?',
@@ -202,6 +203,7 @@ class DocumentTypeSettingsEditView(
 
 class DocumentTypeSubmitView(FormView):
     extra_context = {
+        'submit_label': _(message='Submit'),
         'title': _(message='Submit all documents of a type for parsing')
     }
     form_class = DocumentTypeFilteredSelectForm

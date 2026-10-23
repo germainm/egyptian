@@ -1,9 +1,9 @@
+from rest_framework.exceptions import ValidationError
+from rest_framework.settings import api_settings
+
 from mayan.apps.organizations.utils import get_organization_installation_url
 from mayan.apps.rest_api import generics
 from mayan.apps.rest_api.api_view_mixins import ContentTypeAPIViewMixin
-
-from rest_framework.settings import api_settings
-from rest_framework.exceptions import ValidationError
 
 from .exceptions import MailerError
 from .mailing_actions import ModelMailingAction

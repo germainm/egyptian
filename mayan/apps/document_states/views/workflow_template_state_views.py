@@ -64,6 +64,7 @@ class WorkflowTemplateStateActionCreateView(
 
     def get_form_extra_kwargs(self):
         return {
+            'backend_class': self.get_backend_class(),
             'request': self.request,
             'user': self.request.user
         }
@@ -142,6 +143,7 @@ class WorkflowTemplateStateActionEditView(
 
     def get_form_extra_kwargs(self):
         return {
+            'backend_class': self.get_backend_class(),
             'request': self.request,
             'user': self.request.user
         }
@@ -215,6 +217,7 @@ class WorkflowTemplateStateActionSelectionView(
                 'object', 'workflow'
             ),
             'object': self.external_object,
+            'submit_label': _(message='Next'),
             'title': _(
                 message='New workflow state action selection for: %s'
             ) % self.external_object,

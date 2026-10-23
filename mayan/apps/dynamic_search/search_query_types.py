@@ -257,9 +257,9 @@ class QueryTypeRegularExpression(QueryType):
 
 QueryType.register(klass=QueryTypeExact)
 QueryType.register(klass=QueryTypeFuzzy)
-QueryType.register(klass=QueryTypeGreaterThanOrEqual)  # Must go before greater than.
+QueryType.register(klass=QueryTypeGreaterThanOrEqual)
 QueryType.register(klass=QueryTypeGreaterThan)
-QueryType.register(klass=QueryTypeLessThanOrEqual)  # Must go before less than.
+QueryType.register(klass=QueryTypeLessThanOrEqual)
 QueryType.register(klass=QueryTypeLessThan)
 QueryType.register(klass=QueryTypePartial)
 QueryType.register(klass=QueryTypeRange)

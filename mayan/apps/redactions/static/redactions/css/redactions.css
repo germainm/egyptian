@@ -1,0 +1,16 @@
+.cropper-invisible {
+    background: #000;
+    opacity: 1;
+}
+
+.cropper-main {
+    width: 100%;
+}
+
+.cropper-main img {
+    max-width: 100%;
+}
+
+.cropper-modal {
+    opacity: 0;
+}

@@ -43,7 +43,9 @@ class DocumentCheckInView(MultipleObjectConfirmActionView):
     view_icon = icon_check_in_document
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Check in')
+        }
 
         if self.object_list.count() == 1:
             context.update(
@@ -65,8 +67,6 @@ class DocumentCheckInView(MultipleObjectConfirmActionView):
             super().get_post_action_redirect()
 
     def get_source_queryset(self):
-        # object_permission is None to disable restricting queryset mixin
-        # and restrict the queryset ourselves from two permissions.
         queryset_documents = Document.valid.all()
 
         queryset_check_ins = AccessControlList.objects.restrict_queryset(
@@ -113,7 +113,9 @@ class DocumentCheckOutView(MultipleObjectFormActionView):
     view_icon = icon_check_out_document
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Check out')
+        }
 
         if self.object_list.count() == 1:
             context.update(

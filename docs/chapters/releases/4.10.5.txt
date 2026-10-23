@@ -1,9 +1,0 @@
-Version 4.10.5
-==============
-
-Released: April 24, 2026
-
-Summary
--------
-
-Version 4.10.5 is a maintenance release focused on stability and security updates. It merges a set of improvements from the 4.9 series include some minor dependency updates.

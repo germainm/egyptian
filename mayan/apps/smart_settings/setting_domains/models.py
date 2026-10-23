@@ -4,7 +4,6 @@ from django.db.utils import OperationalError, ProgrammingError
 from django.utils.encoding import force_str
 
 from mayan.apps.common.serialization import yaml_dump, yaml_load
-
 from ..domains import SettingDomain
 
 
@@ -20,8 +19,6 @@ class SettingDomainModel(SettingDomain):
         result = yaml_dump(
             allow_unicode=True, data=data, default_flow_style=False
         )
-        # safe_dump returns bytestrings.
-        # Disregard the last 3 dots that mark the end of the YAML document.
         if force_str(s=result).endswith('...\n'):
             result = result[:-4]
 
@@ -48,17 +45,11 @@ class SettingDomainModel(SettingDomain):
 
         value_serialized = cls.serialize_data(data=value)
 
-        instance, created = UpdatedStoredSetting.objects.update_or_create(
+        UpdatedStoredSetting.objects.update_or_create(
             defaults={
                 'value': value_serialized,
             }, key=key
         )
-
-        stored_value = cls.deserialize_stream(stream=instance.value)
-
-        if not created and stored_value == value:
-            # Perform clean up.
-            cls.do_key_revert(key=key)
 
     @classmethod
     def do_ready(cls, data):
@@ -75,7 +66,28 @@ class SettingDomainModel(SettingDomain):
             Non fatal. Non initialized installation. Ignore exception.
             """
 
-    # Getters
+
+    @classmethod
+    def get_key_value_pending_map(cls):
+        try:
+            UpdatedStoredSetting = apps.get_model(
+                app_label='smart_settings', model_name='UpdatedStoredSetting'
+            )
+        except AppRegistryNotReady:
+            return {}
+
+        try:
+            queryset = UpdatedStoredSetting.objects.all()
+
+            return {
+                item.key: cls.deserialize_stream(stream=item.value)
+                for item in queryset
+            }
+        except (OperationalError, ProgrammingError):
+            """
+            Non fatal. Non initialized installation. Ignore exception.
+            """
+            return {}
 
     @classmethod
     def get_key_value_pending(cls, key):

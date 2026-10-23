@@ -17,6 +17,7 @@ from .links import (
 class ViewsApp(MayanAppConfig):
     app_namespace = 'views'
     app_url = 'views'
+    has_javascript_translations = True
     has_tests = True
     name = 'mayan.apps.views'
     verbose_name = _(message='Views')

@@ -32,6 +32,7 @@ class SettingClusterConfigurationFileSave(ConfirmView):
                 message='This will overwrite the content of the '
                 'configuration file.'
             ),
+            'submit_label': _(message='Save'),
             'title': _(message='Save settings to the configuration file?')
         }
 

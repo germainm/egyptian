@@ -5,8 +5,6 @@ from .model_mixins import StatisticResultBusinessLogicMixin
 
 
 class StatisticResult(StatisticResultBusinessLogicMixin, models.Model):
-    # Translators: 'Slug' refers to the URL valid ID of the statistic
-    # More info: https://docs.djangoproject.com/en/1.7/glossary/#term-slug
     slug = models.SlugField(
         unique=True, verbose_name=_(message='Slug')
     )

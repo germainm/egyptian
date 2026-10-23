@@ -14,11 +14,11 @@ from django.utils.deconstruct import deconstructible
 from django.utils.functional import SimpleLazyObject
 from django.utils.translation import gettext_lazy as _
 
+from .utils import parse_range
+
 
 def _lazy_re_compile(regex, flags=0):
-    """Lazily compile a regex with flags."""
     def _compile():
-        # Compile the regex if it was not passed pre-compiled.
         if isinstance(regex, str):
             return re.compile(regex, flags)
         else:
@@ -29,9 +29,6 @@ def _lazy_re_compile(regex, flags=0):
 
 @deconstructible
 class JSONValidator:
-    """
-    Validates that the input is JSON compliant.
-    """
     def __call__(self, value):
         value = value.strip()
         try:
@@ -53,9 +50,6 @@ class JSONValidator:
 
 @deconstructible
 class YAMLValidator:
-    """
-    Validates that the input is YAML compliant.
-    """
     def __call__(self, value):
         value = value.strip()
         try:
@@ -69,6 +63,32 @@ class YAMLValidator:
     def __eq__(self, other):
         return (
             isinstance(other, YAMLValidator)
+        )
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+@deconstructible
+class RangeValidator:
+    def __call__(self, value):
+        value = value.strip()
+
+        try:
+            parse_range(range_string=value)
+        except ValueError:
+            raise ValidationError(
+                code='invalid',
+                message=_(
+                    message='Enter a valid list of numbers. Separate the '
+                    'entries with commas and use a dash for a range of '
+                    'numbers. Example: 1,3,5-8'
+                )
+            )
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, RangeValidator)
         )
 
     def __ne__(self, other):

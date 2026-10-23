@@ -6,7 +6,6 @@ namespace = PermissionNamespace(
     label=_(message='Mailing'), name='mailing'
 )
 
-# Mailing profile
 
 permission_mailing_profile_create = namespace.add_permission(
     label=_(message='Create a mailing profile'),
@@ -26,13 +25,11 @@ permission_mailing_profile_view = namespace.add_permission(
     label=_(message='View a mailing profile'), name='mailing_profile_view'
 )
 
-# Document
 
 permission_send_document_link = namespace.add_permission(
     label=_(message='Send document link via email'), name='mail_link'
 )
 
-# Document file
 
 permission_send_document_file_attachment = namespace.add_permission(
     label=_(message='Send document file via email'),
@@ -43,7 +40,6 @@ permission_send_document_file_link = namespace.add_permission(
     name='mail_document_file_link'
 )
 
-# Document version
 
 permission_send_document_version_attachment = namespace.add_permission(
     label=_(message='Send document version via email'),

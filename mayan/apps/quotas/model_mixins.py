@@ -30,9 +30,6 @@ class QuotaBusinessModelMixin:
         )
 
     def get_backend_class(self):
-        """
-        Retrieves the backend by importing the module and the class.
-        """
         try:
             return import_string(dotted_path=self.backend_path)
         except ImportError as exception:

@@ -1,9 +1,9 @@
 from django.core import validators
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from mayan.apps.databases.model_mixins import ValueChangeModelMixin
 from mayan.apps.events.decorators import method_event
 from mayan.apps.events.event_managers import EventManagerSave
 from mayan.apps.lock_manager.decorators import locked_class_method
@@ -15,7 +15,7 @@ from .model_mixins import (
 )
 
 
-class Cache(CacheBusinessLogicMixin, ValueChangeModelMixin, models.Model):
+class Cache(CacheBusinessLogicMixin, models.Model):
     defined_storage_name = models.CharField(
         db_index=True, help_text=_(
             message='Internal name of the defined storage for this cache.'
@@ -29,6 +29,11 @@ class Cache(CacheBusinessLogicMixin, ValueChangeModelMixin, models.Model):
         ), validators=[
             validators.MinValueValidator(limit_value=1)
         ], verbose_name=_(message='Maximum size')
+    )
+    maximum_size_old = models.PositiveBigIntegerField(
+        editable=False, help_text=_(
+            message='Previous maximum size of the cache in bytes.'
+        ), verbose_name=_(message='Old maximum size')
     )
 
     class Meta:
@@ -47,26 +52,23 @@ class Cache(CacheBusinessLogicMixin, ValueChangeModelMixin, models.Model):
 
     @method_event(
         event_manager_class=EventManagerSave,
-        created={
-            'event': event_cache_created,
-            'target': 'self'
-        },
-        edited={
-            'event': event_cache_edited,
-            'target': 'self'
-        }
+        created={'event': event_cache_created, 'target': 'self'},
+        edited={'event': event_cache_edited, 'target': 'self'}
     )
     def save(self, *args, **kwargs):
-        old_maximum_size = self._get_field_previous_value(
-            field='maximum_size'
-        )
+        self._maximum_size_previous = self.maximum_size_old
+        self.maximum_size_old = self.maximum_size
 
-        result = super().save(*args, **kwargs)
+        update_fields = kwargs.get('update_fields')
 
-        if self.maximum_size < old_maximum_size:
-            self.prune()
+        if update_fields is not None:
+            update_fields = set(update_fields)
 
-        return result
+            if 'maximum_size' in update_fields:
+                update_fields.add('maximum_size_old')
+                kwargs['update_fields'] = update_fields
+
+        return super().save(*args, **kwargs)
 
 
 class CachePartition(CachePartitionBusinessLogicMixin, models.Model):
@@ -107,6 +109,12 @@ class CachePartitionFile(CachePartitionFileBusinessLogicMixin, models.Model):
     datetime = models.DateTimeField(
         auto_now_add=True, db_index=True, verbose_name=_(message='Date time')
     )
+    accessed = models.DateTimeField(
+        db_index=True, default=timezone.now, help_text=_(
+            message='Last date and time this cache partition file was read. '
+            'Used to evict the least recently used files first.'
+        ), verbose_name=_(message='Accessed')
+    )
     filename = models.CharField(
         max_length=255, verbose_name=_(message='Filename')
     )
@@ -116,7 +124,7 @@ class CachePartitionFile(CachePartitionFileBusinessLogicMixin, models.Model):
     hits = models.PositiveIntegerField(
         db_index=True, default=0, help_text=_(
             message='Times this cache partition file has been accessed.'
-        ), verbose_name='Hits'
+        ), verbose_name=_(message='Hits')
     )
 
     class Meta:

@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Value
 from django.db.models.functions import Cast, Replace
+from django.utils.translation import gettext_lazy as _
 
 from ...exceptions import DynamicSearchValueTransformationError
 from ...search_backends import SearchBackend
@@ -12,11 +13,11 @@ from .literals import DJANGO_TO_DJANGO_FIELD_MAP
 
 
 class DjangoSearchBackend(SearchBackend):
+    label = _(message='Django ORM')
     field_type_mapping = DJANGO_TO_DJANGO_FIELD_MAP
 
     def _do_search_model_filter(self, filter_kwargs, search_field):
         if search_field.field_class == models.UUIDField:
-            # Remove hyphens when searching UUID fields.
             replace_function = Replace(
                 expression=Cast(
                     expression=search_field.field_name,
@@ -57,14 +58,13 @@ class DjangoSearchBackend(SearchBackend):
 
         for search_model in SearchModel.all():
             queryset = search_model.get_queryset()
+            object_count = queryset.count()
 
             result.append(
-                '{}: {}'.format(
-                    search_model.label, queryset.count()
-                )
+                {'search_model': search_model, 'object_count': object_count}
             )
 
-        return '\n'.join(result)
+        return result
 
     def _search(
         self, search_field, query_type, value, is_quoted_value=False,

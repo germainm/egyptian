@@ -23,9 +23,7 @@ from .mixins import SourceBackendActionMixinFileGenerated
 class SourceBackendActionGenerateFileBase(
     SourceBackendActionMixinFileGenerated, SourceBackendAction
 ):
-    """
-    Base action class for all generated file source actions.
-    """
+    pass
 
 
 class SourceBackendActionGenerateFileDocumentFileUpload(

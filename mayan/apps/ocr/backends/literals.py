@@ -5,4 +5,4 @@ if platform.system() in ('FreeBSD', 'OpenBSD', 'Darwin'):
 else:
     DEFAULT_TESSERACT_BINARY_PATH = '/usr/bin/tesseract'
 
-DEFAULT_TESSERACT_TIMEOUT = 600  # 600 seconds, 10 minutes
+DEFAULT_TESSERACT_TIMEOUT = 600

@@ -23,7 +23,6 @@ def condition_cabinet_is_root(context, resolved_object):
     return context['resolved_object'].is_root_node()
 
 
-# Document links
 
 link_document_cabinet_list = Link(
     args='resolved_object.pk', icon=icon_cabinet_list,
@@ -49,7 +48,6 @@ link_multiple_document_cabinet_remove = Link(
     view='cabinets:multiple_document_cabinet_remove'
 )
 
-# Cabinet links
 
 link_custom_acl_list = copy.copy(link_acl_list)
 link_custom_acl_list.condition = condition_cabinet_is_root

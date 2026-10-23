@@ -1,48 +1,38 @@
 {% load i18n %}
 
-<style>
-    .container-btn-secondary .btn {
-        margin-bottom: 5px;
-    }
-
-    .no-result-icon {
-        font-size: 200%;
-    }
-</style>
+{% load icons_tags %}
 
 <div class="text-center">
-    <div class="no-result-icon">
+    <div class="mayan-icon-2x">
         {% if no_results_icon %}
             {{ no_results_icon.render }}
         {% else %}
-            <i class="fa fa-times"></i>
+            {% icons_get_icon 'mayan.apps.appearance.icons.icon_no_results' %}
         {% endif %}
     </div>
 
     {% trans 'No results' as default_title %}
-    <h4>{{ no_results_title|default:default_title }}</h4>
+    <h4 class="mayan-h4">{{ no_results_title|default:default_title }}</h4>
     {% if no_results_text %}
         <p class="small">{{ no_results_text }}</p>
     {% endif %}
 
-    {% if no_results_main_link %}
-        <div>
+    <div class="d-flex justify-content-center gap-2">
+        {% if no_results_main_link %}
             {% with no_results_main_link as link %}
             {% with 'btn btn-primary btn-sm' as link_classes %}
             {% include 'navigation/generic_subnavigation.html' %}
             {% endwith %}
             {% endwith %}
-        </div>
-    {% endif %}
+        {% endif %}
 
-    {% if no_results_secondary_links %}
-        <div class="btn-list container-btn-secondary">
+        {% if no_results_secondary_links %}
             {% for link in no_results_secondary_links %}
-                {% with 'btn btn-default btn-sm' as link_classes %}
+                {% with 'btn btn-secondary btn-sm' as link_classes %}
                     {% include 'navigation/generic_subnavigation.html' %}
                 {% endwith %}
             {% endfor %}
-        </div>
-    {% endif %}
+        {% endif %}
+    </div>
 </div>
 

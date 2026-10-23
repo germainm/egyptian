@@ -27,10 +27,6 @@ class DownloadFile(
     DatabaseFileModelMixin, DownloadFileBusinessLogicMixin,
     ExtraDataModelMixin, models.Model
 ):
-    """
-    Keep a database link to a stored file. Used for generated files meant
-    to be downloaded at a later time.
-    """
     _ordering_fields = ('filename', 'datetime', 'label')
 
     file = models.FileField(
@@ -55,7 +51,6 @@ class DownloadFile(
         verbose_name_plural = _(message='Download files')
 
     def __str__(self):
-        # Ensure the returned value is not a promise.
         return str(self.filename or self.label)
 
     @method_event(
@@ -80,10 +75,6 @@ class DownloadFile(
 
 
 class SharedUploadedFile(DatabaseFileModelMixin, models.Model):
-    """
-    Keep a database link to a stored file. Used to share files between code
-    that runs out of process.
-    """
 
     file = models.FileField(
         storage=DefinedStorageLazy(

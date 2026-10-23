@@ -1,10 +1,6 @@
 class DeprecationWarning(UserWarning):
-    """
-    Warning when a feature or interface has been deprecated.
-    """
+    pass
 
 
 class InterfaceWarning(UserWarning):
-    """
-    Warning when using obsolete internal interfaces.
-    """
+    pass

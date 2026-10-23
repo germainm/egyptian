@@ -11,10 +11,6 @@ from .utils import get_language_choices, get_timezone_choices
 
 
 class UserLocaleProfile(models.Model):
-    """
-    Stores the locale preferences of a user. Stores timezone and language at
-    the moment.
-    """
     user = models.OneToOneField(
         on_delete=models.CASCADE, related_name='locale_profile',
         to=settings.AUTH_USER_MODEL, verbose_name=_(message='User')

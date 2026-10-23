@@ -9,10 +9,6 @@ logger = logging.getLogger(name=__name__)
 
 
 class StoredFileUploadForm(UploadBaseForm):
-    """
-    Form that show all the files in the source specified by the
-    StoredFolderFile class passed as 'cls' argument.
-    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

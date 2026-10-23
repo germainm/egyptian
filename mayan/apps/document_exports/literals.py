@@ -1,5 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 
+DEFAULT_DOCUMENT_VERSION_EXPORT_RESOLUTION = 300.0
+
 DOCUMENT_VERSION_EXPORT_MESSAGE_BODY = _(
     message='Document version "%(document_version)s" has been '
     'exported and is available for download using the '
@@ -8,3 +10,5 @@ DOCUMENT_VERSION_EXPORT_MESSAGE_BODY = _(
 )
 DOCUMENT_VERSION_EXPORT_MESSAGE_SUBJECT = _(message='Document version exported.')
 DOCUMENT_VERSION_EXPORT_MIMETYPE = 'application/pdf'
+
+ERROR_LOG_DOMAIN_NAME = 'document_exports'

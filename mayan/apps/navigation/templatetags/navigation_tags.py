@@ -1,10 +1,16 @@
 from django.template import Library
 from django.utils.module_loading import import_string
 
+from ..literals import TEXT_HTML_CLASS_MODAL_LINK
 from ..menus import Menu
 from ..source_columns import SourceColumn
 
 register = Library()
+
+
+@register.simple_tag(name='navigation_get_modal_link_class')
+def tag_navigation_get_modal_link_class():
+    return TEXT_HTML_CLASS_MODAL_LINK
 
 
 def _navigation_resolve_menu(context, name, source=None, sort_results=None):

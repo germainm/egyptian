@@ -40,8 +40,8 @@ class TrashedDocumentBusinessLogicMixin:
     def restore(self, user):
         self._event_actor = user
         self.in_trash = False
-        # Skip the edit event at .save().
+        self.trashed_date_time = None
         self._event_ignore = True
         self.save(
-            update_fields=('in_trash',)
+            update_fields=('in_trash', 'trashed_date_time')
         )

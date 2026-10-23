@@ -33,6 +33,25 @@ x-mayan-depends_on-advanced:
       condition: service_completed_successfully
       required: false
 
+# The processor limit keeps the background workers from taking every core
+# of the host and leaving nothing for the interactive containers. The
+# concurrency and the nice level of each worker are the primary control
+# over that and are set per worker, so this limit is the outer bound
+# rather than the mechanism.
+#
+# The limit applies to each container separately, not to the deployment as
+# a whole. A worker whose concurrency equals the limit has no room left for
+# its own parent process and is throttled while doing the work it was
+# given, so keep the limit above the highest worker concurrency in use.
+x-mayan-deploy:
+  &mayan-deploy
+  deploy:
+    resources:
+      limits:
+        cpus: '${MAYAN_DOCKER_CPU_LIMIT:-6.0}'
+      reservations:
+        cpus: '${MAYAN_DOCKER_CPU_RESERVATION:-2.0}'
+
 x-mayan-environment:
   &mayan-environment
   MAYAN_CELERY_BROKER_URL: amqp://${MAYAN_RABBITMQ_USER:-mayan}:${MAYAN_RABBITMQ_PASSWORD:-mayanrabbitpass}@${MAYAN_DOCKER_RABBITMQ_HOSTNAME:-rabbitmq}:${MAYAN_DOCKER_RABBITMQ_PORT:-5672}/${MAYAN_RABBITMQ_VHOST:-mayan}
@@ -40,23 +59,28 @@ x-mayan-environment:
   MAYAN_DATABASES: "{'default':{'ENGINE':'django.db.backends.postgresql','NAME':'${MAYAN_DATABASE_NAME:-mayan}','PASSWORD':'${MAYAN_DATABASE_PASSWORD:-mayandbpass}','USER':'${MAYAN_DATABASE_USER:-mayan}','HOST':'${MAYAN_DATABASE_HOST:-postgresql}','PORT':${MAYAN_DATABASE_PORT:-},'CONN_MAX_AGE':${MAYAN_DATABASE_CONN_MAX_AGE:-0},${MAYAN_DATABASE_EXTRA_OPTIONS:-}}}"
   MAYAN_LOCK_MANAGER_BACKEND: mayan.apps.lock_manager.backends.redis_lock.RedisLock
   MAYAN_LOCK_MANAGER_BACKEND_ARGUMENTS: "{'redis_url':'redis://:${MAYAN_REDIS_PASSWORD:-mayanredispassword}@${MAYAN_DOCKER_REDIS_HOSTNAME:-redis}:${MAYAN_DOCKER_REDIS_PORT:-6379}/${MAYAN_REDIS_LOCK_MANAGER_DATABASE:-2}'}"
+  MAYAN_SERVER_SIDE_EVENTS_BACKEND: mayan.apps.server_side_events.sse_backends.redis.RedisServerEventStreamBackend
+  MAYAN_SERVER_SIDE_EVENTS_BACKEND_ARGUMENTS: "{'url':'redis://:${MAYAN_REDIS_PASSWORD:-mayanredispassword}@${MAYAN_DOCKER_REDIS_HOSTNAME:-redis}:${MAYAN_DOCKER_REDIS_PORT:-6379}/${MAYAN_REDIS_SERVER_SIDE_EVENTS_DATABASE:-3}'}"
 
-x-mayan-container:
-  &mayan-container
-  <<: [*mayan-depends_on-basic]
-  env_file:
-    - ${MAYAN_DOCKER_ENV_FILE:-.env}
-    - path: .env-local
-      required: false
-  environment:
-    <<: [*mayan-environment]
-  image: ${MAYAN_DOCKER_IMAGE_NAME:-mayanedms/mayanedms}:${MAYAN_DOCKER_IMAGE_TAG:-s4.11}
+x-mayan-logging:
+  &mayan-logging
   logging:
     driver: "json-file"
     options:
       max-size: "100m"
       max-file: "3"
       mode: "non-blocking"
+
+x-mayan-container:
+  &mayan-container
+  <<: [*mayan-depends_on-basic, *mayan-deploy, *mayan-logging]
+  env_file:
+    - ${MAYAN_DOCKER_ENV_FILE:-.env}
+    - path: .env-local
+      required: false
+  environment:
+    <<: [*mayan-environment]
+  image: ${MAYAN_DOCKER_IMAGE_NAME:-mayanedms/mayanedms}:${MAYAN_DOCKER_IMAGE_TAG:-s4.12}
   networks:
     - mayan
   restart: unless-stopped
@@ -116,6 +140,7 @@ services:
       - bootstrap.memory_lock=true
       - discovery.type=single-node
       - http.max_content_length=400mb
+      - xpack.security.http.ssl.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - ELASTIC_PASSWORD=${MAYAN_ELASTICSEARCH_PASSWORD:-mayanespassword}
     healthcheck:
@@ -234,19 +259,31 @@ services:
     volumes:
       - ${MAYAN_RABBITMQ_VOLUME:-rabbitmq}:/var/lib/rabbitmq
 
+  # This instance holds the locks, the task results and the server side
+  # event stream. The locks and the results are not cache: a lock key that
+  # disappears is mutual exclusion silently lost, and the counter a chord
+  # uses to know its tasks are done is an ordinary key like any other, so a
+  # policy that discards keys under pressure can leave a chord that never
+  # completes and reports nothing.
+  #
+  # `noeviction` refuses the write instead, which fails loudly and can be
+  # acted on. Every key written here carries an expiry, so the memory is
+  # bounded by what arrives within the lifetime of a key rather than by the
+  # eviction policy. Raise `--maxmemory` if a deployment writes more than
+  # that within the expiry.
   redis:
     command:
       - redis-server
       - --appendonly
       - "no"
       - --databases
-      - "3"
+      - "4"
       - --maxmemory
       - "100mb"
       - --maxclients
       - "500"
       - --maxmemory-policy
-      - "allkeys-lru"
+      - "noeviction"
       - --save
       - ""
       - --tcp-backlog
@@ -254,7 +291,7 @@ services:
       - --requirepass
       - "${MAYAN_REDIS_PASSWORD:-mayanredispassword}"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${MAYAN_REDIS_PASSWORD:-mayanredispassword}", "ping | grep PONG"]
+      test: ["CMD-SHELL", "redis-cli -a ${MAYAN_REDIS_PASSWORD:-mayanredispassword} ping | grep -q PONG"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -370,7 +407,6 @@ services:
     command:
       - run_worker
       - worker_d
-      - --concurrency=1
       - --prefetch-multiplier=1
     profiles:
       - extra_worker_d
@@ -385,6 +421,17 @@ services:
       - --prefetch-multiplier=1
     profiles:
       - extra_worker_e
+      - multi_container
+
+  # Run a separate class F worker
+  worker_f:
+    <<: [*mayan-depends_on-advanced, *mayan-container]
+    command:
+      - run_worker
+      - worker_f
+      - --prefetch-multiplier=1
+    profiles:
+      - extra_worker_f
       - multi_container
 
   worker_custom_queue:
@@ -402,10 +449,7 @@ services:
   celery_beat:
     <<: [*mayan-depends_on-advanced, *mayan-container]
     command:
-      - run_celery
-      - beat
-      - --pidfile=
-      - --loglevel=ERROR
+      - run_beat
     profiles:
       - extra_celery_beat
       - multi_container
@@ -439,7 +483,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
     # - Add DNS provider variables (https://doc.traefik.io/traefik/https/acme/#providers)
     # environment:
-    image: ${MAYAN_DOCKER_TRAEFIK_IMAGE:-traefik}:${MAYAN_DOCKER_TRAEFIK_TAG:-v2.11.43}
+    image: ${MAYAN_DOCKER_TRAEFIK_IMAGE:-traefik}:${MAYAN_DOCKER_TRAEFIK_TAG:-v3.7.9}
     labels:
       - "traefik.enable=${MAYAN_TRAEFIK_DASHBOARD_ENABLE:-false}"
       - "traefik.http.middlewares.basic-auth-global.basicauth.users=${MAYAN_TRAEFIK_DASHBOARD_AUTHENTICATION}"
@@ -470,7 +514,6 @@ volumes:
   postgres:
   postgres-backups:
   postgres-initdb:
-  mountindex:
   rabbitmq:
   redis:
   traefik-certificates-letsencrypt:

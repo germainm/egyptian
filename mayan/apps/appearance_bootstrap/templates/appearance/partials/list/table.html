@@ -6,11 +6,11 @@
 {% load navigation_tags %}
 {% load smart_settings_tags %}
 
-{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_actions' extra_context__html_data__style='pointer-events: none;' extra_context__icon_css_classes_extra='mayan-icon-padding-none' as icon_menu_actions %}
-{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_views' extra_context__html_data__style='pointer-events: none;' extra_context__icon_css_classes_extra='mayan-icon-padding-none' as icon_menu_views %}
+{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_actions' extra_context__html_data__style='pointer-events: none;' as icon_menu_actions %}
+{% icons_get_icon 'mayan.apps.appearance.icons.icon_menu_views' extra_context__html_data__style='pointer-events: none;' as icon_menu_views %}
 
 <div class="row">
-    <div class="col-xs-12">
+    <div class="col-12">
         {% include 'appearance/partials/list/header.html' %}
 
         {% navigation_resolve_menu name='multi item' sort_results=True source=object_list.0 as links_multi_menus_results %}
@@ -18,44 +18,32 @@
         {% navigation_get_source_columns source=object_list only_identifier=True as source_columns_identifier %}
         {% navigation_get_source_columns source=object_list exclude_identifier=True as source_columns_non_identifier %}
 
-        <div class="well center-block">
+        <div class="card card-body bg-body-secondary border-0">
             <div class="table-responsive">
-                <table class="table table-condensed table-striped appearance-table-condensed">
+                <table class="table table-sm table-striped">
                     <thead>
                         {% if not hide_header %}
-                            <tr>
+                            <tr class="pb-2 pt-0">
                                 {% include 'appearance/partials/list/table/head/row_cell_checkbox.html' %}
                                 {% include 'appearance/partials/list/table/head/row_cell_identifier.html' %}
                                 {% include 'appearance/partials/list/table/head/row_cell_data.html' %}
                                 {% include 'appearance/partials/list/table/head/row_cell_links.html' %}
                             </tr>
                         {% endif %}
-                        <tr class="appearance-table-thead-tr-spacer">
-                            <th></th>
-                        </tr>
-
-                        <tr class="appearance-table-thead-tr-ruler">
-                            <th></th>
-                        </tr>
                     </thead>
                     <tbody>
                         {% for object in object_list %}
-                            <tr>
+                            <tr{% if links_multi_menus_results %} class="mayan-table-item"{% endif %}>
                                 {% include 'appearance/partials/list/table/body/row_cell_checkbox.html' %}
                                 {% include 'appearance/partials/list/table/body/row_cell_identifier.html' %}
                                 {% include 'appearance/partials/list/table/body/row_cell_data.html' %}
                                 {% include 'appearance/partials/list/table/body/row_cell_links.html' %}
                             </tr>
                         {% endfor %}
-                        {% if object_list %}
-                            <tr class="appearance-table-tbody-tr-ruler">
-                                <td></td>
-                            </tr>
-                        {% endif %}
                     </tbody>
                 </table>
                 {% if not object_list %}
-                    <div class="well center-block">
+                    <div class="bg-body-secondary border-0 card card-body">
                         {% include 'appearance/partials/list/no_results.html' %}
                     </div>
                 {% endif %}

@@ -1,17 +1,21 @@
 from collections import deque
 from contextlib import contextmanager
 import functools
+import logging
 import threading
+import time
 
 import elasticsearch
 from elasticsearch import Elasticsearch, helpers
 from elasticsearch.dsl import Q, Search
 
+from django.utils.translation import gettext_lazy as _
+
 from mayan.literals import DEFAULT_ELASTICSEARCH_PASSWORD
 
 from ...exceptions import (
-    DynamicSearchBackendException, DynamicSearchRetry,
-    DynamicSearchValueTransformationError
+    DynamicSearchBackendException, DynamicSearchBackendResourceError,
+    DynamicSearchRetry, DynamicSearchValueTransformationError
 )
 from ...search_backends import SearchBackend
 from ...search_fields import SearchFieldVirtualAllFields
@@ -24,16 +28,24 @@ from .literals import (
     DEFAULT_ELASTICSEARCH_POINT_IN_TIME_KEEP_ALIVE,
     DEFAULT_ELASTICSEARCH_REFRESH_ON_SEARCH,
     DEFAULT_ELASTICSEARCH_SEARCH_PAGE_SIZE,
-    DJANGO_TO_ELASTICSEARCH_FIELD_MAP, INDEX_NAME_DELIMITER
+    DEFAULT_ELASTICSEARCH_SEARCH_RETRY_BACKOFF,
+    DEFAULT_ELASTICSEARCH_SEARCH_RETRY_BACKOFF_MAX,
+    DEFAULT_ELASTICSEARCH_SEARCH_RETRY_NUMBER,
+    DJANGO_TO_ELASTICSEARCH_FIELD_MAP,
+    ELASTICSEARCH_STATUS_CODE_TOO_MANY_REQUESTS, INDEX_NAME_DELIMITER
 )
+
+logger = logging.getLogger(name=__name__)
 
 
 class ElasticsearchSearchBackend(SearchBackend):
     _client_registry = {}
     _client_registry_lock = threading.Lock()
+    _index_mappings_cache = {}
 
     feature_reindex = True
     field_type_mapping = DJANGO_TO_ELASTICSEARCH_FIELD_MAP
+    label = _(message='Elasticsearch')
 
     def __init__(
         self, client_kwargs=None,
@@ -41,7 +53,7 @@ class ElasticsearchSearchBackend(SearchBackend):
         search_page_size=DEFAULT_ELASTICSEARCH_SEARCH_PAGE_SIZE,
         point_in_time_keep_alive=DEFAULT_ELASTICSEARCH_POINT_IN_TIME_KEEP_ALIVE,
         refresh_on_search=DEFAULT_ELASTICSEARCH_REFRESH_ON_SEARCH,
-        **kwargs
+        search_retry=None, **kwargs
     ):
         super().__init__(**kwargs)
 
@@ -52,6 +64,22 @@ class ElasticsearchSearchBackend(SearchBackend):
         # top-N heap larger than the number of results we will actually use.
         self.search_page_size = min(
             search_page_size, setting_results_limit.value
+        )
+
+        # Shared PIT id active during a top-level search() call.
+        # None means no shared PIT is active; each do_search_execute call
+        # will open and close its own PIT independently.
+        self._active_pit_id = None
+
+        search_retry = search_retry or {}
+        self.search_retry_number = search_retry.get(
+            'number', DEFAULT_ELASTICSEARCH_SEARCH_RETRY_NUMBER
+        )
+        self.search_retry_backoff = search_retry.get(
+            'backoff', DEFAULT_ELASTICSEARCH_SEARCH_RETRY_BACKOFF
+        )
+        self.search_retry_backoff_max = search_retry.get(
+            'backoff_max', DEFAULT_ELASTICSEARCH_SEARCH_RETRY_BACKOFF_MAX
         )
 
         self.client_kwargs = client_kwargs or {
@@ -90,10 +118,60 @@ class ElasticsearchSearchBackend(SearchBackend):
             sorted(items)
         )
 
-        # Shared PIT id active during a top-level search() call.
-        # None means no shared PIT is active; each do_search_execute call
-        # will open and close its own PIT independently.
-        self._active_pit_id = None
+    @staticmethod
+    def _is_throttle_error(exception):
+        if isinstance(exception, elasticsearch.exceptions.ApiError):
+            meta = getattr(exception, 'meta', None)
+            status = getattr(meta, 'status', None)
+            return status == ELASTICSEARCH_STATUS_CODE_TOO_MANY_REQUESTS
+
+        if isinstance(exception, helpers.BulkIndexError):
+            for action_error in exception.errors:
+                for action_result in action_error.values():
+                    if isinstance(action_result, dict):
+                        status = action_result.get('status')
+                        if status == ELASTICSEARCH_STATUS_CODE_TOO_MANY_REQUESTS:
+                            return True
+
+        return False
+
+    def _execute_with_throttle_retry(self, func):
+        last_exception = None
+
+        for attempt in range(self.search_retry_number + 1):
+            try:
+                return func()
+            except elasticsearch.exceptions.ApiError as exception:
+                if not self._is_throttle_error(exception=exception):
+                    raise
+
+                last_exception = exception
+
+                if attempt < self.search_retry_number:
+                    backoff = min(
+                        self.search_retry_backoff_max,
+                        self.search_retry_backoff * (2 ** attempt)
+                    )
+                    logger.warning(
+                        'Elasticsearch is throttling search requests (HTTP '
+                        '429). Retrying in %s seconds (attempt %d of %d).',
+                        backoff, attempt + 1, self.search_retry_number
+                    )
+                    time.sleep(backoff)
+
+        logger.error(
+            'Elasticsearch rejected a search request with HTTP 429 (Too '
+            'Many Requests) after %d retries. The search cluster is '
+            'overloaded; reduce the query load or increase its capacity.',
+            self.search_retry_number
+        )
+
+        raise DynamicSearchBackendResourceError(
+            _(
+                message='The search service is temporarily too busy to '
+                'process your search. Please try again in a few moments.'
+            )
+        ) from last_exception
 
     @contextmanager
     def _pit_context(self, index_name):
@@ -105,9 +183,11 @@ class ElasticsearchSearchBackend(SearchBackend):
         every do_search_execute() call within the same request reuses the
         same PIT instead of opening and closing one per scope.
         """
-        pit = self._client.open_point_in_time(
-            index=index_name, keep_alive=self.point_in_time_keep_alive
+        func = functools.partial(
+            self._client.open_point_in_time, index=index_name,
+            keep_alive=self.point_in_time_keep_alive
         )
+        pit = self._execute_with_throttle_retry(func=func)
         self._active_pit_id = pit['id']
         try:
             yield self._active_pit_id
@@ -138,19 +218,26 @@ class ElasticsearchSearchBackend(SearchBackend):
         block), the existing PIT is reused and its lifecycle is NOT managed
         here. Otherwise a new PIT is opened and closed within this method.
         """
-        model = self._get_model_for_index(index_name=index_name)
+        model = ElasticsearchSearchBackend._get_model_for_index(
+            index_name=index_name
+        )
 
         if self.refresh_on_search:
-            self._client.indices.refresh(index=index_name)
+            func = functools.partial(
+                self._client.indices.refresh, index=index_name
+            )
+            self._execute_with_throttle_retry(func=func)
 
         pk_field = model._meta.pk
 
         owned_pit = self._active_pit_id is None
         if owned_pit:
-            pit = self._client.open_point_in_time(
-                index=index_name, keep_alive=self.point_in_time_keep_alive
+            func = functools.partial(
+                self._client.open_point_in_time, index=index_name,
+                keep_alive=self.point_in_time_keep_alive
             )
-            pit_id = pit['id']
+            point_in_time = self._execute_with_throttle_retry(func=func)
+            pit_id = point_in_time['id']
         else:
             pit_id = self._active_pit_id
 
@@ -185,7 +272,9 @@ class ElasticsearchSearchBackend(SearchBackend):
                 else:
                     search_new = search_new.extra(search_after=search_after)
 
-                response = search_new.execute()
+                response = self._execute_with_throttle_retry(
+                    func=search_new.execute
+                )
 
                 if not response or not len(response):
                     break
@@ -211,8 +300,9 @@ class ElasticsearchSearchBackend(SearchBackend):
             search_model.full_name
         )
 
+    @staticmethod
     @functools.lru_cache(maxsize=256)
-    def _get_model_for_index(self, index_name):
+    def _get_model_for_index(index_name):
         indices_namespace, search_model_name = index_name.split(
             INDEX_NAME_DELIMITER
         )
@@ -221,30 +311,33 @@ class ElasticsearchSearchBackend(SearchBackend):
 
         return model
 
-    @functools.cache
     def _get_search_model_index_mappings(self, search_model):
-        mappings = {}
+        cache = ElasticsearchSearchBackend._index_mappings_cache
 
-        field_map = self.get_resolved_field_type_map(
-            search_model=search_model
-        )
-        for field_name, search_field_data in field_map.items():
-            mappings[field_name] = {
-                'type': search_field_data['field'].name
-            }
+        try:
+            return cache[search_model]
+        except KeyError:
+            mappings = {}
 
-            if 'analyzer' in search_field_data:
-                mappings[field_name]['analyzer'] = search_field_data['analyzer']
+            field_map = self.get_resolved_field_type_map(
+                search_model=search_model
+            )
+            for field_name, search_field_data in field_map.items():
+                mappings[field_name] = {
+                    'type': search_field_data['field'].name
+                }
 
-        return mappings
+                if 'analyzer' in search_field_data:
+                    mappings[field_name]['analyzer'] = search_field_data[
+                        'analyzer'
+                    ]
+
+            cache[search_model] = mappings
+
+            return mappings
 
     def _get_status(self):
         result = []
-
-        title = 'Elasticsearch search model indexing status'
-        title_length = len(title)
-        result.append(title)
-        result.append('=' * title_length)
 
         for search_model in SearchModel.all():
             index_name = self._get_index_name(search_model=search_model)
@@ -253,13 +346,13 @@ class ElasticsearchSearchBackend(SearchBackend):
             except elasticsearch.exceptions.NotFoundError:
                 index_stats = {}
 
-            count = index_stats.get('count', 'None')
+            object_count = index_stats.get('count', None)
 
             result.append(
-                '{}: {}'.format(search_model.label, count)
+                {'search_model': search_model, 'object_count': object_count}
             )
 
-        return '\n'.join(result)
+        return result
 
     def _initialize(self):
         self._update_mappings()
@@ -437,10 +530,12 @@ class ElasticsearchSearchBackend(SearchBackend):
             elasticsearch.exceptions.ConnectionError,
             elasticsearch.exceptions.ConnectionTimeout
         ) as exception:
-            # Transient transport errors are retried instead of being
-            # allowed to propagate as a permanent failure that would leave
-            # the instance missing from the search index.
             raise DynamicSearchRetry from exception
+        except elasticsearch.exceptions.ApiError as exception:
+            if self._is_throttle_error(exception=exception):
+                raise DynamicSearchRetry from exception
+
+            raise
 
     def index_instances(self, search_model, id_list):
         index_name = self._get_index_name(search_model=search_model)
@@ -469,10 +564,14 @@ class ElasticsearchSearchBackend(SearchBackend):
             elasticsearch.exceptions.ConnectionError,
             elasticsearch.exceptions.ConnectionTimeout
         ) as exception:
-            # Transient transport errors are retried instead of being
-            # allowed to propagate as a permanent failure that would leave
-            # instances missing from the search index.
             raise DynamicSearchRetry from exception
+        except (
+            elasticsearch.exceptions.ApiError, helpers.BulkIndexError
+        ) as exception:
+            if self._is_throttle_error(exception=exception):
+                raise DynamicSearchRetry from exception
+
+            raise
 
     def refresh(self):
         for search_model in SearchModel.all():

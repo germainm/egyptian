@@ -5,7 +5,6 @@ from django.template import RequestContext
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
-from mayan.apps.acls.models import AccessControlList
 from mayan.apps.views.generics import (
     ConfirmView, MultipleObjectConfirmActionView, MultipleObjectDeleteView,
     SingleObjectCreateView, SingleObjectDetailView, SingleObjectListView
@@ -144,7 +143,9 @@ class MessageMarkReadView(MultipleObjectConfirmActionView):
     view_icon = icon_message_mark_read
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Mark as read')
+        }
 
         if self.object_list.count() == 1:
             context.update(
@@ -163,22 +164,21 @@ class MessageMarkReadView(MultipleObjectConfirmActionView):
 
 
 class MessageMarkReadAllView(ConfirmView):
+    object_permission = permission_message_edit
     post_action_redirect = reverse_lazy(viewname='messaging:message_list')
     view_icon = icon_message_mark_read_all
 
     def get_extra_context(self):
         return {
+            'submit_label': _(message='Mark as read'),
             'title': _(message='Mark all message as read?')
         }
 
-    def get_queryset(self):
+    def get_source_queryset(self):
         return self.request.user.messages.all()
 
     def view_action(self, form=None):
-        queryset = AccessControlList.objects.restrict_queryset(
-            permission=permission_message_edit, queryset=self.get_queryset(),
-            user=self.request.user
-        )
+        queryset = self.get_queryset()
 
         for message in queryset.all():
             message.mark_read(user=self.request.user)
@@ -212,7 +212,9 @@ class MessageMarkUnReadView(MultipleObjectConfirmActionView):
     view_icon = icon_message_mark_unread
 
     def get_extra_context(self):
-        context = {}
+        context = {
+            'submit_label': _(message='Mark as unread')
+        }
 
         if self.object_list.count() == 1:
             context.update(

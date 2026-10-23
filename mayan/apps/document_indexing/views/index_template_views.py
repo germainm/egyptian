@@ -85,13 +85,13 @@ class IndexTemplateListView(SingleObjectListView):
                 context=RequestContext(request=self.request)
             ),
             'no_results_text': _(
-                message='Indexes group document automatically into levels. '
-                'Indexes are defined using template whose markers are '
+                message='Indexes group documents automatically into levels. '
+                'Indexes are defined using templates whose markers are '
                 'replaced with direct properties of documents like label '
                 'or description, or that of extended properties like '
                 'metadata.'
             ),
-            'no_results_title': _(message='There are no index templates.'),
+            'no_results_title': _(message='There are no index templates'),
             'title': _(message='Index templates')
         }
 
@@ -236,6 +236,7 @@ class IndexTemplateEventTriggerListView(ExternalObjectViewMixin, FormView):
                 'of this index template to be updated.'
             ),
             'object': self.external_object,
+            'submit_label': _(message='Save'),
             'title': _(
                 message='Index template event triggers for: %s'
             ) % self.external_object
@@ -280,6 +281,12 @@ class IndexTemplateNodeListView(
     def get_extra_context(self):
         return {
             'hide_object': True,
+            'no_results_icon': icon_index_template_node_tree_view,
+            'no_results_text': _(
+                message='Template nodes define how documents are grouped '
+                'into the levels of an index.'
+            ),
+            'no_results_title': _(message='No template nodes available'),
             'object': self.external_object,
             'title': _(
                 message='Tree template nodes for index: %s'
@@ -379,6 +386,7 @@ class IndexTemplateRebuildView(ConfirmView):
     def get_extra_context(self):
         return {
             'object': self.get_object(),
+            'submit_label': _(message='Rebuild'),
             'title': _(
                 message='Rebuild index template: %s'
             ) % self.get_object()
@@ -410,6 +418,7 @@ class IndexTemplateRebuildView(ConfirmView):
 
 class IndexTemplateAllRebuildView(FormView):
     extra_context = {
+        'submit_label': _(message='Rebuild'),
         'title': _(message='Rebuild index templates')
     }
     form_class = IndexTemplateFilteredForm
@@ -446,6 +455,7 @@ class IndexTemplateAllRebuildView(FormView):
 
 class IndexTemplateResetView(FormView):
     extra_context = {
+        'submit_label': _(message='Reset'),
         'title': _(message='Reset indexes')
     }
     form_class = IndexTemplateFilteredForm

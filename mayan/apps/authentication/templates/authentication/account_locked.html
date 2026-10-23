@@ -1,0 +1,34 @@
+{% extends 'appearance/base_plain.html' %}
+
+{% load i18n %}
+{% load static %}
+
+{% load common_tags %}
+
+{% block base_title %}{% trans 'Account locked' %}{% endblock %}
+
+{% block project_name %}{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col-10 offset-1 col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-4 offset-lg-4">
+            <div class="alert alert-danger" role="alert">
+                {% trans 'Account locked: too many failed login attempts.' %}
+            </div>
+
+            <p>
+                {% if cooloff_time %}
+                    {% blocktrans %}For security reasons access has been temporarily suspended. Try again in {{ cooloff_time }}.{% endblocktrans %}
+                {% else %}
+                    {% trans 'For security reasons access has been suspended. Contact a system administrator to restore access to this account.' %}
+                {% endif %}
+            </p>
+
+            <div class="text-center">
+                <a class="btn btn-primary" href="{% url 'authentication:login_view' %}">{% trans 'Login page' %}</a>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

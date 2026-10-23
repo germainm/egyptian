@@ -10,6 +10,7 @@ from mayan.apps.common.menus import (
     menu_list_facet, menu_object, menu_secondary, menu_tools
 )
 from mayan.apps.events.classes import EventModelRegistry, ModelEventType
+from mayan.apps.navigation.column_widgets import SourceColumnDateTimeWidget
 from mayan.apps.navigation.source_columns import SourceColumn
 
 from .events import (
@@ -108,7 +109,7 @@ class DocumentSignaturesApp(MayanAppConfig):
 
         SourceColumn(
             attribute='date_time', label=_(message='Date and time'),
-            source=SignatureBaseModel
+            source=SignatureBaseModel, widget=SourceColumnDateTimeWidget
         )
         SourceColumn(
             attribute='get_key_id', label=_(message='Key ID'),
@@ -125,14 +126,12 @@ class DocumentSignaturesApp(MayanAppConfig):
             source=SignatureBaseModel
         )
 
-        # Document file
 
         menu_list_facet.bind_links(
             links=(link_document_file_signature_list,),
             sources=(DocumentFile,)
         )
 
-        # Signatures
 
         menu_list_facet.bind_links(
             links=(
@@ -162,7 +161,6 @@ class DocumentSignaturesApp(MayanAppConfig):
             )
         )
 
-        # Tools
 
         menu_tools.bind_links(
             links=(

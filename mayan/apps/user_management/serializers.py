@@ -3,6 +3,8 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from django.utils.translation import gettext_lazy as _
 
+from rest_framework.exceptions import ValidationError
+
 from mayan.apps.rest_api import serializers
 from mayan.apps.rest_api.relations import FilteredPrimaryKeyRelatedField
 
@@ -47,8 +49,13 @@ class GroupUserAddSerializer(serializers.Serializer):
         help_text=_(
             message='Primary key of the user to add to the group.'
         ), label=_(message='User ID'), source_permission=permission_user_edit,
-        source_queryset=get_user_queryset()
+        source_queryset_method='get_user_source_queryset'
     )
+
+    def get_user_source_queryset(self):
+        return get_user_queryset(
+            user=self.context['request'].user
+        )
 
 
 class GroupUserRemoveSerializer(serializers.Serializer):
@@ -56,8 +63,13 @@ class GroupUserRemoveSerializer(serializers.Serializer):
         help_text=_(
             message='Primary key of the user to remove from the group.'
         ), label=_(message='User ID'), source_permission=permission_user_edit,
-        source_queryset=get_user_queryset()
+        source_queryset_method='get_user_source_queryset'
     )
+
+    def get_user_source_queryset(self):
+        return get_user_queryset(
+            user=self.context['request'].user
+        )
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
@@ -120,3 +132,19 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
             )
 
         return data
+
+
+class UserDetailSerializer(UserSerializer):
+    def validate_password(self, value):
+        if self.instance and (
+            self.instance.is_staff or self.instance.is_superuser
+        ):
+            raise ValidationError(
+                _(
+                    message='Changing the password of staff or super user '
+                    'accounts through this endpoint is not allowed. Use '
+                    'administration tools to perform this operation.'
+                )
+            )
+
+        return value

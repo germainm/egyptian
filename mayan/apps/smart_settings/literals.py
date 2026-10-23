@@ -9,8 +9,21 @@ CONFIGURATION_FILENAME_LAST_GOOD = 'config_backup.yml'
 
 DEFAULT_ALLOWED_HOSTS = global_settings.ALLOWED_HOSTS
 DEFAULT_APPEND_SLASH = global_settings.APPEND_SLASH
-DEFAULT_AUTH_PASSWORD_VALIDATORS = global_settings.AUTH_PASSWORD_VALIDATORS
 DEFAULT_AUTHENTICATION_BACKENDS = global_settings.AUTHENTICATION_BACKENDS
+DEFAULT_AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'
+    }
+]
 DEFAULT_CACHES = global_settings.CACHES
 DEFAULT_CSRF_COOKIE_SECURE = global_settings.CSRF_COOKIE_SECURE
 DEFAULT_CSRF_TRUSTED_ORIGINS = global_settings.CSRF_TRUSTED_ORIGINS
@@ -28,15 +41,16 @@ DEFAULT_EMAIL_TIMEOUT = global_settings.EMAIL_TIMEOUT
 DEFAULT_EMAIL_USE_SSL = global_settings.EMAIL_USE_SSL
 DEFAULT_EMAIL_USE_TLS = global_settings.EMAIL_USE_TLS
 DEFAULT_FILE_UPLOAD_MAX_MEMORY_SIZE = global_settings.FILE_UPLOAD_MAX_MEMORY_SIZE
-DEFAULT_LOGIN_URL = global_settings.LOGIN_URL
-DEFAULT_LOGIN_REDIRECT_URL = global_settings.LOGIN_REDIRECT_URL
-DEFAULT_LOGOUT_REDIRECT_URL = global_settings.LOGOUT_REDIRECT_URL
 DEFAULT_INTERNAL_IPS = global_settings.INTERNAL_IPS
 DEFAULT_LANGUAGES = global_settings.LANGUAGES
 DEFAULT_LANGUAGE_CODE = global_settings.LANGUAGE_CODE
+DEFAULT_LOGIN_REDIRECT_URL = global_settings.LOGIN_REDIRECT_URL
+DEFAULT_LOGIN_URL = global_settings.LOGIN_URL
+DEFAULT_LOGOUT_REDIRECT_URL = global_settings.LOGOUT_REDIRECT_URL
+DEFAULT_SECURE_PROXY_SSL_HEADER = global_settings.SECURE_PROXY_SSL_HEADER
+DEFAULT_SERVER_EMAIL = global_settings.SERVER_EMAIL
 DEFAULT_SESSION_COOKIE_NAME = global_settings.SESSION_COOKIE_NAME
 DEFAULT_SESSION_ENGINE = global_settings.SESSION_ENGINE
-DEFAULT_SECURE_PROXY_SSL_HEADER = global_settings.SECURE_PROXY_SSL_HEADER
 DEFAULT_STATIC_URL = global_settings.STATIC_URL
 DEFAULT_STORAGES = global_settings.STORAGES
 DEFAULT_TIME_ZONE = global_settings.TIME_ZONE
@@ -50,5 +64,20 @@ MESSAGE_LOCAL_STORAGE_DISABLED = _(
 )
 
 NAMESPACE_VERSION_INITIAL = '0001'
+
+SETTING_VALUE_BOOLEAN_MAP = {
+    '0': False,
+    '1': True,
+    'f': False,
+    'false': False,
+    'n': False,
+    'no': False,
+    'off': False,
+    'on': True,
+    't': True,
+    'true': True,
+    'y': True,
+    'yes': True
+}
 
 SMART_SETTINGS_NAMESPACES_NAME = 'SMART_SETTINGS_NAMESPACES'

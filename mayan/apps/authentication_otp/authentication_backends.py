@@ -1,5 +1,3 @@
-from django.conf import settings
-
 from mayan.apps.authentication.authentication_backends import (
     AuthenticationBackendModelEmailPassword,
     AuthenticationBackendModelUsernamePassword
@@ -23,25 +21,17 @@ class AuthenticationBackendTOTPMixin:
 class AuthenticationBackendModelEmailPasswordTOTP(
     AuthenticationBackendTOTPMixin, AuthenticationBackendModelEmailPassword
 ):
-    """
-    Same backend as AuthenticationBackendModelEmailPassword but with
-    an additional form for an TOTP token.
-    """
-    def initialize(self):
-        settings.AUTHENTICATION_BACKENDS = (
-            get_class_full_name(klass=DjangoAuthenticationBackendEmailMultiFactorOTP),
-        )
+
+    django_authentication_backend_paths = (
+        get_class_full_name(klass=DjangoAuthenticationBackendEmailMultiFactorOTP),
+    )
 
 
 class AuthenticationBackendModelUsernamePasswordTOTP(
     AuthenticationBackendTOTPMixin,
     AuthenticationBackendModelUsernamePassword
 ):
-    """
-    Same backend as AuthenticationBackendModelUsernamePassword but with
-    an additional form for an TOTP token.
-    """
-    def initialize(self):
-        settings.AUTHENTICATION_BACKENDS = (
-            get_class_full_name(klass=DjangoAuthenticationBackendUsernameMultiFactorOTP),
-        )
+
+    django_authentication_backend_paths = (
+        get_class_full_name(klass=DjangoAuthenticationBackendUsernameMultiFactorOTP),
+    )

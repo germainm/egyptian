@@ -26,6 +26,47 @@ class ModelPermission:
         cls._model_permissions.pop(model, None)
 
     @classmethod
+    def get_inheritance_ancestor_models(cls, model):
+        result = set()
+        pending = [model]
+
+        while pending:
+            current = pending.pop()
+
+            entry_list = cls._inheritances.get(
+                current, ()
+            )
+            for entry in entry_list:
+                related_model = get_related_field(
+                    model=current, related_field_name=entry['field_name']
+                ).related_model
+
+                if related_model is not None and related_model not in result:
+                    result.add(related_model)
+                    pending.append(related_model)
+
+        return result
+
+    @classmethod
+    def do_inheritance_cycle_check(cls, model, model_reverse, related):
+        if model_reverse is None:
+            return
+
+        ancestor_models = cls.get_inheritance_ancestor_models(
+            model=model_reverse
+        )
+
+        if model is model_reverse or model in ancestor_models:
+            raise ImproperlyConfigured(
+                'Registering inheritance from "{}" to "{}" via '
+                'field "{}" would create a cycle in the ACL '
+                'inheritance graph, which would cause unbounded '
+                'recursion during permission resolution.'.format(
+                    model.__name__, model_reverse.__name__, related
+                )
+            )
+
+    @classmethod
     def get_choices_for_class(cls, klass):
         result = []
 
@@ -42,7 +83,6 @@ class ModelPermission:
                 (namespace, permission_options)
             )
 
-        # Sort by namespace label.
         result.sort(
             key=lambda entry: entry[0].label
         )
@@ -55,17 +95,14 @@ class ModelPermission:
         )
 
         if as_content_type:
-            # This returns a dictionary but a queryset is needed.
             content_type_dictionary = ContentType.objects.get_for_models(
                 *cls._model_permissions.keys()
             )
 
-            # Convert the dictionary into a list of IDs.
             content_type_ids = [
                 content_type.pk for content_type in content_type_dictionary.values()
             ]
 
-            # Return a queryset of content types based on the ID list.
             return ContentType.objects.filter(pk__in=content_type_ids)
         else:
             return cls._model_permissions.keys()
@@ -76,8 +113,6 @@ class ModelPermission:
 
     @classmethod
     def get_for_class(cls, klass):
-        # Return the permissions for the klass and the models that
-        # inherit from it.
         result = set()
         result.update(
             cls._model_permissions.get(
@@ -118,7 +153,6 @@ class ModelPermission:
 
     @classmethod
     def get_inheritances(cls, model):
-        # Proxy models get the inheritance from their base model.
         if model._meta.proxy:
             model = model._meta.proxy_for_model
 
@@ -144,11 +178,6 @@ class ModelPermission:
 
     @classmethod
     def register(cls, model, permissions, bind_link=True, exclude=None):
-        """
-        Match a model class to a set of permissions. And connect the model
-        to the ACLs via a GenericRelation field.
-        """
-        # Hidden imports.
         from django.contrib.contenttypes.fields import GenericRelation
 
         from mayan.apps.common.classes import ModelCopy
@@ -184,10 +213,7 @@ class ModelPermission:
                 ) from exception
 
         if initalize_model_for_events:
-            # These need to happen only once.
 
-            # Allow the model to be used as the action_object for the ACL
-            # events.
             EventModelRegistry.register(model=model)
 
             if not is_excluded_subclass:
@@ -223,6 +249,11 @@ class ModelPermission:
         model_reverse = get_related_field(
             model=model, related_field_name=related
         ).related_model
+
+        cls.do_inheritance_cycle_check(
+            model=model, model_reverse=model_reverse, related=related
+        )
+
         cls._inheritances_reverse.setdefault(
             model_reverse, []
         )

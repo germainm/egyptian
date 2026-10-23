@@ -10,12 +10,15 @@
         {% endwith %}
     {% endif %}
 
-    <div class="row row-avoid-second-scrollbar">
+    
+    
+    
+    <div class="row {% block subtemplates_row_classes %}{% endblock %}">
         {% for subtemplate in subtemplates_list %}
             {% if subtemplate.column_class %}
                 <div class="{{ subtemplate.column_class }}">
             {% else %}
-                <div class="col-xs-12">
+                <div class="col-12">
             {% endif %}
                 {% views_render_subtemplate subtemplate.name subtemplate.context as rendered_subtemplate %}
                 {{ rendered_subtemplate }}

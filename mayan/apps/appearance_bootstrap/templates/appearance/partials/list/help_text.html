@@ -1,7 +1,7 @@
 {% load icons_tags %}
 
 {% if source_column.help_text %}
-    <span class="appearance-list-columns-help-text" data-toggle="tooltip" data-placement="bottom" title="{{ source_column.help_text }}">
+    <span class="appearance-list-columns-help-text" data-bs-toggle="tooltip" data-bs-placement="bottom" title="{{ source_column.help_text }}">
     {% icons_get_icon icon_path='mayan.apps.navigation.icons.icon_source_column_help_text' %}
     </span>
 {% endif %}

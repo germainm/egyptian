@@ -1,7 +1,21 @@
 class CompressionFileError(Exception):
-    """
-    Base exception for file decompression class
-    """
+    pass
+
+
+class ArchiveContentError(CompressionFileError):
+    pass
+
+
+class ArchiveCompressionRatioExceeded(ArchiveContentError):
+    pass
+
+
+class ArchiveInputSizeExceeded(ArchiveContentError):
+    pass
+
+
+class ArchiveMemberSizeExceeded(ArchiveContentError):
+    pass
 
 
 class ArchiveCompressionRatioExceeded(CompressionFileError):
@@ -28,6 +42,4 @@ class ArchiveMemberSizeExceeded(CompressionFileError):
 
 
 class NoMIMETypeMatch(CompressionFileError):
-    """
-    There is no decompressor registered for the specified MIME type
-    """
+    pass

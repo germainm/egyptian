@@ -1,5 +1,14 @@
-{% if value %}
-    <div class="text-success">{{ icon_ok.render }}</div>
-{% else %}
-    <div class="text-danger">{{ icon_fail.render }}</div>
-{% endif %}
+{% load i18n %}
+{% spaceless %}
+    {% if value %}
+        <span class="mayan-two-state bg-success-subtle text-success-emphasis border border-success-subtle rounded-1" title="{% translate 'Yes' %}">
+            {{ icon_ok.render }}
+            <span class="visually-hidden">{% translate 'Yes' %}</span>
+        </span>
+    {% else %}
+        <span class="mayan-two-state bg-danger-subtle text-danger-emphasis border border-danger-subtle rounded-1" title="{% translate 'No' %}">
+            {{ icon_fail.render }}
+            <span class="visually-hidden">{% translate 'No' %}</span>
+        </span>
+    {% endif %}
+{% endspaceless %}

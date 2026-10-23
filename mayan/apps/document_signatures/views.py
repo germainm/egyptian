@@ -107,6 +107,7 @@ class DocumentFileDetachedSignatureCreateView(
     def get_extra_context(self):
         return {
             'object': self.external_object,
+            'submit_label': _(message='Sign'),
             'title': _(
                 message='Sign document file "%s" with a detached signature'
             ) % self.external_object
@@ -184,6 +185,7 @@ class DocumentFileEmbeddedSignatureCreateView(
     def get_extra_context(self):
         return {
             'object': self.external_object,
+            'submit_label': _(message='Sign'),
             'title': _(
                 message='Sign document file "%s" with a embedded signature'
             ) % self.external_object
@@ -253,6 +255,7 @@ class DocumentFileDetachedSignatureUploadView(
     def get_extra_context(self):
         return {
             'object': self.external_object,
+            'submit_label': _(message='Upload'),
             'title': _(
                 message='Upload detached signature for document file: %s'
             ) % self.external_object
@@ -338,7 +341,7 @@ class DocumentFileSignatureListView(
                 )
             ],
             'no_results_title': _(
-                message='There are no signatures for this document file.'
+                message='There are no signatures for this document file'
             ),
             'object': self.external_object,
             'title': _(
@@ -355,7 +358,9 @@ class AllDocumentSignatureRefreshView(ConfirmView):
         'message': _(
             message='On large databases this operation may take some time '
             'to execute.'
-        ), 'title': _(message='Refresh all signatures information?')
+        ),
+        'submit_label': _(message='Refresh'),
+        'title': _(message='Refresh all signatures information?')
     }
     view_icon = icon_document_file_all_signature_refresh
     view_permission = permission_document_file_signature_verify
@@ -377,7 +382,9 @@ class AllDocumentSignatureVerifyView(ConfirmView):
         'message': _(
             message='On large databases this operation may take some time '
             'to execute.'
-        ), 'title': _(message='Verify all document for signatures?')
+        ),
+        'submit_label': _(message='Verify'),
+        'title': _(message='Verify all document for signatures?')
     }
     view_icon = icon_document_file_all_signature_verify
     view_permission = permission_document_file_signature_verify

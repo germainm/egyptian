@@ -1,6 +1,6 @@
 class FileMetadataError(Exception):
-    """Base file metadata driver exception."""
+    pass
 
 
 class FileMetadataDriverError(FileMetadataError):
-    """Exception raised when a driver encounters an unexpected error."""
+    pass

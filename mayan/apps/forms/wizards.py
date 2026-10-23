@@ -1,1 +1,1 @@
-from formtools.wizard.views import SessionWizardView  # NOQA
+from formtools.wizard.views import SessionWizardView

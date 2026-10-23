@@ -2,7 +2,10 @@ from rest_framework.exceptions import ParseError
 
 from mayan.apps.rest_api import generics
 
-from ..exceptions import DynamicSearchException
+from ..exceptions import (
+    DynamicSearchAPIErrorServiceUnavailable,
+    DynamicSearchBackendResourceError, DynamicSearchException
+)
 from ..search_models import SearchModel
 from ..serializers import (
     DummySearchResultModelSerializer, SearchModelSerializer
@@ -33,8 +36,6 @@ class APISearchModelList(generics.ListAPIView):
     serializer_class = SearchModelSerializer
 
     def get_source_queryset(self):
-        # This changes after the initial startup as search models are
-        # automatically loaded.
         return SearchModel.all()
 
 
@@ -54,6 +55,10 @@ class APISearchView(
     def get_source_queryset(self):
         try:
             return self.get_search_queryset()
+        except DynamicSearchBackendResourceError as exception:
+            raise DynamicSearchAPIErrorServiceUnavailable(
+                detail=str(exception)
+            )
         except DynamicSearchException as exception:
             raise ParseError(
                 detail=str(exception)

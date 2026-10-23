@@ -29,6 +29,7 @@ class MailingObjectSendView(MultipleObjectFormActionView):
         queryset = self.object_list
 
         result = {
+            'submit_label': _(message='Send'),
             'title': ngettext(
                 singular=self.title,
                 plural=self.title_plural,

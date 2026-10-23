@@ -5,13 +5,13 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
-from mayan.apps.acls.models import AccessControlList
 from mayan.apps.document_states.classes import WorkflowAction
 from mayan.apps.documents.models.document_models import Document
 from mayan.apps.permissions.classes import Permission
 from mayan.apps.permissions.models import Role
 
 from .classes import ModelPermission
+from .models import AccessControlList
 from .permissions import permission_acl_edit
 
 __all__ = (
@@ -78,7 +78,15 @@ class GrantAccessAction(WorkflowAction):
     label = _(message='Grant object access')
 
     @classmethod
-    def clean(cls, request, form_data=None):
+    def clean(cls, request, form_data=None, instance=None):
+        form_data = form_data or {}
+
+        content_type_id = form_data.get('content_type')
+        object_id = form_data.get('object_id')
+
+        if not content_type_id or not object_id:
+            return form_data
+
         ContentType = apps.get_model(
             app_label='contenttypes', model_name='ContentType'
         )
@@ -87,16 +95,22 @@ class GrantAccessAction(WorkflowAction):
             app_label='acls', model_name='AccessControlList'
         )
 
-        content_type = ContentType.objects.get(
-            pk=int(
-                form_data['action_data']['content_type']
+        try:
+            content_type = ContentType.objects.get_for_id(
+                id=int(content_type_id)
             )
-        )
-        obj = content_type.get_object_for_this_type(
-            pk=int(
-                form_data['action_data']['object_id']
+            obj = content_type.get_object_for_this_type(
+                pk=int(object_id)
             )
-        )
+        except Exception as exception:
+            raise ValidationError(
+                message={
+                    'object_id': _(
+                        message='Unable to find an object of the selected '
+                        'type with this ID; %(exception)s'
+                    ) % {'exception': exception}
+                }
+            )
 
         try:
             AccessControlList.objects.check_access(
@@ -142,8 +156,8 @@ class GrantAccessAction(WorkflowAction):
             app_label='contenttypes', model_name='ContentType'
         )
 
-        content_type = ContentType.objects.get(
-            pk=self.kwargs['content_type']
+        content_type = ContentType.objects.get_for_id(
+            id=self.kwargs['content_type']
         )
         self.obj = content_type.get_object_for_this_type(
             pk=self.kwargs['object_id']
@@ -160,10 +174,17 @@ class GrantAccessAction(WorkflowAction):
     def execute(self, context):
         self.get_execute_data()
 
+        log_entry = context.get('log_entry')
+        if log_entry:
+            actor = log_entry.user
+        else:
+            actor = None
+
         for role in self.roles:
             for permission in self.permissions:
                 AccessControlList.objects.grant(
-                    obj=self.obj, permission=permission, role=role
+                    obj=self.obj, permission=permission, role=role,
+                    user=actor
                 )
 
 
@@ -173,10 +194,17 @@ class RevokeAccessAction(GrantAccessAction):
     def execute(self, context):
         self.get_execute_data()
 
+        log_entry = context.get('log_entry')
+        if log_entry:
+            actor = log_entry.user
+        else:
+            actor = None
+
         for role in self.roles:
             for permission in self.permissions:
                 AccessControlList.objects.revoke(
-                    obj=self.obj, permission=permission, role=role
+                    obj=self.obj, permission=permission, role=role,
+                    user=actor
                 )
 
 
@@ -249,11 +277,17 @@ class GrantDocumentAccessAction(WorkflowAction):
     def execute(self, context):
         self.get_execute_data()
 
+        log_entry = context.get('log_entry')
+        if log_entry:
+            actor = log_entry.user
+        else:
+            actor = None
+
         for role in self.roles:
             for permission in self.permissions:
                 AccessControlList.objects.grant(
                     obj=context['workflow_instance'].document,
-                    permission=permission, role=role
+                    permission=permission, role=role, user=actor
                 )
 
 
@@ -263,9 +297,15 @@ class RevokeDocumentAccessAction(GrantDocumentAccessAction):
     def execute(self, context):
         self.get_execute_data()
 
+        log_entry = context.get('log_entry')
+        if log_entry:
+            actor = log_entry.user
+        else:
+            actor = None
+
         for role in self.roles:
             for permission in self.permissions:
                 AccessControlList.objects.revoke(
                     obj=context['workflow_instance'].document,
-                    permission=permission, role=role
+                    permission=permission, role=role, user=actor
                 )

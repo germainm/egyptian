@@ -9,9 +9,6 @@ def hook_is_new_file_allowed(instance, kwargs=None):
     )
 
     document = kwargs.get('document', None)
-    # Do not put "instance.document" as the default for .get() as it gets
-    # evaluated before .get() is executed and returns an AttributeError when
-    # instance is None.
     if not document:
         if not instance:
             return

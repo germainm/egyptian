@@ -1,9 +1,19 @@
 from collections import OrderedDict
 
-from django.forms.widgets import *  # NOQA
+from django.forms.widgets import *
 from django.forms.widgets import __all__ as django_forms_widgets_all
-from django.forms.widgets import Media, SelectMultiple, TextInput, Widget
+from django.forms.widgets import (
+    CheckboxSelectMultiple as DjangoCheckboxSelectMultiple, Media,
+    RadioSelect as DjangoRadioSelect, SelectMultiple, TextInput, Widget
+)
 from django.utils.html import format_html
+
+from .literals import (
+    WIDGET_COLOR_ATTRIBUTE_AUTO_ENABLED, WIDGET_COLOR_ATTRIBUTE_AUTO_SOURCE,
+    WIDGET_COLOR_NAME_SUFFIX_AUTO_STATE, WIDGET_COLOR_VALUE_FALSE,
+    WIDGET_COLOR_VALUE_TRUE
+)
+from .settings import setting_color_auto_enabled
 
 __all__ = django_forms_widgets_all + (
     'ColorWidget', 'DisableableSelectWidget', 'DropzoneWidget',
@@ -11,23 +21,83 @@ __all__ = django_forms_widgets_all + (
 )
 
 
+class CheckboxSelectMultiple(DjangoCheckboxSelectMultiple):
+    option_template_name = 'forms/forms/widgets/input_option.html'
+
+
 class ColorWidget(TextInput):
     template_name = 'forms/forms/widgets/widget_color_picker.html'
 
-    def __init__(self, attrs=None):
+    def __init__(self, attrs=None, auto_color_source_field_name=None):
         attrs = attrs or {}
         attrs['type'] = 'color'
+
+        self.auto_color_source_field_name = auto_color_source_field_name
+
+        self.auto_color_enabled_submitted = None
+
         super().__init__(attrs=attrs)
+
+    def get_auto_color_state_name(self, name):
+        return '{}{}'.format(name, WIDGET_COLOR_NAME_SUFFIX_AUTO_STATE)
+
+    def get_auto_color_source_name(self, name):
+        name_part_list = name.rsplit('-', 1)
+        name_part_list[-1] = self.auto_color_source_field_name
+
+        return '-'.join(name_part_list)
+
+    def value_from_datadict(self, data, files, name):
+        state_name = self.get_auto_color_state_name(name=name)
+
+        if state_name in data:
+            self.auto_color_enabled_submitted = data[
+                state_name
+            ] == WIDGET_COLOR_VALUE_TRUE
+
+        return super().value_from_datadict(data=data, files=files, name=name)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(attrs=attrs, name=name, value=value)
+
+        if self.auto_color_source_field_name:
+            source_name = self.get_auto_color_source_name(name=name)
+
+            if self.auto_color_enabled_submitted is not None:
+                auto_color_enabled = self.auto_color_enabled_submitted
+            else:
+                auto_color_enabled = setting_color_auto_enabled.value
+
+            if auto_color_enabled:
+                auto_color_enabled_text = WIDGET_COLOR_VALUE_TRUE
+            else:
+                auto_color_enabled_text = WIDGET_COLOR_VALUE_FALSE
+
+            widget_context = context['widget']
+            widget_context['auto_color_enabled'] = auto_color_enabled
+            widget_context['auto_color_enabled_text'] = (
+                auto_color_enabled_text
+            )
+            widget_context['auto_color_source_name'] = source_name
+            widget_context['auto_color_state_name'] = (
+                self.get_auto_color_state_name(name=name)
+            )
+
+            widget_attribute_dictionary = widget_context['attrs']
+            widget_attribute_dictionary[
+                WIDGET_COLOR_ATTRIBUTE_AUTO_ENABLED
+            ] = auto_color_enabled_text
+            widget_attribute_dictionary[
+                WIDGET_COLOR_ATTRIBUTE_AUTO_SOURCE
+            ] = source_name
+
+        return context
 
 
 class DisableableSelectWidget(SelectMultiple):
     def create_option(self, *args, **kwargs):
         result = super().create_option(*args, **kwargs)
 
-        # Get a keyword argument named value or the second positional argument
-        # Current interface as of Django 1.11
-        # def create_option(self, name, value, label, selected, index,
-        # subindex=None, attrs=None):
         value = kwargs.get(
             'value', args[1]
         )
@@ -42,6 +112,9 @@ class DisableableSelectWidget(SelectMultiple):
 
 class DropzoneWidget(Widget):
     template_name = 'forms/forms/widgets/dropzone.html'
+
+    def id_for_label(self, id_):
+        return ''
 
 
 class NamedMultiWidget(Widget):
@@ -62,7 +135,6 @@ class NamedMultiWidget(Widget):
         super().__init__(attrs)
 
     def _get_media(self):
-        "Media for a multiwidget is the combination of all media of the subwidgets"
         media = Media()
         for name, widget in self.widgets.items():
             media += widget.media
@@ -88,7 +160,6 @@ class NamedMultiWidget(Widget):
         id_ = final_attrs.get('id')
         subwidgets = []
 
-        # Include new subwidgets added by subclasses after __init__.
         _subwidgets_order = self.subwidgets_order.copy()
         for widget in self.widgets.keys():
             if widget not in _subwidgets_order:
@@ -147,10 +218,9 @@ class NamedMultiWidget(Widget):
 
 
 class PlainWidget(Widget):
-    """
-    Class to define a form widget that effectively nulls the htmls of a
-    widget and reduces the output to only it's value.
-    """
+    def id_for_label(self, id_):
+        return ''
+
     def render(self, name, value, attrs=None, renderer=None):
         if value is None:
             value_final = ''
@@ -160,9 +230,12 @@ class PlainWidget(Widget):
         return format_html('{}', value_final)
 
 
+class RadioSelect(DjangoRadioSelect):
+    option_template_name = 'forms/forms/widgets/input_option.html'
+
+
 class TextAreaDiv(Widget):
-    """
-    Class to define a form widget that simulates the behavior of a
-    Textarea widget but using a div tag instead.
-    """
     template_name = 'appearance/forms/widgets/textareadiv.html'
+
+    def id_for_label(self, id_):
+        return ''

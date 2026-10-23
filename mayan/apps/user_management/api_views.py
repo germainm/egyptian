@@ -1,5 +1,7 @@
 from django.contrib.auth.models import Group
 
+from rest_framework.permissions import IsAuthenticated
+
 from mayan.apps.rest_api import generics
 from mayan.apps.rest_api.api_view_mixins import ExternalObjectAPIViewMixin
 
@@ -11,7 +13,7 @@ from .permissions import (
 from .querysets import get_user_queryset
 from .serializers import (
     GroupSerializer, GroupUserAddSerializer, GroupUserRemoveSerializer,
-    UserSerializer
+    UserDetailSerializer, UserSerializer
 )
 
 
@@ -22,6 +24,7 @@ class APICurrentUserView(generics.RetrieveUpdateDestroyAPIView):
     patch: Partially edit the current user.
     put: Edit the current user.
     """
+    permission_classes = (IsAuthenticated,)
     serializer_class = UserSerializer
 
     def get_object(self):
@@ -74,7 +77,7 @@ class APIGroupUserAddView(generics.ObjectActionAPIView):
 
     def object_action(self, obj, request, serializer):
         obj.users_add(
-            queryset=get_user_queryset().filter(
+            queryset=get_user_queryset(user=self.request.user).filter(
                 pk=serializer.validated_data['user'].pk
             ), user=self.request.user
         )
@@ -93,7 +96,9 @@ class APIGroupUserListView(
     serializer_class = UserSerializer
 
     def get_source_queryset(self):
-        return self.get_external_object().user_set.all()
+        return self.get_external_object().get_users(
+            permission=permission_user_view, user=self.request.user
+        )
 
 
 class APIGroupUserRemoveView(generics.ObjectActionAPIView):
@@ -107,7 +112,7 @@ class APIGroupUserRemoveView(generics.ObjectActionAPIView):
 
     def object_action(self, obj, request, serializer):
         obj.users_remove(
-            queryset=get_user_queryset().filter(
+            queryset=get_user_queryset(user=self.request.user).filter(
                 pk=serializer.validated_data['user'].pk
             ), user=self.request.user
         )
@@ -121,10 +126,12 @@ class APIUserListView(generics.ListCreateAPIView):
     mayan_object_permission_map = {'GET': permission_user_view}
     mayan_view_permission_map = {'POST': permission_user_create}
     serializer_class = UserSerializer
-    source_queryset = get_user_queryset()
 
     def get_instance_extra_data(self):
         return {'_event_actor': self.request.user}
+
+    def get_source_queryset(self):
+        return get_user_queryset(user=self.request.user)
 
 
 class APIUserDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -141,11 +148,13 @@ class APIUserDetailView(generics.RetrieveUpdateDestroyAPIView):
         'PATCH': permission_user_edit,
         'DELETE': permission_user_delete
     }
-    serializer_class = UserSerializer
-    source_queryset = get_user_queryset()
+    serializer_class = UserDetailSerializer
 
     def get_instance_extra_data(self):
         return {'_event_actor': self.request.user}
+
+    def get_source_queryset(self):
+        return get_user_queryset(user=self.request.user)
 
 
 class APIUserGroupListView(
@@ -154,11 +163,13 @@ class APIUserGroupListView(
     """
     Returns a list of all the groups to which the user belongings.
     """
-    external_object_queryset = get_user_queryset()
     external_object_pk_url_kwarg = 'user_id'
     mayan_external_object_permission_map = {'GET': permission_user_view}
     mayan_object_permission_map = {'GET': permission_group_view}
     serializer_class = GroupSerializer
+
+    def get_external_object_queryset(self):
+        return get_user_queryset(user=self.request.user)
 
     def get_source_queryset(self):
         return self.get_external_object().groups.all()

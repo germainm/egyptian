@@ -1,44 +1,23 @@
 {% load static %}
 
-<script src="{% static 'appearance_bootstrap/node_modules/bootstrap/dist/js/bootstrap.min.js' %}" type="text/javascript"></script>
+<script src="{% static 'appearance_bootstrap/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js' %}" type="text/javascript"></script>
 
 <script>
-    'use strict';
+    (function () {
+        'use strict';
 
-    // Add invisible bootstrap messages to copy the styles to toastr.js.
-    $('body').append('<div id="div-javascript-dynamic-content"></div>');
-    $('#div-javascript-dynamic-content').html('\
-        <div class="hidden alert alert-success">\
-            <p>text</p>\
-        </div>\
-        <div class="hidden alert alert-info">\
-            <p>text</p>\
-        </div>\
-        <div class="hidden alert alert-danger">\
-            <p>text</p>\
-        </div>\
-        <div class="hidden alert alert-warning">\
-            <p>text</p>\
-        </div>\
-    ');
+        function updateNavbarHeight() {
+            var navbar = document.querySelector('.navbar.fixed-top');
 
-    // Copy the bootstrap style from the sample alerts to toaster.js via
-    // dynamic document style tag.
-    $('head').append('\
-        <style>\
-            .toast-success {\
-                background-color: ' + $('.alert-success').css('background-color') +'\
-            }\
-            .toast-info {\
-                background-color: ' + $('.alert-info').css('background-color') +'\
-            }\
-            .toast-error {\
-                background-color: ' + $('.alert-danger').css('background-color') +'\
-            }\
-            .toast-warning {\
-                background-color: ' + $('.alert-warning').css('background-color') +'\
-            }\
-        </style>\
-    ');
-    $('#div-javascript-dynamic-content').remove();
+            if (navbar) {
+                document.documentElement.style.setProperty(
+                    '--mayan-navbar-height', navbar.offsetHeight + 'px'
+                );
+            }
+        }
+
+        updateNavbarHeight();
+        window.addEventListener('load', updateNavbarHeight);
+        window.addEventListener('resize', updateNavbarHeight);
+    })();
 </script>

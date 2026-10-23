@@ -1,8 +1,8 @@
+from django.core.exceptions import ImproperlyConfigured
+
 from rest_framework import generics as rest_framework_generics, status
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
-
-from django.core.exceptions import ImproperlyConfigured
 
 from mayan.apps.dynamic_search.api_filters import RESTAPISearchFilter
 
@@ -25,8 +25,6 @@ class GenericAPIView(
     request_method_real = None
 
     def initial(self, *args, **kwargs):
-        # DRF modified the value of the request.method attribute.
-        # Preserve the real request method for individual subclass usage.
         self.request_method_real = self.request.method.upper()
         result = super().initial(*args, **kwargs)
         return result
@@ -37,10 +35,6 @@ class CreateAPIView(
     SchemaInspectionAPIViewMixin, SerializerExtraContextAPIViewMixin,
     QuerySetOverrideCheckAPIViewMixin, rest_framework_generics.CreateAPIView
 ):
-    """
-    requires:
-        view_permission = {'POST': ...}
-    """
     permission_classes = (MayanPermission,)
 
 
@@ -49,16 +43,9 @@ class ListAPIView(
     SerializerExtraContextAPIViewMixin, SchemaInspectionAPIViewMixin,
     QuerySetOverrideCheckAPIViewMixin, rest_framework_generics.ListAPIView
 ):
-    """
-    requires:
-        object_permission = {'GET': ...}
-    """
     filter_backends = (
         MayanObjectPermissionsFilter, MayanSortingFilter, RESTAPISearchFilter
     )
-    # `permission_classes` is required for the `EventListAPIView`
-    # when `Actions` objects support ACLs then this can be removed
-    # as was intended.
     permission_classes = (MayanPermission,)
 
 
@@ -68,11 +55,6 @@ class ListCreateAPIView(
     SchemaInspectionAPIViewMixin, QuerySetOverrideCheckAPIViewMixin,
     rest_framework_generics.ListCreateAPIView
 ):
-    """
-    requires:
-        object_permission = {'GET': ...}
-        view_permission = {'POST': ...}
-    """
     filter_backends = (
         MayanObjectPermissionsFilter, MayanSortingFilter, RESTAPISearchFilter
     )
@@ -88,10 +70,6 @@ class ObjectActionAPIView(
     def get_serializer_context(self):
         context = super().get_serializer_context()
 
-        # When rendering the exception handler, DRF calls this class
-        # method via `.override_method()` hiding the real request method.
-        # Use the real request method instead which saved during the view
-        # initialization for correct behavior.
         if self.request_method_real == 'POST':
             context.update(
                 {
@@ -136,7 +114,6 @@ class ObjectActionAPIView(
         )
 
         if result:
-            # If object action returned `serializer.data`.
             headers = self.get_success_headers(data=result)
             return Response(
                 headers=headers, data=result,
@@ -154,12 +131,6 @@ class RetrieveAPIView(
     SchemaInspectionAPIViewMixin, QuerySetOverrideCheckAPIViewMixin,
     rest_framework_generics.RetrieveAPIView
 ):
-    """
-    requires:
-        object_permission = {
-            'GET': ...,
-        }
-    """
     filter_backends = (MayanObjectPermissionsFilter,)
 
 
@@ -169,13 +140,6 @@ class RetrieveDestroyAPIView(
     SchemaInspectionAPIViewMixin, QuerySetOverrideCheckAPIViewMixin,
     rest_framework_generics.RetrieveDestroyAPIView
 ):
-    """
-    requires:
-        object_permission = {
-            'DELETE': ...,
-            'GET': ...,
-        }
-    """
     filter_backends = (MayanObjectPermissionsFilter,)
 
 
@@ -185,14 +149,6 @@ class RetrieveUpdateAPIView(
     SchemaInspectionAPIViewMixin, QuerySetOverrideCheckAPIViewMixin,
     rest_framework_generics.RetrieveUpdateAPIView
 ):
-    """
-    requires:
-        object_permission = {
-            'GET': ...,
-            'PATCH': ...,
-            'PUT': ...
-        }
-    """
     filter_backends = (MayanObjectPermissionsFilter,)
 
 
@@ -202,13 +158,4 @@ class RetrieveUpdateDestroyAPIView(
     SchemaInspectionAPIViewMixin, QuerySetOverrideCheckAPIViewMixin,
     rest_framework_generics.RetrieveUpdateDestroyAPIView
 ):
-    """
-    requires:
-        object_permission = {
-            'DELETE': ...,
-            'GET': ...,
-            'PATCH': ...,
-            'PUT': ...
-        }
-    """
     filter_backends = (MayanObjectPermissionsFilter,)

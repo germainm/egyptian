@@ -8,20 +8,30 @@ def code_generate_internal_name(apps, schema_editor):
     Workflow = apps.get_model(
         app_label='document_states', model_name='Workflow'
     )
-    internal_names = []
+    field_length = Workflow._meta.get_field(
+        field_name='internal_name'
+    ).max_length
+    internal_names = set()
 
-    for workflow in Workflow.objects.using(alias=schema_editor.connection.alias).all():
-        # Slugify and replace dashes (not allowed) by underscores
-        workflow.internal_name = slugify(workflow.label).replace('-', '_')
-        if workflow.internal_name in internal_names:
-            # Add a suffix in case two conversions yield the same
-            # result.
-            workflow.internal_name = '{}_'.format(
-                workflow.internal_name
+    alias = schema_editor.connection.alias
+
+    queryset = Workflow.objects.using(alias=alias).order_by('pk')
+
+    for workflow in queryset:
+        internal_name = slugify(workflow.label).replace('-', '_')
+
+        candidate = internal_name[:field_length]
+        index = 0
+        while candidate in internal_names:
+            index = index + 1
+            suffix = '_{}'.format(index)
+            candidate = '{}{}'.format(
+                internal_name[:field_length - len(suffix)], suffix
             )
 
-        internal_names.append(workflow.internal_name)
-        workflow.save()
+        workflow.internal_name = candidate
+        internal_names.add(candidate)
+        workflow.save(using=alias)
 
 
 class Migration(migrations.Migration):
@@ -30,9 +40,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Add the internal name field but make it non unique
-        # https://docs.djangoproject.com/en/1.10/howto/
-        # writing-migrations/#migrations-that-add-unique-fields
         migrations.AddField(
             model_name='workflow',
             name='internal_name',
@@ -46,15 +53,10 @@ class Migration(migrations.Migration):
                 ], verbose_name='Internal name'
             )
         ),
-        # Generate the slugs based on the labels
         migrations.RunPython(
             code=code_generate_internal_name,
             reverse_code=migrations.RunPython.noop
         ),
-        # Make the internal name field unique
-        # Add the internal name field but make it non unique
-        # https://docs.djangoproject.com/en/1.10/howto/
-        # writing-migrations/#migrations-that-add-unique-fields
         migrations.AlterField(
             model_name='workflow',
             name='internal_name',

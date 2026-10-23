@@ -108,8 +108,6 @@ class ViewMixinDownload:
             mime_type, encoding = self.get_download_mime_type_and_encoding(
                 file_object=response.file_to_stream
             )
-            # Encoding isn't set to prevent browsers from automatically
-            # uncompressing files.
             content_type = encoding_map.get(encoding, mime_type)
             response.headers['Content-Type'] = content_type or 'application/octet-stream'
         else:

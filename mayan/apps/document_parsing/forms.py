@@ -1,7 +1,8 @@
+from django.template.loader import render_to_string
 from django.utils.encoding import force_str
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
-from django.utils.translation import gettext_lazy as _, gettext
+from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.forms import form_fields, form_widgets, forms
 
@@ -9,10 +10,6 @@ from .models import DocumentFilePageContent
 
 
 class DocumentFileContentForm(forms.Form):
-    """
-    Form that concatenates all of a document pages' text content into a
-    single textarea widget
-    """
 
     def __init__(self, *args, **kwargs):
         self.document = kwargs.pop('instance', None)
@@ -30,16 +27,16 @@ class DocumentFileContentForm(forms.Form):
             except DocumentFilePageContent.DoesNotExist:
                 """Page does not have parsed content, skip."""
             else:
-                content.append(
-                    conditional_escape(
-                        text=force_str(s=page_content)
-                    )
+                text_escaped = conditional_escape(
+                    text=force_str(s=page_content)
                 )
+                content.append(text_escaped)
+
+                context = {'page_number': page.page_number}
                 content.append(
-                    '\n\n\n<hr/><div class="document-page-content-divider">- %s -</div><hr/>\n\n\n' % (
-                        gettext(
-                            message='Page %(page_number)d'
-                        ) % {'page_number': page.page_number}
+                    render_to_string(
+                        context=context,
+                        template_name='document_parsing/forms/widgets/page_content_divider.html'
                     )
                 )
 
@@ -50,10 +47,7 @@ class DocumentFileContentForm(forms.Form):
     contents = form_fields.CharField(
         label=_(message='Contents'),
         widget=form_widgets.TextAreaDiv(
-            attrs={
-                'class': 'full-height',
-                'data-height-difference': 360
-            }
+            attrs={'class': 'scrollable'}
         )
     )
 
@@ -62,10 +56,7 @@ class DocumentFilePageContentForm(forms.Form):
     contents = form_fields.CharField(
         label=_(message='Contents'),
         widget=form_widgets.TextAreaDiv(
-            attrs={
-                'class': 'full-height',
-                'data-height-difference': 360
-            }
+            attrs={'class': 'scrollable'}
         )
     )
 

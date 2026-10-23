@@ -40,6 +40,23 @@ def handler_event_trigger(sender, **kwargs):
     IndexInstance = apps.get_model(
         app_label='document_indexing', model_name='IndexInstance'
     )
+    StoredEventType = apps.get_model(
+        app_label='events', model_name='StoredEventType'
+    )
+
+    stored_event_type_id = StoredEventType.objects.get_pk_for_name(
+        name=action.verb
+    )
+
+    if stored_event_type_id is None:
+        return
+
+    queryset_index_instance = IndexInstance.objects.filter(
+        event_triggers__stored_event_type_id=stored_event_type_id
+    )
+
+    if not queryset_index_instance.exists():
+        return
 
     if isinstance(action.target, Document):
         document = action.target
@@ -49,9 +66,8 @@ def handler_event_trigger(sender, **kwargs):
         document = None
 
     if document:
-        index_instance_queryset = IndexInstance.objects.filter(
-            document_types=document.document_type,
-            event_triggers__stored_event_type__name=kwargs['instance'].verb
+        index_instance_queryset = queryset_index_instance.filter(
+            document_types=document.document_type
         )
 
         for index_instance in index_instance_queryset:

@@ -4,16 +4,16 @@
 {% load navigation_tags %}
 {% load views_tags %}
 
-<div id="list-toolbar-spacer"></div>
-<nav id="list-toolbar">
-    <div class="well center-block toolbar">
+<nav id="mayan-list-toolbar" class="bg-body-secondary">
+    
+    
+    
+    <div class="mayan-toolbar btn-toolbar mx-auto align-items-center flex-wrap gap-2" role="toolbar" aria-label="{% trans 'List actions' %}">
         {% if links_multi_menus_results %}
-            <div class="pull-left">
-                <div class="btn-toolbar btn-toolbar-check-all" role="toolbar">
-                    <div class="form-group">
-                        <input type="checkbox" class="check-all" data-checked=false title="{% trans 'Select/Deselect all' %}"/>
-                    </div>
-                </div>
+            <div class="input-group input-group-sm w-auto mayan-toolbar-check-all">
+                <span class="bg-secondary input-group-text">
+                    <input class="check-all form-check-input mt-0" type="checkbox" title="{% trans 'Select/Deselect all' %}" aria-label="{% trans 'Select/Deselect all' %}">
+                </span>
             </div>
         {% endif %}
 
@@ -22,19 +22,18 @@
         {% appearance_app_templates template_name='list_toolbar' %}
 
         {% if links_multi_menus_results %}
-            <div id="multi-item-title-responsible-wrapper">
-                <p class="pull-right" id="multi-item-title">{% trans 'Select items to activate bulk actions. Use Shift + click to select many.' %}</p>
-            </div>
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <p class="mb-0 d-none d-xxl-block" id="mayan-multi-item-title">{% trans 'Select items to activate bulk actions. Use Shift + click to select many.' %}</p>
 
-            <div class="pull-right btn-group" id="multi-item-actions">
-                {% trans 'Bulk actions' as action_dropdown_label %}
-                {% with links_multi_menus_results as action_menus_link_results %}
-                    {% include 'navigation/actions_dropdown.html' %}
-                {% endwith %}
+                <div class="btn-group btn-group-sm" id="mayan-multi-item-actions" role="group" style="display: none;">
+                    {% trans 'Bulk actions' as action_dropdown_label %}
+                    {% with links_multi_menus_results as action_menus_link_results %}
+                    {% with 'dropdown-menu-end' as navigation_action_dropdown_menu_css_classes_extra %}
+                        {% include 'navigation/actions_dropdown.html' %}
+                    {% endwith %}
+                    {% endwith %}
+                </div>
             </div>
-
         {% endif %}
-
-        <div class="clearfix"></div>
     </div>
 </nav>

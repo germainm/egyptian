@@ -30,9 +30,6 @@ class EventLogPruneBackend:
 
 
 class EventLogPruneBackendLatest(EventLogPruneBackend):
-    """
-    Keep the last N events in the entire log.
-    """
 
     def __init__(self, number):
         self.number = number
@@ -44,9 +41,6 @@ class EventLogPruneBackendLatest(EventLogPruneBackend):
 
 
 class EventLogPruneBackendLatestPerObject(EventLogPruneBackend):
-    """
-    Keep the last N events for each target.
-    """
 
     def __init__(self, number):
         self.number = number
@@ -77,10 +71,6 @@ class EventLogPruneBackendLatestPerObject(EventLogPruneBackend):
 
 
 class EventLogPruneBackendLatestPerObjectEventType(EventLogPruneBackend):
-    """
-    Keep the last N events for each target per event type. Ensures
-    at least the most recent event for each type is retained.
-    """
 
     def __init__(self, number):
         self.number = number
@@ -111,9 +101,6 @@ class EventLogPruneBackendLatestPerObjectEventType(EventLogPruneBackend):
 
 
 class EventLogPruneBackendOlderThanDays(EventLogPruneBackend):
-    """
-    Delete events older than N days.
-    """
 
     def __init__(self, days):
         self.days = days

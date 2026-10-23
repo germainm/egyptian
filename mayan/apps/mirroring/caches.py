@@ -66,8 +66,6 @@ class MirrorFilesystemCache:
         return self.cache.get(key=key)
 
     def set_path(self, path, document=None, node=None):
-        # Must provide a document_pk or a node_pk
-        # not both.
         if document:
             path_key = MirrorFilesystemCache.get_path_key(path=path)
             self.cache.set(

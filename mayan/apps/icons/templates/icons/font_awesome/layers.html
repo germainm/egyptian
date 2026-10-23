@@ -1,10 +1,12 @@
-<span class="fa-layers fa-fw {{ css_classes }} mayan-icon">
-    {% if enable_shadow %}
+<span class="mayan-icon {{ wrapper_css_classes }} {{ html_data.class }}"{% if html_data.id %} id="{{ html_data.id }}"{% endif %}{% if html_data.style %} style="{{ html_data.style }}"{% endif %}>
+    <span class="fa-layers fa-fw">
+        {% if enable_shadow %}
+            {% for entry in data %}
+                <i class="{{ entry.class }} fashadow" data-fa-transform="{{ entry.transform }}" data-fa-mask="{{ entry.mask }}"></i>
+            {% endfor %}
+        {% endif %}
         {% for entry in data %}
-            <i class="{{ entry.class }} fashadow" data-fa-transform="{{ entry.transform }}" data-fa-mask="{{ entry.mask }}"></i>
+            <i class="{{ entry.class }}" data-fa-transform="{{ entry.transform }}" data-fa-mask="{{ entry.mask }}"></i>
         {% endfor %}
-    {% endif %}
-    {% for entry in data %}
-        <i class="{{ entry.class }}" data-fa-transform="{{ entry.transform }}" data-fa-mask="{{ entry.mask }}"></i>
-    {% endfor %}
+    </span>
 </span>

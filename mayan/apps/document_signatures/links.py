@@ -35,7 +35,6 @@ def condition_is_detached_signature(context, resolved_object):
     ).is_detached
 
 
-# Detached signature
 
 link_document_file_signature_detached_create = Link(
     args='resolved_object.pk',
@@ -67,7 +66,6 @@ link_document_file_signature_detached_upload = Link(
     view='signatures:document_file_signature_detached_upload'
 )
 
-# Embedded
 
 link_document_file_signature_embedded_create = Link(
     args='resolved_object.pk',
@@ -77,7 +75,6 @@ link_document_file_signature_embedded_create = Link(
     view='signatures:document_file_signature_embedded_create'
 )
 
-# All
 
 link_document_file_signature_detail = Link(
     args='resolved_object.pk',
@@ -92,7 +89,6 @@ link_document_file_signature_list = Link(
     text=_(message='Signatures'), view='signatures:document_file_signature_list'
 )
 
-# Tools
 
 link_document_file_all_signature_refresh = Link(
     icon=icon_document_file_all_signature_refresh,

@@ -15,11 +15,6 @@ from .model_mixins import KeyBusinessLogicMixin
 
 
 class Key(ExtraDataModelMixin, KeyBusinessLogicMixin, models.Model):
-    """
-    Fields:
-    * key_type - Will show private or public, the only two types of keys in
-    a public key infrastructure, the kind used in Mayan.
-    """
     key_data = models.TextField(
         help_text=_(message='ASCII armored version of the key.'),
         verbose_name=_(message='Key data')
@@ -59,14 +54,10 @@ class Key(ExtraDataModelMixin, KeyBusinessLogicMixin, models.Model):
         return '{} - {}'.format(self.key_id, self.user_id)
 
     def clean(self):
-        """
-        Validate the key before saving.
-        """
-        import_results = GPGBackend.get_instance().import_key(
-            key_data=self.key_data
-        )
+        backend = GPGBackend.get_instance()
+        import_results = backend.import_key(key_data=self.key_data)
 
-        if not import_results.count:
+        if not import_results.key_count:
             raise ValidationError(
                 message=_(message='Invalid key data')
             )
@@ -86,11 +77,8 @@ class Key(ExtraDataModelMixin, KeyBusinessLogicMixin, models.Model):
         )
 
     @method_event(
-        event_manager_class=EventManagerSave,
-        created={
-            'event': event_key_created,
-            'target': 'self'
-        }
+        created={'event': event_key_created, 'target': 'self'},
+        event_manager_class=EventManagerSave
     )
     def save(self, *args, **kwargs):
         self.introspect_key_data()

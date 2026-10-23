@@ -10,7 +10,7 @@ from .settings import setting_saved_resultset_time_to_live_increment
 
 class SavedResultsetBusinessLogicModelMixin:
     def get_content_type(self):
-        content_type = ContentType.objects.get(
+        content_type = ContentType.objects.get_by_natural_key(
             app_label=self.app_label, model=self.model_name
         )
 

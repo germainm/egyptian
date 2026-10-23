@@ -1,5 +1,0 @@
-- :ref:`Digital signatures<apps-document_signatures>`.
-
-  - Check the authenticity of documents by verifying their embedded
-    cryptographic signatures or upload detached signatures for document
-    signed after they were stored.

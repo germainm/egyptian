@@ -7,8 +7,6 @@ from django.utils.translation import gettext, gettext_lazy as _
 
 from mayan.apps.acls.models import AccessControlList
 from mayan.apps.converter.exceptions import AppImageError
-from mayan.apps.storage.compressed_files import Archive
-from mayan.apps.storage.exceptions import NoMIMETypeMatch
 
 from ..events import event_document_type_changed
 from ..literals import (
@@ -26,10 +24,6 @@ logger = logging.getLogger(name=__name__)
 class DocumentBusinessLogicMixin:
     @classmethod
     def execute_pre_create_hooks(cls, kwargs=None):
-        """
-        Helper method to allow checking if it is possible to create
-        a new document.
-        """
         cls._execute_hooks(
             hook_list=cls._hooks_pre_create, kwargs=kwargs
         )
@@ -81,7 +75,6 @@ class DocumentBusinessLogicMixin:
             user=user
         )
 
-        # Verify the user has the access to change the document's type.
         queryset.get(pk=self.pk)
 
         queryset = AccessControlList.objects.restrict_queryset(
@@ -90,8 +83,6 @@ class DocumentBusinessLogicMixin:
             user=user
         )
 
-        # Verify the user has the access to change into the new document
-        # type.
         document_type = queryset.get(pk=document_type.pk)
 
         return self._document_type_change(
@@ -100,7 +91,7 @@ class DocumentBusinessLogicMixin:
 
     def files_upload(
         self, file_object, action_name=None, comment=None, filename=None,
-        expand=False, user=None
+        user=None
     ):
         logger.debug('Creating new document file for document: %s', self)
 
@@ -113,32 +104,6 @@ class DocumentBusinessLogicMixin:
         DocumentFile = apps.get_model(
             app_label='documents', model_name='DocumentFile'
         )
-
-        if expand:
-            try:
-                compressed_file = Archive.open(file_object=file_object)
-                for compressed_file_member in compressed_file.members():
-                    with compressed_file.open_member(filename=compressed_file_member) as compressed_file_member_file_object:
-                        # Recursive call to expand nested compressed files
-                        # expand=True literal for recursive nested files.
-                        # Might cause problem with office files inside a
-                        # compressed file.
-                        # Don't use keyword arguments for Path to allow
-                        # partials.
-                        self.file_upload(
-                            action_name=action_name, comment=comment,
-                            expand=False,
-                            file_object=compressed_file_member_file_object,
-                            filename=Path(compressed_file_member).name,
-                            user=user
-                        )
-
-                # Avoid executing the expand=False code path.
-                return
-            except NoMIMETypeMatch:
-                logger.debug(msg='No expanding; Exception: NoMIMETypeMatch')
-                # Fall through to same code path as expand=False to avoid
-                # duplicating code.
 
         try:
             filename = filename or Path(file_object.name).name
@@ -196,7 +161,6 @@ class DocumentBusinessLogicMixin:
         try:
             return self.version_active.pages
         except AttributeError:
-            # Document has no version yet.
             DocumentVersionPage = apps.get_model(
                 app_label='documents', model_name='DocumentVersionPage'
             )

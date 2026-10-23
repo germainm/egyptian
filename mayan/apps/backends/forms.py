@@ -30,7 +30,6 @@ class FormDynamicModelBackend(
 
     def __init__(self, backend_path=None, user=None, *args, **kwargs):
         self.backend_path = backend_path
-        # For the filtered fields reload method.
         self.user = user
 
         super().__init__(*args, **kwargs)
@@ -48,8 +47,6 @@ class FormDynamicModelBackend(
     def clean(self):
         data = super().clean()
 
-        # Consolidate the dynamic fields into a single JSON field called
-        # 'backend_data'.
         backend_data = {}
 
         for field_name, field_data in self.schema['fields'].items():
@@ -57,12 +54,10 @@ class FormDynamicModelBackend(
                 field_name, field_data.get('default', None)
             )
             if isinstance(backend_data[field_name], QuerySet):
-                # Flatten the queryset to a list of ids.
                 backend_data[field_name] = list(
                     backend_data[field_name].values_list('id', flat=True)
                 )
             elif isinstance(backend_data[field_name], Model):
-                # Store only the ID of a model instance.
                 backend_data[field_name] = backend_data[field_name].pk
 
         data['backend_data'] = json.dumps(obj=backend_data)

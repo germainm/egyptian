@@ -24,8 +24,6 @@ def code_document_type_driver_configuration_populate(apps, schema_editor):
             enabled = document_type_file_metadata_settings.auto_process
 
         for stored_driver in StoredDriver.objects.using(alias=schema_editor.connection.alias).all():
-            # TODO: Add `create_defaults={'enabled': enabled}` when Django
-            # is updated to 5.0.
             DocumentTypeDriverConfiguration.objects.update_or_create(
                 defaults={'enabled': enabled}, document_type=document_type,
                 stored_driver=stored_driver

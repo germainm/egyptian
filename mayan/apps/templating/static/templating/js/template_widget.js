@@ -1,11 +1,13 @@
 'use strict';
 
 jQuery(document).ready(function() {
-    /* Inject filters and tags */
+     
 
     $('[data-autocopy="true"]').change(function(event) {
         const $this = $(this);
-        const $idTemplate = $this.siblings('[data-template-fields="template"]');
+        const $idTemplate = $this.parent().find(
+            '[data-template-fields="template"]'
+        ).first();
         const templateCursorPosition = $idTemplate.prop('selectionStart');
         let templateValue = $idTemplate.val();
         const modelVariable = $idTemplate.data('model-variable') || '';
@@ -32,48 +34,112 @@ jQuery(document).ready(function() {
         $this.val('');
     });
 
-    /* Update the code preview */
+     
 
-    const templatingPreviewRefresh = function (event) {
+    const templatingPreviewRefresh = function () {
         const $this = $(this);
-        const $preview = $this.parent().find('code.templating-widget-code');
+        const editor = this;
+        const $preview = $this.parent().find(
+            'code.templating-widget-code-preview-code'
+        );
+        const previewCode = $preview.get(0);
 
         let content = $this.val();
 
+         
+        if (content.slice(-1) === '\n') {
+            content = content + ' ';
+        }
+
         $preview.text(content);
         $preview.removeAttr('data-highlighted');
-        hljs.highlightElement($preview[0]);
-    }
 
-    $('textarea.templating-widget-code').on(
-        'input change keyup', templatingPreviewRefresh
-    );
+        if (typeof hljs !== 'undefined') {
+            hljs.highlightElement(previewCode);
 
-    $('textarea.templating-widget-code').each(templatingPreviewRefresh);
+             
+            const foreground = window.getComputedStyle(previewCode).color;
 
-    /* Synchronize the scrolling */
+            editor.style.setProperty(
+                '--templating-widget-code-caret-color', foreground
+            );
+            editor.style.setProperty(
+                '--templating-widget-code-selection-background',
+                'color-mix(in srgb, ' + foreground + ' 30%, transparent)'
+            );
+        }
+    };
 
-    const syncScroll = function(event) {
-        const $other = $syncScrollSelector.not(this)
-        const other = $other.get(0);
+     
 
-        $other.off('scroll', syncScroll);
+    const templatingPreviewScroll = function () {
+        const $this = $(this);
+        const textarea = this;
+        const preview = $this.parent().find(
+            'pre.templating-widget-code-preview'
+        ).get(0);
 
-        let percentage = this.scrollTop / (this.scrollHeight - this.offsetHeight);
+        if (preview) {
+            preview.scrollLeft = textarea.scrollLeft;
+            preview.scrollTop = textarea.scrollTop;
+        }
+    };
 
-        other.scrollTop = (other.scrollHeight - other.offsetHeight) * percentage;
+    const $editorSelector = $('textarea.templating-widget-code');
 
-        setTimeout(
-            function(){
-                $other.on('scroll', syncScroll);
-            }, 25
-        );
+    $editorSelector.on('input change keyup', templatingPreviewRefresh);
+    $editorSelector.on('input change keyup scroll', templatingPreviewScroll);
 
-    }
+    $editorSelector.each(function () {
+        templatingPreviewRefresh.call(this);
+        templatingPreviewScroll.call(this);
+    });
 
-    const $syncScrollSelector = $('textarea.templating-widget-code, code.templating-widget-code');
+     
 
-    $syncScrollSelector.on('scroll', syncScroll);
+    const templatingCopyText = function ($textarea) {
+        const text = $textarea.val();
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+
+         
+        const textarea = $textarea.get(0);
+        textarea.focus();
+        textarea.select();
+
+        let succeeded = false;
+
+        try {
+            succeeded = document.execCommand('copy');
+        } catch (error) {
+            succeeded = false;
+        }
+
+        return succeeded ? Promise.resolve() : Promise.reject();
+    };
+
+    $('.templating-widget-code-copy').each(function () {
+        const $button = $(this);
+        $button.data('label-original', $button.text());
+    });
+
+    $('.templating-widget-code-copy').on('click', function (event) {
+        const $button = $(this);
+        const $textarea = $button.siblings('textarea.templating-widget-code');
+        const labelOriginal = $button.data('label-original');
+        const labelDone = typeof gettext !== 'undefined' ? gettext('Copied!') : 'Copied!';
+
+        templatingCopyText($textarea).then(function () {
+            $button.text(labelDone);
+            setTimeout(
+                function () {
+                    $button.text(labelOriginal);
+                }, 2000
+            );
+        });
+    });
 
     const selectTemplatingEntryTemplate = function (object) {
         if (!object.id) {

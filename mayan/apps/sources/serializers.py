@@ -42,6 +42,9 @@ class DocumentFileSourceMetadataSerializer(
 
 
 class SourceBackendActionInterfaceArgumentSerializer(serializers.Serializer):
+    choices = serializers.SerializerMethodField(
+        label=_(message='Choices')
+    )
     default = serializers.SerializerMethodField(
         label=_(message='Default')
     )
@@ -57,6 +60,17 @@ class SourceBackendActionInterfaceArgumentSerializer(serializers.Serializer):
     required = serializers.BooleanField(
         label=_(message='Required')
     )
+
+    def get_choices(self, instance):
+        choices = getattr(instance, 'choices', None)
+
+        if choices:
+            return [
+                {'label': str(label), 'value': value}
+                for value, label in choices
+            ]
+        else:
+            return
 
     def get_default(self, instance):
         if instance.has_default:

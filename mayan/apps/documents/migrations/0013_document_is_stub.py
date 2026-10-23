@@ -23,5 +23,8 @@ class Migration(migrations.Migration):
             ),
             preserve_default=True
         ),
-        migrations.RunPython(code=code_make_existing_documents_not_stubs)
+        migrations.RunPython(
+            code=code_make_existing_documents_not_stubs,
+            reverse_code=migrations.RunPython.noop, elidable=True
+        )
     ]

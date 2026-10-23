@@ -9,6 +9,7 @@ from .template_backends import TemplateContextEntry
 class TemplatingApp(MayanAppConfig):
     app_namespace = 'templating'
     app_url = 'templating'
+    has_javascript_translations = True
     has_rest_api = True
     has_static_media = True
     has_tests = True

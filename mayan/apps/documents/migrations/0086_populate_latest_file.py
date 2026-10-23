@@ -15,11 +15,11 @@ def code_document_latest_file_populate(apps, schema_editor):
                 {documents_documentfile_timestamp_max}.{document_id}, {documents_documentfile}.{id}
             FROM {documents_documentfile}, (
                 SELECT
-                    {document_id}, {id}, MAX({timestamp}) as {timestamp_max}
+                    {document_id}, MAX({timestamp}) as {timestamp_max}
                 FROM
                     {documents_documentfile}
                 GROUP BY
-                    {document_id}, {id}
+                    {document_id}
             ) AS {documents_documentfile_timestamp_max}
             WHERE {documents_documentfile}.{timestamp} = {documents_documentfile_timestamp_max}.{timestamp_max}
             AND {documents_documentfile}.{document_id} = {documents_documentfile_timestamp_max}.{document_id}

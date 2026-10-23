@@ -1,5 +1,4 @@
 import pathlib
-from shutil import copyfileobj
 import subprocess
 
 from django.utils.translation import gettext_lazy as _
@@ -9,13 +8,24 @@ from mayan.apps.storage.utils import NamedTemporaryFile
 
 from ..classes import MIMETypeBackend
 
-from .literals import DEFAULT_FILE_PATH
+from .literals import (
+    DEFAULT_COPY_LENGTH, DEFAULT_FILE_PATH, DEFAULT_MIME_TYPE_COMMAND_TIMEOUT
+)
 
 
 class MIMETypeBackendFileCommand(MIMETypeBackend):
-    def _init(self, copy_length=None, file_path=None):
+    def _init(self, copy_length=None, file_path=None, timeout=None):
         self.file_path = file_path or DEFAULT_FILE_PATH
+
+        if copy_length is None:
+            copy_length = DEFAULT_COPY_LENGTH
+
         self.copy_length = copy_length
+
+        if timeout is None:
+            timeout = DEFAULT_MIME_TYPE_COMMAND_TIMEOUT
+
+        self.timeout = timeout
 
         path = pathlib.Path(self.file_path)
 
@@ -26,14 +36,10 @@ class MIMETypeBackendFileCommand(MIMETypeBackend):
 
     def _get_mime_type(self, file_object, mime_type_only):
         with NamedTemporaryFile() as temporary_file_object:
-            file_object.seek(0)
-
-            copyfileobj(
-                fsrc=file_object, fdst=temporary_file_object,
-                length=self.copy_length
+            self.do_file_object_copy(
+                file_object=file_object,
+                target_file_object=temporary_file_object
             )
-            file_object.seek(0)
-            temporary_file_object.seek(0)
 
             cmd = [
                 self.file_path, '--brief',
@@ -41,7 +47,8 @@ class MIMETypeBackendFileCommand(MIMETypeBackend):
                 temporary_file_object.name
             ]
             completed = subprocess.run(
-                args=cmd, capture_output=True, check=False, text=True
+                args=cmd, capture_output=True, check=False, text=True,
+                timeout=self.timeout
             )
             output = (completed.stdout or '').strip().split(';')
 

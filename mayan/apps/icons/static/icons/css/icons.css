@@ -1,3 +1,53 @@
-.mayan-icon-fa-dual-symbol {
-    margin-right: 3px;
+.mayan-icon {
+    display: inline-block;
+    flex-shrink: 0;
+    height: 1em;
+    line-height: 0;
+    position: relative;
+    text-align: center;
+    vertical-align: baseline;
+    width: 1.25em;
+}
+
+.mayan-icon::after {
+    content: "";
+    display: inline-block;
+    height: 0.875em;
+    width: 0;
+}
+
+.mayan-icon > *,
+.mayan-icon > * > svg {
+    bottom: 0;
+    left: 0;
+    margin: auto;
+    position: absolute;
+    right: 0;
+    top: 0;
+}
+
+
+.mayan-icon-dual {
+    margin-inline-end: 0.1875em;
+}
+
+
+[dir="rtl"] i.mayan-icon-directional {
+    transform: scaleX(-1);
+}
+
+.mayan-icon-2x {
+    font-size: 2em;
+}
+
+.mayan-icon-4x {
+    font-size: 4em;
+}
+
+.mayan-icon-6x {
+    font-size: 6em;
+}
+
+.mayan-icon-10x {
+    font-size: 10em;
 }

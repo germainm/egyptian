@@ -1,7 +1,7 @@
+from celery.schedules import crontab
+
 from django.apps import apps
 from django.utils.translation import gettext_lazy as _
-
-from celery.schedules import crontab
 
 from mayan.apps.common.class_mixins import AppsModuleLoaderMixin
 from mayan.celery import app
@@ -9,6 +9,7 @@ from mayan.celery import app
 from .renderers import (
     RendererChartJSDoughnut, RendererChartJSLine, RendererChartJSPie
 )
+from .queues import queue_task_execute_statistic, queue_statistics
 
 
 class StatisticNamespace(AppsModuleLoaderMixin):
@@ -84,7 +85,6 @@ class StatisticType:
             periodic_task.delete()
 
             if crontab_instance and not crontab_instance.periodictask_set.all():
-                # Only delete the interval if nobody else is using it
                 crontab_instance.delete()
 
         StatisticResult.objects.filter(
@@ -111,9 +111,6 @@ class StatisticType:
         self, func, label, slug, day_of_month='*', day_of_week='*',
         hour='*', minute='*', month_of_year='*'
     ):
-        # Hidden import.
-        from .queues import queue_statistics, task_execute_statistic
-
         self.slug = slug
         self.label = label
         self.func = func
@@ -126,7 +123,7 @@ class StatisticType:
         app.conf.beat_schedule.update(
             {
                 self.get_task_name(): {
-                    'task': task_execute_statistic.dotted_path,
+                    'task': queue_task_execute_statistic.dotted_path,
                     'schedule': self.schedule,
                     'args': (self.slug,)
                 }
@@ -148,7 +145,6 @@ class StatisticType:
 
     def execute(self):
         results = self.func()
-        # Force evaluation of results to be able to store it serialized.
         results = StatisticType.evaluate(data=results)
         self.store_results(results=results)
 
@@ -175,8 +171,6 @@ class StatisticType:
         except StatisticResult.DoesNotExist:
             return StatisticResult.objects.none()
         except StatisticResult.MultipleObjectsReturned:
-            # This should not happen. Self-heal by deleting the duplicate
-            # results.
             StatisticResult.objects.filter(slug=self.slug).delete()
             return StatisticResult.objects.none()
 

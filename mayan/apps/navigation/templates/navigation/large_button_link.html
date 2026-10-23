@@ -1,26 +1,12 @@
-{% load icons_tags %}
-{% load navigation_tags %}
 
-{% navigation_link_get_icon link=link as link_icon %}
 
 <div class="{{ div_class }}">
-    {% if link.method == 'get' %}
-        <a class="btn btn-primary btn-lg navigation-btn-lg {% if 'new_window' in link.tags %}new_window{% endif %}" href="{{ link.url }}">
-            {% if link_icon %}<span class="navigation-lg-icon-container">{% icons_icon_render link_icon enable_shadow=True %}</span>{% endif %}
-            <br>
-            {{ link.text }}
-        </a>
-    {% elif link.method == 'post' %}
-        <form action="{{ link.url }}" class="navigation-btn-lg-form" method="{{ link.method }}">
-            <!--mayan-templating-hash-exclude-start-->
-            {% csrf_token %}
-            <!--mayan-templating-hash-exclude-end-->
-            <button class="btn btn-primary btn-lg navigation-btn-lg" type="submit">
-                {% if link_icon %}<span class="navigation-lg-icon-container">{% icons_icon_render link_icon enable_shadow=True %}</span>{% endif %}
-                <br>
-                {{ link.text }}
-            </button>
-        </form>
-    {% endif %}
+    {% with 'btn btn-primary btn-lg navigation-btn-lg' as link_classes %}
+        {% with 'navigation/large_button_link_body.html' as link_body_template %}
+            {% with 'navigation-btn-lg-form' as link_form_classes %}
+                {% include 'navigation/link_instance_element.html' %}
+            {% endwith %}
+        {% endwith %}
+    {% endwith %}
 </div>
 

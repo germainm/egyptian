@@ -14,6 +14,33 @@ class SettingNamespaceMigration:
 
         return '{}_{}'.format(method_name, version)
 
+    def get_is_value_explicit(self, global_name):
+        cluster = self.namespace.cluster
+
+        try:
+            value, domain_dict = cluster.get_domains_value(key=global_name)
+        except KeyError:
+            return False
+        else:
+            return value is not None
+
+    def get_value_renamed(
+        self, global_name, global_name_old, value, value_fallback
+    ):
+        if self.get_is_value_explicit(global_name=global_name):
+            return value
+
+        cluster = self.namespace.cluster
+
+        try:
+            value_old, domain_dict = cluster.get_domains_value(
+                key=global_name_old
+            )
+        except KeyError:
+            return value_fallback
+        else:
+            return value_old
+
     def do_setting_migrate(self, setting):
         namespace = self.namespace
         cluster = setting.get_cluster()
@@ -27,7 +54,6 @@ class SettingNamespaceMigration:
                 setting=setting
             )
 
-            # Get methods for this setting.
             pattern = r'{}_\d{{4}}'.format(setting_method_name)
             setting_methods = re.findall(
                 pattern=pattern, string='\n'.join(
@@ -35,7 +61,6 @@ class SettingNamespaceMigration:
                 )
             )
 
-            # Get order of execution of setting methods.
             version_list = [
                 method.replace(
                     '{}_'.format(setting_method_name), ''

@@ -35,15 +35,11 @@ class CabinetSerializer(serializers.ModelSerializer):
         label=_(message='Parents URL'), read_only=True
     )
 
-    # This is here because parent is optional in the model but the serializer
-    # sets it as required.
     parent = serializers.PrimaryKeyRelatedField(
         allow_null=True, label=_(message='Parent'),
         queryset=Cabinet.objects.all(), required=False
     )
 
-    # DEPRECATION: Version 5.0, remove 'parent' fields from GET request as
-    # it is replaced by 'parent_id'.
 
     class Meta:
         extra_kwargs = {

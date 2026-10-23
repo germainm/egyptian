@@ -5,13 +5,3 @@
 {% smart_setting "TEMPLATING_WIDGET_HIGHLIGHT_THEME" as theme %}
 
 <link href="{% static 'templating/node_modules/@highlightjs/cdn-assets/styles/' %}{{ theme }}.min.css" media="screen" rel="stylesheet" type="text/css" />
-
-<style>
-    textarea.templating-widget-code {
-        font-family: mono;
-    }
-
-    pre code.hljs {
-        height: 100%;
-    }
-</style>

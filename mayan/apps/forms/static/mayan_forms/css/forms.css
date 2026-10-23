@@ -1,0 +1,185 @@
+
+
+
+.dropzone {
+    background-color: var(--bs-tertiary-bg);
+    border: 2px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: flex-start;
+    min-height: 150px;
+    padding: 1.5rem;
+}
+
+.dropzone.dz-clickable {
+    cursor: pointer;
+}
+
+
+.dropzone.dz-drag-hover {
+    background-color: var(--bs-secondary-bg);
+    border-color: var(--bs-primary);
+    border-style: solid;
+}
+
+
+.dropzone .dz-message {
+    color: var(--bs-secondary-color);
+    flex: 1 0 100%;
+    margin: auto;
+    text-align: center;
+}
+
+.dropzone .dz-message .dz-button {
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+}
+
+.dropzone.dz-drag-hover .dz-message {
+    opacity: 0.5;
+}
+
+
+.dropzone .dz-preview {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    text-align: center;
+    width: 7rem;
+}
+
+
+.dropzone .dz-preview .mayan-icon-10x {
+    font-size: 8em;
+    width: 100%;
+}
+
+
+.dropzone .dz-preview .mayan-icon-10x i,
+.dropzone .dz-preview .mayan-icon-10x svg {
+    width: 100%;
+}
+
+
+.dropzone .dz-preview .dz-details {
+    font-size: 0.8125rem;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.dropzone .dz-preview .dz-filename {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.dropzone .dz-preview img[data-dz-thumbnail] {
+    display: none;
+}
+
+
+.dropzone .dz-preview .dz-remove {
+    cursor: pointer;
+    font-size: 0.8125rem;
+}
+
+
+.dropzone .dz-preview .dz-success-mark,
+.dropzone .dz-preview .dz-error-mark {
+    height: auto;
+    left: 0;
+    margin: 0;
+    right: 0;
+    text-align: center;
+    top: 3rem;
+    width: auto;
+}
+
+.dropzone .dz-preview .dz-success-mark .mayan-icon,
+.dropzone .dz-preview .dz-error-mark .mayan-icon {
+    font-size: 2.5rem;
+}
+
+
+@keyframes mayan-dropzone-mark {
+    0% {
+        opacity: 0;
+        transform: scale(0.4);
+    }
+
+    60% {
+        transform: scale(1.15);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.dropzone .dz-preview.dz-success .dz-success-mark,
+.dropzone .dz-preview.dz-error .dz-error-mark {
+    animation: mayan-dropzone-mark 0.3s ease-out;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    .dropzone .dz-preview.dz-success .dz-success-mark,
+    .dropzone .dz-preview.dz-error .dz-error-mark {
+        animation: none;
+    }
+}
+
+
+.dropzone .dz-preview .dz-progress {
+    border: 0;
+    display: flex;
+    height: 0.5rem;
+    margin-top: 0.25rem;
+    width: 100%;
+}
+
+.dropzone .dz-preview.dz-complete .dz-progress {
+    display: none;
+}
+
+
+.dropzone .dz-preview .dz-error-message {
+    color: var(--bs-danger);
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+}
+
+
+@media (max-width: 575.98px) {
+    .dropzone {
+        gap: 0.75rem;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    .dropzone .dz-preview {
+        width: 6rem;
+    }
+
+    .dropzone .dz-preview .mayan-icon-10x {
+        font-size: 6em;
+    }
+
+    .dropzone .dz-preview .dz-success-mark,
+    .dropzone .dz-preview .dz-error-mark {
+        top: 2.25rem;
+    }
+
+    .dropzone .dz-preview .dz-success-mark .mayan-icon,
+    .dropzone .dz-preview .dz-error-mark .mayan-icon {
+        font-size: 1.875rem;
+    }
+}

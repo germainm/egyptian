@@ -61,6 +61,7 @@ class EventListExportView(EventExportBaseView):
         context = super().get_extra_context()
         context.update(
             {
+                'submit_label': _(message='Export'),
                 'title': _(message='Export events')
             }
         )
@@ -80,6 +81,7 @@ class ObjectEventExportView(
         context.update(
             {
                 'object': self.external_object,
+                'submit_label': _(message='Export'),
                 'title': _(
                     message='Export events of: %s'
                 ) % self.external_object
@@ -98,6 +100,7 @@ class VerbEventExportView(VerbEventViewMixin, EventExportBaseView):
         context = super().get_extra_context()
         context.update(
             {
+                'submit_label': _(message='Export'),
                 'title': _(
                     message='Export events of type: %s'
                 ) % self.event_type

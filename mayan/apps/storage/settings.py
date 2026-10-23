@@ -45,9 +45,17 @@ setting_compressed_file_compression_ratio_maximum = setting_namespace.do_setting
     global_name='STORAGE_COMPRESSED_FILE_COMPRESSION_RATIO_MAXIMUM',
     help_text=_(
         message='Maximum ratio of uncompressed size to compressed size '
-        'permitted for a single archive member. Ratios above this value '
+        'permitted for a compressed archive. Ratios above this value '
         'are characteristic of zip-bomb / tar-bomb payloads and are '
-        'rejected. Set to 0 to disable.'
+        'rejected. For formats that store a compressed size per member '
+        '(ZIP), the ratio is applied to each member. For formats that '
+        'compress the whole archive as a single unit (TAR, and its '
+        'gzip and bzip2 variants), no per member compressed size '
+        'exists, so the ratio is applied to the archive as a whole: '
+        'the declared size of all members combined against the size of '
+        'the archive file. Raise this value if legitimate archives of '
+        'highly compressible content are being rejected. Set to 0 to '
+        'disable.'
     )
 )
 setting_download_file_expiration_interval = setting_namespace.do_setting_add(

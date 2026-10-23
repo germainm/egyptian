@@ -47,9 +47,7 @@ class MountCommandMixin:
         self.add_extra_arguments(parser)
 
     def add_extra_arguments(self, parser):
-        """
-        Optional method to allow subclasses to add their own arguments.
-        """
+        pass
 
     def factory_func_document_container_node(self, *args, **options):
         raise NotImplementedError

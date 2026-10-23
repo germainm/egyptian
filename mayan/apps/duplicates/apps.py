@@ -14,7 +14,9 @@ from .handlers import (
     handler_remove_empty_duplicates_lists, handler_scan_duplicates_for
 )
 from .links import (
-    link_document_duplicates_list, link_duplicated_document_list,
+    link_document_duplicate_backend_document_list,
+    link_document_duplicate_backend_list,
+    link_duplicate_backend_document_list, link_duplicate_backend_list,
     link_duplicated_document_scan
 )
 
@@ -43,8 +45,12 @@ class DuplicatesApp(MayanAppConfig):
         DuplicateTargetDocument = self.get_model(
             model_name='DuplicateTargetDocument'
         )
+        StoredDuplicateBackend = self.get_model(
+            model_name='StoredDuplicateBackend'
+        )
 
         DuplicateBackend.load_modules()
+
 
         SourceColumn(
             func=lambda context: DuplicateBackendEntry.objects.get_duplicates_of(
@@ -61,13 +67,49 @@ class DuplicatesApp(MayanAppConfig):
             source=DuplicateTargetDocument
         )
 
-        menu_documents.bind_links(
-            links=(link_duplicated_document_list,)
+        SourceColumn(
+            attribute='stored_backend', include_label=True, is_identifier=True,
+            label=_(message='Backend'), source=DuplicateBackendEntry
         )
+
+        SourceColumn(
+            attribute='get_document_count', include_label=True,
+            kwargs={
+                'permission': permission_document_view, 'user': 'request.user'
+            }, source=DuplicateBackendEntry,
+        )
+
+
+        SourceColumn(
+            attribute='__str__', include_label=True, is_identifier=True,
+            source=StoredDuplicateBackend
+        )
+        SourceColumn(
+            attribute='get_document_count', include_label=True, kwargs={
+                'permission': permission_document_view, 'user': 'request.user'
+            }, source=StoredDuplicateBackend
+        )
+
+
         menu_list_facet.bind_links(
-            links=(link_document_duplicates_list,),
+            links=(link_document_duplicate_backend_list,),
             sources=(Document,)
         )
+        menu_list_facet.bind_links(
+            links=(link_document_duplicate_backend_document_list,),
+            sources=(DuplicateBackendEntry,)
+        )
+
+
+        menu_documents.bind_links(
+            links=(link_duplicate_backend_list,)
+        )
+        menu_list_facet.bind_links(
+            links=(link_duplicate_backend_document_list,),
+            sources=(StoredDuplicateBackend,)
+        )
+
+
         menu_tools.bind_links(
             links=(link_duplicated_document_scan,)
         )

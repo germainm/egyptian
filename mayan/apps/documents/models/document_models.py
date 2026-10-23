@@ -27,13 +27,6 @@ class Document(
     DocumentBusinessLogicMixin, ExtraDataModelMixin, HooksModelMixin,
     models.Model
 ):
-    """
-    Defines a single document with it's fields and properties
-    Fields:
-    * uuid - UUID of a document, universally Unique ID. An unique identifier
-    generated for each document. No two documents can ever have the same UUID.
-    This ID is generated automatically.
-    """
     _hooks_pre_create = []
     _ordering_fields = ('datetime_created', 'label')
 

@@ -10,7 +10,7 @@ from .literals import DEFAULT_TX_PATH
 BinaryDependency(
     environments=(environment_development,), help_text=_(
         message='Transifex Client'
-    ), label='Transifex Client', module=__name__, name='tx',
+    ), label=_(message='Transifex Client'), module=__name__, name='tx',
     path=DEFAULT_TX_PATH
 )
 
@@ -36,5 +36,5 @@ PythonDependency(
         LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
         FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
         DEALINGS IN THE SOFTWARE.
-    ''', module=__name__, name='pytz', version_string='==2026.1.post1'
+    ''', module=__name__, name='pytz', version_string='==2026.2'
 )

@@ -66,7 +66,7 @@ class DocumentVersion(
         for page in self.pages.all():
             page.delete()
 
-        self.cache_partition.delete()
+        self.cache_partition_delete()
 
         return super().delete(*args, **kwargs)
 
@@ -97,21 +97,14 @@ class DocumentVersion(
                 result = super().save(*args, **kwargs)
 
                 if self.active:
-                    # Don't save the same version again. The active value
-                    # was already save in the previous super call to
-                    # .save().
                     self.active_set(save=False)
 
                 return result
         else:
-            # Handle existing document versions that change the value of
-            # active directly without using the method `active_set`. Such
-            # as via the API or direct model manipulation.
             if self.active:
-                # Don't save the version. The active value will be made
-                # permanent in the `super.save` call following this
-                # statement.
                 self.active_set(save=False)
+            else:
+                self.active_unset(save=False)
 
             return super().save(*args, **kwargs)
 

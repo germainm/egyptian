@@ -17,13 +17,14 @@ def code_remove_duplicates(apps, schema_editor):
     for workflow_transition_trigger_entry in queryset:
         workflow_transition_trigger_entry.pop('count')
 
-        queryset_to_delete = WorkflowTransitionTriggerEvent.objects.filter(
-            **workflow_transition_trigger_entry
-        )[1:].values('id')
+        id_list_to_delete = list(
+            WorkflowTransitionTriggerEvent.objects.filter(
+                **workflow_transition_trigger_entry
+            ).order_by('id').values_list('id', flat=True)[1:]
+        )
 
-        # Redo query as 'limit' or 'offset' can't be used with delete.
         WorkflowTransitionTriggerEvent.objects.filter(
-            id__in=queryset_to_delete
+            id__in=id_list_to_delete
         ).delete()
 
 

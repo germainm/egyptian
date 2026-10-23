@@ -68,7 +68,6 @@ class DocumentFile(
             message='An optional short text describing the document file.'
         ), verbose_name=_(message='Comment')
     )
-    # File related fields.
     file = models.FileField(
         storage=DefinedStorageLazy(name=STORAGE_NAME_DOCUMENT_FILES),
         upload_to=upload_to, verbose_name=_(message='File')
@@ -130,7 +129,7 @@ class DocumentFile(
         name = self.file.name
         self.file.close()
         self.file.storage.delete(name=name)
-        self.cache_partition.delete()
+        self.cache_partition_delete()
 
         with transaction.atomic():
             result = super().delete(*args, **kwargs)
@@ -160,10 +159,6 @@ class DocumentFile(
     natural_key.dependencies = ['documents.Document']
 
     def save(self, skip_introspection=False, *args, **kwargs):
-        """
-        Overloaded save method that updates the document file's checksum,
-        MIME type, and page count when created.
-        """
         self._event_keep_attributes = ('_event_actor',)
         new_document_file = not self.pk
 

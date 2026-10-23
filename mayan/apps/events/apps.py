@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models.signals import post_delete, post_save
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.acls.classes import ModelPermission
@@ -13,6 +14,7 @@ from mayan.apps.forms import column_widgets
 from mayan.apps.navigation.source_columns import SourceColumn
 
 from .classes import EventTypeNamespace
+from .handlers import handler_stored_event_type_pk_cache_clear
 from .html_widgets import widget_event_actor_link, widget_event_type_link
 from .links import (
     link_event_list, link_event_list_clear, link_event_list_export,
@@ -50,8 +52,6 @@ class EventsApp(MayanAppConfig):
             name='_ordering_fields', value=('timestamp',)
         )
 
-        # Typecast the related field because actstream uses CharFields for
-        # the object_id the action_object, actor, and target fields.
         ModelPermission.register_inheritance(
             fk_field_cast=models.CharField, model=Action,
             related='action_object'
@@ -80,8 +80,6 @@ class EventsApp(MayanAppConfig):
             model=ObjectEventSubscription, related='content_object'
         )
 
-        # Add labels to Action model, they are not marked translatable in the
-        # upstream package.
         SourceColumn(
             attribute='timestamp', is_identifier=True,
             is_sortable=True, label=_(message='Date and time'), name='timestamp',
@@ -104,7 +102,6 @@ class EventsApp(MayanAppConfig):
             include_label=True, source=Action, widget=column_widgets.ObjectLinkWidget
         )
 
-        # Stored event type
 
         SourceColumn(
             attribute='namespace', label=_(message='Namespace'),
@@ -115,7 +112,6 @@ class EventsApp(MayanAppConfig):
             attribute='label', label=_(message='Label'), source=StoredEventType
         )
 
-        # Notification
 
         SourceColumn(
             attribute='action__timestamp', is_identifier=True,
@@ -147,7 +143,6 @@ class EventsApp(MayanAppConfig):
             widget=column_widgets.TwoStateWidget
         )
 
-        # Object event subscription
 
         SourceColumn(
             attribute='content_object', include_label=True,
@@ -159,7 +154,6 @@ class EventsApp(MayanAppConfig):
             label=_(message='Event type'), source=ObjectEventSubscription
         )
 
-        # Clear
 
         menu_secondary.bind_links(
             links=(link_event_list_clear,),
@@ -175,7 +169,6 @@ class EventsApp(MayanAppConfig):
             )
         )
 
-        # Export
 
         menu_secondary.bind_links(
             links=(link_event_list_export,),
@@ -191,7 +184,6 @@ class EventsApp(MayanAppConfig):
             )
         )
 
-        # Notification
 
         menu_object.bind_links(
             links=(
@@ -212,7 +204,6 @@ class EventsApp(MayanAppConfig):
             )
         )
 
-        # Subscription
 
         menu_list_facet.bind_links(
             links=(
@@ -221,7 +212,6 @@ class EventsApp(MayanAppConfig):
             ), sources=(User,)
         )
 
-        # Other
 
         menu_return.bind_links(
             links=(link_event_list,), sources=(
@@ -234,4 +224,15 @@ class EventsApp(MayanAppConfig):
         )
         menu_tools.bind_links(
             links=(link_event_list,)
+        )
+
+        post_delete.connect(
+            dispatch_uid='events_handler_stored_event_type_pk_cache_clear_delete',
+            receiver=handler_stored_event_type_pk_cache_clear,
+            sender=StoredEventType
+        )
+        post_save.connect(
+            dispatch_uid='events_handler_stored_event_type_pk_cache_clear_save',
+            receiver=handler_stored_event_type_pk_cache_clear,
+            sender=StoredEventType
         )

@@ -130,8 +130,12 @@ PythonDependency(
     ''', module=__name__, name='pycountry', version_string='==26.2.16'
 )
 PythonDependency(
+    environments=(environment_production,), module=__name__, name='Markdown',
+    version_string='==3.10.2'
+)
+PythonDependency(
     environments=(environment_production,), module=__name__, name='nh3',
-    version_string='==0.3.5'
+    version_string='==0.3.6'
 )
 PythonDependency(
     environments=(environment_production,), module=__name__, name='requests',
@@ -159,10 +163,9 @@ PythonDependency(
         LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
         OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
         THE SOFTWARE.
-    ''', module=__name__, name='sh', version_string='==2.2.2'
+    ''', module=__name__, name='sh', version_string='==2.2.6'
 )
 
-# Build
 
 PythonDependency(
     environments=(environment_build,), module=__name__, name='setuptools',
@@ -177,7 +180,6 @@ PythonDependency(
     version_string='=={}'.format(PYTHON_WHEEL_VERSION)
 )
 
-# Development
 
 PythonDependency(
     environments=(environment_development,), module=__name__,

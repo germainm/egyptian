@@ -1,0 +1,7 @@
+{% if disable_title_link %}
+    {% include image_template_name %}
+{% else %}
+    <a href="{{ url }}">
+        {% include image_template_name %}
+    </a>
+{% endif %}

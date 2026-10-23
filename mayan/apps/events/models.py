@@ -8,7 +8,7 @@ from actstream.models import Action
 
 from .managers import (
     EventSubscriptionManager, NotificationManager,
-    ObjectEventSubscriptionManager
+    ObjectEventSubscriptionManager, StoredEventTypeManager
 )
 from .model_mixins import (
     NotificationBusinessLogicMixin, StoredEventTypeBusinessLogicMixin
@@ -16,14 +16,13 @@ from .model_mixins import (
 
 
 class StoredEventType(StoredEventTypeBusinessLogicMixin, models.Model):
-    """
-    Model to mirror the real event classes as database objects.
-    """
     _ordering_fields = ('name',)
 
     name = models.CharField(
         max_length=64, unique=True, verbose_name=_(message='Name')
     )
+
+    objects = StoredEventTypeManager()
 
     class Meta:
         verbose_name = _(message='Stored event type')
@@ -34,10 +33,6 @@ class StoredEventType(StoredEventTypeBusinessLogicMixin, models.Model):
 
 
 class EventSubscription(models.Model):
-    """
-    This model stores the event subscriptions of a user for the entire
-    system.
-    """
     user = models.ForeignKey(
         db_index=True, on_delete=models.CASCADE,
         related_name='event_subscriptions', to=settings.AUTH_USER_MODEL,
@@ -59,11 +54,6 @@ class EventSubscription(models.Model):
 
 
 class Notification(NotificationBusinessLogicMixin, models.Model):
-    """
-    This model keeps track of the notifications for a user. Notifications are
-    created when an event to which this user has been subscribed, are
-    committed elsewhere in the system.
-    """
     _ordering_fields = ('read',)
 
     user = models.ForeignKey(

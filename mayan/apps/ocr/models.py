@@ -16,9 +16,6 @@ from .managers import (
 
 
 class DocumentTypeOCRSettings(ExtraDataModelMixin, models.Model):
-    """
-    Model to store the OCR settings for a document type.
-    """
     document_type = models.OneToOneField(
         on_delete=models.CASCADE, related_name='ocr_settings',
         to=DocumentType, unique=True, verbose_name=_(message='Document type')
@@ -41,9 +38,6 @@ class DocumentTypeOCRSettings(ExtraDataModelMixin, models.Model):
 
 
 class DocumentVersionPageOCRContent(models.Model):
-    """
-    This model stores the OCR results for a document version page.
-    """
     document_version_page = models.OneToOneField(
         on_delete=models.CASCADE, related_name='ocr_content',
         to=DocumentVersionPage, verbose_name=_(

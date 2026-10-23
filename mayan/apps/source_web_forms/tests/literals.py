@@ -1,1 +1,0 @@
-TEST_SOURCE_BACKEND_PATH_WEB_FORM = 'mayan.apps.source_web_forms.source_backends.SourceBackendWebForm'

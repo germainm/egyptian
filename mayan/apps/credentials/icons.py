@@ -9,10 +9,10 @@ icon_credential_create = Icon(
     secondary_symbol='plus'
 )
 icon_credential_delete = Icon(
-    driver_name='fontawesome', symbol='times'
+    driver_name='fontawesome', symbol='trash-can'
 )
 icon_credential_edit = Icon(
-    driver_name='fontawesome', symbol='pencil-alt'
+    driver_name='fontawesome', symbol='pencil'
 )
 icon_credential_list = Icon(
     driver_name='fontawesome', symbol='id-card'

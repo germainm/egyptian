@@ -1,8 +1,8 @@
 from mayan.apps.icons.icons import Icon
 
-icon_check_version = Icon(driver_name='fontawesome', symbol='sync')
+icon_check_version = Icon(driver_name='fontawesome', symbol='arrows-rotate')
 
-icon_dependency_group_list = Icon(driver_name='fontawesome', symbol='boxes')
+icon_dependency_group_list = Icon(driver_name='fontawesome', symbol='boxes-stacked')
 icon_dependency_group_entry_list = Icon(
     driver_name='fontawesome', symbol='box'
 )

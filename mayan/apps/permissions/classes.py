@@ -46,7 +46,6 @@ class Permission(AppsModuleLoaderMixin):
 
     @classmethod
     def all(cls):
-        # Return sorted permissions by namespace.name
         return PermissionCollection(
             sorted(
                 cls._registry.values(), key=lambda x: x.namespace.name
@@ -89,7 +88,6 @@ class Permission(AppsModuleLoaderMixin):
 
     @classmethod
     def post_load_modules(cls):
-        # Prime cache for all permissions.
         StoredPermission = apps.get_model(
             app_label='permissions', model_name='StoredPermission'
         )

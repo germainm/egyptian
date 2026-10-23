@@ -65,7 +65,7 @@ class TransformationCreateView(
         transformation_template_name = self.get_transformation_template_name()
 
         if transformation_template_name:
-            form_field_css_classes = 'hidden'
+            form_field_css_classes = 'd-none'
         else:
             form_field_css_classes = ''
 
@@ -183,7 +183,7 @@ class TransformationEditView(
         transformation_template_name = self.get_transformation_template_name()
 
         if transformation_template_name:
-            form_field_css_classes = 'hidden'
+            form_field_css_classes = 'd-none'
         else:
             form_field_css_classes = ''
 

@@ -100,6 +100,10 @@ class DocumentUploadView(ExternalObjectViewMixin, UploadBaseView):
             }
         )
 
+        context.setdefault(
+            'submit_label', _(message='Upload')
+        )
+
         return context
 
     def get_form_extra_kwargs__document_form(self):

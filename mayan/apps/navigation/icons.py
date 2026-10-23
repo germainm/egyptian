@@ -4,5 +4,5 @@ icon_source_column_help_text = Icon(
     driver_name='fontawesome', symbol='question'
 )
 icon_source_column_help_text = Icon(
-    driver_name='fontawesome-css', css_classes='far fa-question-circle'
+    driver_name='fontawesome', style='fa-regular', symbol='circle-question'
 )

@@ -2,13 +2,13 @@
     'use strict';
 
     jQuery(document).ready(function() {
-        $('body').on('change', '#navigation-form-sort-field', function (event) {
+        $('body').on('change', '#navigation-sort-field-select', function (event) {
             const $this = $(this);
 
             let url = new URL(
                 window.location.hash.substring(1), window.location
             )
-            url.search = $this.serializeArray()[0].value;
+            url.search = $this.val();
 
             partialNavigation.setLocation(url.pathname + url.search);
         });

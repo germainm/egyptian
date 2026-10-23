@@ -58,6 +58,7 @@ class SearchBackendReindexView(ConfirmView):
                 message='This tool erases and populates the search '
                 'backend\'s internal index.'
             ),
+            'submit_label': _(message='Reindex'),
             'title': _(message='Reindex search backend')
         }
 
@@ -188,16 +189,14 @@ class SearchResultView(
                 )
             ),
             'no_results_text': _(
-                message='Try again using different terms. '
+                message='Try again using different terms.'
             ),
             'no_results_title': _(message='No search results'),
             'search_model': self.search_model,
             'subtitle': _(
                 message='Search query: %s'
             ) % self.search_interpreter.to_explain(),
-            'title': _(
-                message='Search results for: %s'
-            ) % self.search_model.label
+            'title': self.get_title()
         }
 
         if self.search_model.list_mode == LIST_MODE_CHOICE_ITEM:
@@ -214,3 +213,19 @@ class SearchResultView(
 
             messages.error(message=exception, request=self.request)
             return self.search_model.get_queryset().none()
+
+    def get_title(self):
+        term_list = self.search_interpreter.get_term_list()
+
+        if term_list:
+            term_text = ', '.join(term_list)
+
+            return _(
+                message='Search results for: %(terms)s in %(search_model)s'
+            ) % {
+                'search_model': self.search_model.label, 'terms': term_text
+            }
+        else:
+            return _(
+                message='Search results for: %s'
+            ) % self.search_model.label

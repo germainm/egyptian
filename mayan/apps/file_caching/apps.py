@@ -1,3 +1,4 @@
+from django.db.models.signals import post_save
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.acls.classes import ModelPermission
@@ -18,6 +19,7 @@ from .dashboard_widgets import (
 from .events import (
     event_cache_edited, event_cache_partition_purged, event_cache_purged
 )
+from .handlers import handler_cache_prune_on_maximum_size_decrease
 from .links import (
     link_cache_list, link_cache_purge_multiple,
     link_cache_purge_single, link_cache_tool
@@ -102,4 +104,10 @@ class FileCachingAppConfig(MayanAppConfig):
         )
         menu_tools.bind_links(
             links=(link_cache_tool,)
+        )
+
+        post_save.connect(
+            dispatch_uid='cache_prune_on_maximum_size_decrease',
+            receiver=handler_cache_prune_on_maximum_size_decrease,
+            sender=Cache
         )

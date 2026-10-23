@@ -1,4 +1,0 @@
-- Signature captures.
-
-  - Signature captures are digital recording of handwritten signatures.
-  - Commonly used for business transactions and remote contract signing.

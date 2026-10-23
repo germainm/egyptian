@@ -37,7 +37,7 @@ class WorkflowAction(DynamicFormModelBackend):
     )
 
     @classmethod
-    def clean(cls, request, form_data=None):
+    def clean(cls, request, form_data=None, instance=None):
         return form_data
 
     @classmethod
@@ -46,7 +46,6 @@ class WorkflowAction(DynamicFormModelBackend):
             app.name: app for app in apps.get_app_configs()
         }
 
-        # Match each workflow action to an app.
         apps_workflow_action_map = {}
 
         for klass in WorkflowAction.get_all():
@@ -65,7 +64,6 @@ class WorkflowAction(DynamicFormModelBackend):
             (app.verbose_name, workflow_actions) for app, workflow_actions in apps_workflow_action_map.items()
         ]
 
-        # Sort by app, then by workflow action.
         return sorted(
             result, key=lambda x: (
                 x[0], x[1]
@@ -85,8 +83,6 @@ class WorkflowAction(DynamicFormModelBackend):
                     backend_path=cls.id()
                 )
             except (OperationalError, ProgrammingError):
-                # Ignore errors during the database migration and
-                # quit further attempts.
                 return
 
     def execute(self, context):

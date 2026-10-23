@@ -8,7 +8,6 @@ from .permissions import (
     permission_document_version_view, permission_document_view
 )
 
-# Document
 
 search_model_document = SearchModel(
     app_label='documents', default=True, label=_(message='Document'),
@@ -52,7 +51,6 @@ search_model_document.add_model_field(
     field='files__mimetype', label=_(message='Document file MIME type')
 )
 
-# Document file
 
 search_model_document_file = SearchModel(
     app_label='documents', label=_(message='Document file'),
@@ -89,7 +87,6 @@ search_model_document_file.add_model_field(field='filename')
 search_model_document_file.add_model_field(field='mimetype')
 search_model_document_file.add_model_field(field='size')
 
-# Document file page
 
 search_model_document_file_page = SearchModel(
     app_label='documents', label=_(message='Document file page'),
@@ -116,7 +113,6 @@ search_model_document_file_page.add_model_field(
     field='document_file__document__uuid', label=_(message='Document UUID')
 )
 
-# Document type
 
 search_model_document_type = SearchModel(
     app_label='documents', list_mode=LIST_MODE_CHOICE_ITEM,
@@ -126,7 +122,6 @@ search_model_document_type = SearchModel(
 search_model_document_type.add_model_field(field='id')
 search_model_document_type.add_model_field(field='label')
 
-# Document version
 
 search_model_document_version = SearchModel(
     app_label='documents', label=_(message='Document version'),
@@ -159,7 +154,6 @@ search_model_document_version.add_model_field(
     field='document__uuid', label=_(message='Document UUID')
 )
 
-# Document version page
 
 search_model_document_version_page = SearchModel(
     app_label='documents', label=_(message='Document version page'),

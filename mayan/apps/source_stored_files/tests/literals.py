@@ -1,5 +1,0 @@
-TEST_SOURCE_BACKEND_PATH_STORAGE = 'mayan.apps.source_stored_files.tests.source_backends.SourceBackendTestStorage'
-
-TEST_STAGING_PREVIEW_MAX_SIZE = 100000000
-TEST_STAGING_PREVIEW_HEIGHT = ''
-TEST_STAGING_PREVIEW_WIDTH = 640

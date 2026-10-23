@@ -1,14 +1,16 @@
 {% load i18n %}
 {% load static %}
 
+{% load icons_tags %}
+
 {% if title %}
-<h4>
+<h4 class="mayan-h4">
     {{ title }}
 </h4>
 <hr>
 {% endif %}
 
-<div class="well">
+<div class="card card-body bg-body-secondary border-0">
     {% if form.is_multipart %}
         <form action="{{ form_action }}" class="{{ form_css_classes|default:'' }}" enctype="multipart/form-data" method="{{ submit_method|default:'post' }}" name="{{ form.prefix|default:'' }}" target="{{ submit_target|default:'_self' }}">
     {% else %}
@@ -42,7 +44,7 @@
 
                 {% if form_display_mode_table %}
                     <div class="table-responsive">
-                        <table class="table table-condensed table-striped">
+                        <table class="table table-sm table-striped">
                             <tbody>
                             <tr>
                                 {% for field in formset.forms.0.visible_fields %}
@@ -72,41 +74,41 @@
         {% endif %}
         {% if not read_only %}
             {% if not form.management_form or wizard.management_form or form.forms %}
-            {# Is a normal form, a wizard form, or a formset with at least one form #}
+            
 
-                <div class="form-group">
+                <div class="mt-3">
                     {% for button in form_button_overrides %}
-                        <button class="btn btn-primary {{ button.css_classes }} {% if button.is_primary %}btn-hotkey-default{% endif %}" {% if button.disabled %}disabled="disabled"{% endif %} name="{% if button.name_override %}{{ button.name_override }}{% else %}{% if form.prefix %}{{ form.prefix }}-{{ button.name }}{% else %}{{ button.name }}{% endif %}{% endif %}" type="submit" value="{{ button.value }}">
+                        <button class="btn btn-primary py-2 rounded-1 {{ button.css_classes }} {% if button.is_primary %}btn-hotkey-default{% endif %}" {% if button.disabled %}disabled="disabled"{% endif %} name="{% if button.name_override %}{{ button.name_override }}{% else %}{% if form.prefix %}{{ form.prefix }}-{{ button.name }}{% else %}{{ button.name }}{% endif %}{% endif %}" type="submit" value="{{ button.value }}">
                             {% if button.icon %}
                                 {{ button.icon.render }}
                             {% else %}
-                                <i class="fa fa-check"></i>
+                                {% icons_get_icon 'mayan.apps.views.icons.icon_confirm_form_submit' %}
                             {% endif %}
-                            {% if button.label %}{{ button.label }}{% else %}{% if object %}{% trans 'Save' %}{% else %}{% trans 'Submit' %}{% endif %}{% endif %}
+                            {% if button.label %}{{ button.label }}{% else %}{% if object %}{% trans 'Save' %}{% else %}{% trans 'Confirm' %}{% endif %}{% endif %}
                         </button>
                         &nbsp;
                     {% empty %}
-                        <button class="btn btn-primary btn-hotkey-default" name="{% if form.prefix %}{{ form.prefix }}-submit{% else %}submit{% endif %}" type="submit">
+                        <button class="btn btn-primary btn-hotkey-default py-2 rounded-1" name="{% if form.prefix %}{{ form.prefix }}-submit{% else %}submit{% endif %}" type="submit">
                             {% if submit_icon %}
                                 {{ submit_icon.render }}
                             {% else %}
-                                <i class="fa fa-check"></i>
+                                {% icons_get_icon 'mayan.apps.views.icons.icon_confirm_form_submit' %}
                             {% endif %}
-                            {% if submit_label %}{{ submit_label }}{% else %}{% if form.instance %}{% trans 'Save' %}{% else %}{% trans 'Submit' %}{% endif %}{% endif %}
+                            {% if submit_label %}{{ submit_label }}{% else %}{% if form.instance.pk %}{% trans 'Save' %}{% else %}{% if form.instance %}{% trans 'Create' %}{% else %}{% trans 'Confirm' %}{% endif %}{% endif %}{% endif %}
                         </button>
                         {% if previous %}
-                              &nbsp;<a class="btn btn-default" onclick='history.back();'>
-                                <i class="fa fa-times"></i> {% if cancel_label %}{{ cancel_label }}{% else %}{% trans 'Cancel' %}{% endif %}
+                              &nbsp;<a class="btn btn-secondary py-2 rounded-1" onclick='history.back();'>
+                                {% icons_get_icon 'mayan.apps.views.icons.icon_confirm_form_cancel' %} {% if cancel_label %}{{ cancel_label }}{% else %}{% trans 'Cancel' %}{% endif %}
                               </a>
                         {% endif %}
 
                         {% for button in extra_buttons %}
                             &nbsp;
-                            <button class="btn btn-default" name="{% if form.prefix %}{{ form.prefix }}-{{ button.name }}{% else %}{{ button.name }}{% endif %}" type="submit">
+                            <button class="btn btn-secondary py-2 rounded-1" name="{% if form.prefix %}{{ form.prefix }}-{{ button.name }}{% else %}{{ button.name }}{% endif %}" type="submit">
                                 {% if button.icon %}
                                     {{ button.icon.render }}
                                 {% endif %}
-                                {% if button.label %}{{ button.label }}{% else %}{% if object %}{% trans 'Save' %}{% else %}{% trans 'Submit' %}{% endif %}{% endif %}
+                                {% if button.label %}{{ button.label }}{% else %}{% if object %}{% trans 'Save' %}{% else %}{% trans 'Confirm' %}{% endif %}{% endif %}
                             </button>
                         {% endfor %}
                     {% endfor %}

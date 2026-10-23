@@ -154,12 +154,18 @@ class SourceStoredFile:
                 'without traversal components.'.format(self.filename)
             )
 
+    def get_image_cache_filename(
+        self, maximum_layer_order=None, transformation_instance_list=None,
+        user=None
+    ):
+        return self.encoded_filename
+
     def generate_image(self, transformation_instance_list=None):
         CachePartitionFile = apps.get_model(
             app_label='file_caching', model_name='CachePartitionFile'
         )
 
-        cache_filename = self.encoded_filename
+        cache_filename = self.get_image_cache_filename()
 
         try:
             self.cache_partition.get_file(filename=cache_filename)
@@ -203,11 +209,6 @@ class SourceStoredFile:
         self, maximum_layer_order=None, transformation_instance_list=None,
         user=None
     ):
-        """
-        Return a list of transformation containing the server side
-        transformations for this object as well as transformations
-        created from the arguments as transient interactive transformation.
-        """
         result = [
             TransformationResize(
                 height=self.source.kwargs.get('preview_height'),
@@ -215,7 +216,6 @@ class SourceStoredFile:
             )
         ]
 
-        # Interactive transformations second.
         result.extend(
             transformation_instance_list or []
         )
@@ -246,7 +246,6 @@ class SourceStoredFile:
                 except InvalidOfficeFormat:
                     page_image = converter.get_page()
         except Exception as exception:
-            # Cleanup in case of error.
             logger.error(
                 'Error getting staging file image for file "%s"; %s',
                 self.get_full_path(), exception

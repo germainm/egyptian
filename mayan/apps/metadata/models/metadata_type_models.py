@@ -17,11 +17,6 @@ from .metadata_type_model_mixins import MetadataTypeBusinessLogicMixin
 class MetadataType(
     ExtraDataModelMixin, MetadataTypeBusinessLogicMixin, models.Model
 ):
-    """
-    Model to store a type of metadata. Metadata are user defined properties
-    that can be assigned a value for each document. Metadata types need to be
-    assigned to a document type before they can be used.
-    """
     _ordering_fields = ('label', 'name')
 
     name = models.CharField(
@@ -108,7 +103,6 @@ class MetadataType(
         return super().save(*args, **kwargs)
 
     def validate_value(self, document_type, value):
-        # Check default
         if not value and self.default:
             value = self.get_default_value()
 

@@ -27,8 +27,6 @@ class APIWorkflowTemplateTransitionFieldListView(
     serializer_class = WorkflowTransitionFieldSerializer
 
     def get_instance_extra_data(self):
-        # This method is only called during POST, therefore filter only by
-        # edit permission.
         return {
             '_event_actor': self.request.user,
             'transition': self.get_workflow_template_transition()

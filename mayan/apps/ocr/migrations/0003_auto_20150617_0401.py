@@ -22,7 +22,8 @@ class Migration(migrations.Migration):
     ]
     operations = [
         migrations.RunPython(
-            code=code_move_content_from_documents_to_ocr_app
+            code=code_move_content_from_documents_to_ocr_app,
+            reverse_code=migrations.RunPython.noop, elidable=True
         )
     ]
     run_before = [

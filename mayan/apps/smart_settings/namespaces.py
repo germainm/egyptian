@@ -47,7 +47,6 @@ class SettingNamespace(metaclass=SettingNamespaceMetaclass):
     def __str__(self):
         return force_str(s=self.label)
 
-    # Doers
 
     def do_cache_invalidate(self):
         for setting in self.setting_dict.values():
@@ -97,7 +96,6 @@ class SettingNamespace(metaclass=SettingNamespaceMetaclass):
             namespace=self, metadata=metadata
         )
 
-    # Getters
 
     def get_cluster(self):
         return self.cluster
@@ -110,7 +108,7 @@ class SettingNamespace(metaclass=SettingNamespaceMetaclass):
             self.setting_dict.values(), key=lambda x: x.global_name
         )
 
-    def get_settings_as_data(self, filter_term):
+    def get_settings_as_data(self, filter_term, value_pending_map=None):
         result = {}
 
         for setting in self.get_setting_list():
@@ -119,7 +117,9 @@ class SettingNamespace(metaclass=SettingNamespaceMetaclass):
             )
 
             if not filter_term or selected:
-                value = setting.get_value_pending()
+                value = setting.get_value_pending(
+                    value_pending_map=value_pending_map
+                )
                 result[setting.global_name] = value
 
         return result

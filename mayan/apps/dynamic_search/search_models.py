@@ -3,14 +3,14 @@ import logging
 
 from django.apps import apps
 from django.contrib.admin.utils import reverse_field_path
-from django.db.models.aggregates import Max, Min
+from django.core.exceptions import FieldDoesNotExist
+from django.db.models.constants import LOOKUP_SEP
 from django.utils.functional import cached_property
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.common.class_mixins import AppsModuleLoaderMixin
 from mayan.apps.common.utils import group_iterator, parse_range
-from mayan.apps.databases.literals import DATABASE_MINIMUM_ID
 from mayan.apps.views.literals import LIST_MODE_CHOICE_LIST
 
 from .exceptions import DynamicSearchException
@@ -49,7 +49,10 @@ class SearchModel(AppsModuleLoaderMixin):
                 _(message='Unknown search model `%s`.') % name
             )
         else:
-            if getattr(result, 'serializer_path', None):
+            serializer_path = getattr(result, 'serializer_path', None)
+            serializer = getattr(result, 'serializer', None)
+
+            if serializer_path and not serializer:
                 result.serializer = import_string(
                     dotted_path=result.serializer_path
                 )
@@ -64,7 +67,6 @@ class SearchModel(AppsModuleLoaderMixin):
 
     @classmethod
     def get_for_model(cls, instance):
-        # Works the same for model classes and model instances.
         return cls.get(
             name=instance._meta.label.lower()
         )
@@ -74,24 +76,16 @@ class SearchModel(AppsModuleLoaderMixin):
         through_models = {}
 
         for search_model in cls.all():
-            for related_model, reverse_field_path_text in search_model.get_related_models():
-                # Check is each related model is connected to a many to many.
-                for field in related_model._meta.get_fields():
-                    if field.many_to_many:
-                        try:
-                            through_model = field.through
-                        except AttributeError:
-                            through_model = field.remote_field.through
-
-                        through_models.setdefault(
-                            through_model, {}
-                        )
-                        through_models[through_model].setdefault(
-                            related_model, set()
-                        )
-                        through_models[through_model][related_model].add(
-                            reverse_field_path_text
-                        )
+            for related_model, reverse_field_path_text, through_model in search_model.get_related_models_through():
+                through_models.setdefault(
+                    through_model, {}
+                )
+                through_models[through_model].setdefault(
+                    related_model, set()
+                )
+                through_models[through_model][related_model].add(
+                    reverse_field_path_text
+                )
 
         return through_models
 
@@ -131,7 +125,7 @@ class SearchModel(AppsModuleLoaderMixin):
         self.app_label = app_label
         self.list_mode = list_mode or LIST_MODE_CHOICE_LIST
         self.model_name = model_name.lower()
-        self._proxies = []  # Lazy evaluation.
+        self._proxies = []
         self.permission = permission
         self.queryset = queryset
         self.search_fields_dict = {}
@@ -162,9 +156,6 @@ class SearchModel(AppsModuleLoaderMixin):
         return str(self.label)
 
     def add_model_field(self, **kwargs):
-        """
-        Add a search field that directly belongs to the parent SearchModel.
-        """
         self.do_search_field_cache_invalidate()
 
         kwargs['search_model'] = self
@@ -199,43 +190,32 @@ class SearchModel(AppsModuleLoaderMixin):
     full_name.short_description = _(message='Full name')
 
     def get_id_groups(self, range_string=None):
-        """
-        Generate ID groups when doing bulk indexing. ID groups avoid having
-        to create a single task call for each object to be indexed.
-        """
-        queryset = self.model._meta.managers_map[self.manager_name].all()
+        model = self.model._meta.managers_map[self.manager_name]
+        queryset = model.all()
 
-        # Part 1 - Split the user requested range into blind groups.
         if not range_string:
-            # If range is not specified it will be the minimum and maximum
-            # IDs of the queryset.
-            queryset_id_values = queryset.aggregate(
-                min_id=Min('id'), max_id=Max('id')
+            valid_id_iterable = queryset.values_list(
+                'id', flat=True
+            ).iterator()
+        else:
+            id_list_groups = group_iterator(
+                iterable=parse_range(range_string=range_string),
+                group_size=setting_indexing_chunk_size.value
             )
-            range_string = '{}-{}'.format(
-                queryset_id_values['min_id'] or DATABASE_MINIMUM_ID,
-                queryset_id_values['max_id'] or DATABASE_MINIMUM_ID
+
+            generator_valid_id_groups = (
+                queryset.filter(
+                    pk__in=id_list
+                ).values_list('id', flat=True) for id_list in id_list_groups
             )
 
-        # Part 2 - Validate the blind groups by querying them and retrieve
-        # the valid ID values.
-        id_list_groups = group_iterator(
-            iterable=parse_range(range_string=range_string),
-            group_size=setting_indexing_chunk_size.value
-        )
-
-        generator_valid_id_groups = (
-            queryset.filter(
-                pk__in=id_list
-            ).values_list('id', flat=True) for id_list in id_list_groups
-        )
-
-        # Part 3 - Chain the valid ID groups into a single sequence and
-        # split them again into groups.
-        return group_iterator(
-            iterable=itertools.chain.from_iterable(
+            valid_id_iterable = itertools.chain.from_iterable(
                 generator_valid_id_groups
-            ), group_size=setting_indexing_chunk_size.value
+            )
+
+        return group_iterator(
+            iterable=valid_id_iterable,
+            group_size=setting_indexing_chunk_size.value
         )
 
     def get_queryset(self):
@@ -252,10 +232,128 @@ class SearchModel(AppsModuleLoaderMixin):
                     model=self.model, path=search_field.field_name
                 )
                 if path:
-                    # Ignore search model fields.
                     result.add(
                         (obj, path)
                     )
+
+        return result
+
+    def get_own_save_field_name_set(self):
+        result = set()
+
+        for search_field in self.search_fields:
+            if not search_field.concrete:
+                continue
+
+            first_part = search_field.field_name.split(LOOKUP_SEP)[0]
+
+            try:
+                field = self.model._meta.get_field(field_name=first_part)
+            except FieldDoesNotExist:
+                continue
+
+            if not field.concrete:
+                continue
+
+            result.add(field.name)
+            result.add(field.attname)
+
+        return result
+
+    def get_related_model_save_field_name_map(self):
+        result = {}
+
+        for search_field in self.search_fields:
+            if not search_field.concrete:
+                continue
+
+            model = self.model
+            for part in search_field.field_name.split(LOOKUP_SEP):
+                try:
+                    field = model._meta.get_field(part)
+                except FieldDoesNotExist:
+                    break
+
+                if model is not self.model:
+                    result.setdefault(model, set()).add(part)
+
+                related_model_of_field = getattr(
+                    field, 'related_model', None
+                )
+
+                if related_model_of_field is None:
+                    break
+
+                model = related_model_of_field
+
+            related_model, reverse_path = reverse_field_path(
+                model=self.model, path=search_field.field_name
+            )
+
+            if reverse_path:
+                reverse_first_part = reverse_path.split(LOOKUP_SEP)[0]
+
+                try:
+                    reverse_field = related_model._meta.get_field(
+                        reverse_first_part
+                    )
+                except FieldDoesNotExist:
+                    pass
+                else:
+                    if reverse_field.concrete:
+                        result.setdefault(
+                            related_model, set()
+                        ).add(reverse_first_part)
+
+        return {
+            related_model: field_name_set
+            for related_model, field_name_set in result.items()
+            if field_name_set
+        }
+
+    def get_related_models_through(self):
+        result = set()
+
+        for search_field in self.search_fields:
+            if not search_field.concrete:
+                continue
+
+            model = self.model
+            part_list = search_field.field_name.split(LOOKUP_SEP)
+
+            for index, part in enumerate(part_list):
+                try:
+                    field = model._meta.get_field(part)
+                except FieldDoesNotExist:
+                    """
+                    The remainder of the path is not a field of the model,
+                    so there is nothing further to traverse.
+                    """
+                    break
+
+                if field.many_to_many:
+                    try:
+                        through_model = field.through
+                    except AttributeError:
+                        through_model = field.remote_field.through
+
+                    obj, path = reverse_field_path(
+                        model=self.model, path=LOOKUP_SEP.join(
+                            part_list[:index + 1]
+                        )
+                    )
+
+                    if path:
+                        result.add(
+                            (obj, path, through_model)
+                        )
+
+                related_model = getattr(field, 'related_model', None)
+
+                if related_model is None:
+                    break
+
+                model = related_model
 
         return result
 
@@ -268,9 +366,6 @@ class SearchModel(AppsModuleLoaderMixin):
             )
 
     def get_search_field_choices(self):
-        """
-        Returns a list of the fields for the SearchModel.
-        """
         result = []
         for search_field in self.search_fields:
             result.append(
@@ -303,8 +398,6 @@ class SearchModel(AppsModuleLoaderMixin):
     ):
         instance_field_data = {}
 
-        # Process the search fields by order of priority. This makes sure
-        # that virtual fields are processed last.
         for search_field in self.search_fields_priority_sorted:
             field_value = search_field.get_instance_value(
                 exclude_kwargs=exclude_kwargs, exclude_model=exclude_model,

@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.common.serialization import yaml_load
 from mayan.apps.forms import form_fields, form_widgets, forms
+from mayan.apps.templating.fields import TemplateField
 
 
 class SettingForm(forms.Form):
@@ -14,23 +15,25 @@ class SettingForm(forms.Form):
 
         choices = self.setting.get_value_choices()
 
+        help_text = self.setting.help_text or _(
+            message='Enter the new setting value.'
+        )
+
         if choices:
             self.fields['value'] = form_fields.ChoiceField(
                 choices=list(
                     zip(choices, choices)
-                ), required=True, widget=form_widgets.Select(
+                ), help_text=help_text, label=_(message='Value'),
+                required=True, widget=form_widgets.Select(
                     attrs={'class': 'select2'}
                 )
             )
         else:
-            self.fields['value'] = form_fields.CharField(
-                required=False, widget=form_widgets.Textarea()
+            self.fields['value'] = TemplateField(
+                initial_help_text=help_text, label=_(message='Value'),
+                required=False
             )
 
-        self.fields['value'].label = _(message='Value')
-        self.fields['value'].help_text = self.setting.help_text or _(
-            message='Enter the new setting value.'
-        )
         self.fields['value'].initial = self.setting.get_display_value()
 
     def clean(self):

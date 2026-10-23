@@ -12,6 +12,8 @@
 }
 
 #carousel-container {
+    
+    overflow-x: hidden;
     overflow-y: scroll;
 }
 
@@ -20,9 +22,39 @@
     min-width: 100%;
 }
 
-.carousel-item {
+.document-carousel-item {
     margin: 5px 10px 10px 10px;
-    min-height: 100%;
+}
+
+.carousel-item-image-slot {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 300px;
+    width: 100%;
+}
+
+.carousel-item-image-slot .lazyload-spinner-container {
+    display: none;
+}
+
+.carousel-item-image-slot-empty .lazyload-spinner-container {
+    border: none;
+    display: block;
+    width: auto;
+}
+
+.lazyload-error-container {
+    align-items: center;
+    color: gray;
+    display: flex;
+    justify-content: center;
+    min-height: 150px;
+    width: 100%;
+}
+
+.carousel-item-image-slot .lazyload-error-container {
+    min-height: 300px;
 }
 
 .carousel-item-page-number {
@@ -34,13 +66,6 @@ img.lazy-load {
     min-height: 1px;
     visibility: hidden;
     width: 0px;
-}
-
-img.lazy-load-carousel {
-    min-height: 1px;
-    height: 0px;
-    width: 0px;
-    visibility: hidden;
 }
 
 .img-nolazyload {
@@ -69,7 +94,7 @@ img.lazy-load-carousel {
   margin: auto;
 }
 
-/* Must go after .thin_border-thumbnail */
+
 .thin_border {
     border: 1px solid black;
     margin: auto;

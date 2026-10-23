@@ -5,6 +5,7 @@ from django.db.models.query import QuerySet
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+from django.utils.cache import patch_vary_headers
 from django.utils.translation import gettext_lazy as _, ngettext
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import DeleteView, ModelFormMixin
@@ -17,21 +18,25 @@ from mayan.apps.forms import form_mixins, forms
 from mayan.apps.permissions.classes import Permission
 
 from .exceptions import ActionError
+from .http import URL
 from .literals import (
-    PK_LIST_KEY, PK_LIST_SEPARATOR, LIST_MODE_CHOICE_ITEM,
-    LIST_MODE_CHOICE_LIST, TEXT_LIST_AS_ITEMS_PARAMETER,
-    TEXT_LIST_AS_ITEMS_VARIABLE_NAME, TEXT_SORT_FIELD_PARAMETER,
-    TEXT_SORT_FIELD_VARIABLE_NAME
+    PK_LIST_KEY, PK_LIST_SEPARATOR, HEADER_NAME_MODAL,
+    HEADER_NAME_PAGE_RELOAD, LIST_MODE_CHOICE_ITEM, LIST_MODE_CHOICE_LIST,
+    MODAL_FRAGMENT_ENABLED, TEXT_LIST_AS_ITEMS_PARAMETER,
+    TEXT_LIST_AS_ITEMS_VARIABLE_NAME, TEXT_MODAL_PARAMETER,
+    TEXT_MODAL_VARIABLE_NAME, TEXT_SORT_FIELD_PARAMETER,
+    TEXT_SORT_FIELD_VARIABLE_NAME, REDIRECT_STATUS_CODES
 )
 from .models import UserConfirmView, UserViewMode
-from .utils import is_url_query_positive
+from .settings import (
+    setting_object_list_display_limit, setting_paging_argument
+)
+from .utils import (
+    get_request_referer, get_safe_redirect_url, is_url_query_positive
+)
 
 
 class ContentTypeViewMixin:
-    """
-    This mixin makes it easier for views to retrieve a content type from
-    the URL pattern.
-    """
     content_type_url_kw_args = {
         'app_label': 'app_label',
         'model_name': 'model_name'
@@ -50,9 +55,6 @@ class ContentTypeViewMixin:
 
 
 class ExtraDataDeleteViewMixin:
-    """
-    Mixin to populate the extra data needed for delete views.
-    """
     def form_valid(self, form):
         if hasattr(self, 'get_instance_extra_data'):
             for key, value in self.get_instance_extra_data().items():
@@ -85,15 +87,10 @@ class DynamicFieldSetFormViewMixin(DynamicFormViewMixin):
 
 
 class ExternalObjectBaseMixin:
-    """
-    Mixin to allow views to load an object with minimal code but with all
-    the filtering and configurability possible. This object is often used as
-    the main or master object in multi object views.
-    """
     external_object_class = None
     external_object_permission = None
     external_object_pk_url_kwarg = 'pk'
-    external_object_pk_url_kwargs = None  # Usage: {'pk': 'pk'}
+    external_object_pk_url_kwargs = None
     external_object_queryset = None
 
     def get_pk_url_kwargs(self):
@@ -154,18 +151,14 @@ class ExternalObjectBaseMixin:
 
 
 class ExternalObjectViewMixin(ExternalObjectBaseMixin):
-    def dispatch(self, *args, **kwargs):
+    def dispatch(self, request, *args, **kwargs):
         self.external_object = self.get_external_object()
-        return super().dispatch(*args, **kwargs)
+        return super().dispatch(request=request, *args, **kwargs)
 
 
 class ExternalContentTypeObjectViewMixin(
     ContentTypeViewMixin, ExternalObjectViewMixin
 ):
-    """
-    Mixin to retrieve an external object by content type from the URL
-    pattern.
-    """
     external_object_pk_url_kwarg = 'object_id'
 
     def get_external_object_queryset(self):
@@ -175,10 +168,6 @@ class ExternalContentTypeObjectViewMixin(
 
 
 class ExtraContextViewMixin:
-    """
-    Mixin that allows views to pass extra context to the template much easier
-    than overloading .get_context_data().
-    """
     extra_context = {}
 
     def get_context_data(self, **kwargs):
@@ -193,9 +182,6 @@ class ExtraContextViewMixin:
 
 
 class FormExtraKwargsViewMixin:
-    """
-    Mixin that allows a view to pass extra keyword arguments to forms.
-    """
     form_extra_kwargs = {}
 
     def get_form_extra_kwargs(self):
@@ -209,39 +195,138 @@ class FormExtraKwargsViewMixin:
         return result
 
 
-class ListModeViewMixin:
+class ViewMixinFormSaveAndAddAnother:
+    form_save_and_add_another_button_label = _(message='Create and add another')
+    form_save_and_add_another_button_name = 'save_and_add_another'
+    form_save_and_add_another_disabled = False
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        if context.get(TEXT_LIST_AS_ITEMS_VARIABLE_NAME):
-            default_mode = LIST_MODE_CHOICE_ITEM
-        else:
-            default_mode = LIST_MODE_CHOICE_LIST
+        button_disabled = self.get_form_save_and_add_another_disabled()
+        if not button_disabled:
+            extra_buttons = list(
+                context.get('extra_buttons') or ()
+            )
+            button_label = self.get_form_save_and_add_another_button_label()
+            button_name = self.get_form_save_and_add_another_button_name()
+            extra_buttons.append(
+                {
+                    'label': button_label,
+                    'name': button_name
+                }
+            )
+            context['extra_buttons'] = extra_buttons
 
-        user_list_mode = self.request.GET.get(TEXT_LIST_AS_ITEMS_PARAMETER)
+        return context
 
-        resolver_match = self.request.resolver_match
+    def get_form_save_and_add_another_button_label(self):
+        return self.form_save_and_add_another_button_label
 
-        view_name = '{}:{}'.format(
-            resolver_match.namespace, resolver_match.url_name
+    def get_form_save_and_add_another_button_name(self):
+        return self.form_save_and_add_another_button_name
+
+    def get_form_save_and_add_another_disabled(self):
+        return self.form_save_and_add_another_disabled
+
+    def get_form_save_and_add_another_success_url(self):
+        button_name = self.get_form_save_and_add_another_button_name()
+        button_used = button_name in self.request.POST
+
+        button_disabled = self.get_form_save_and_add_another_disabled()
+        if not button_disabled and button_used:
+            return self.request.get_full_path()
+
+        return self.get_success_url()
+
+
+class ViewMixinFormSaveAndTest:
+    form_save_and_test_button_name = 'save_and_test'
+    form_save_and_test_label = None
+
+    def get_form_save_and_test_available(self):
+        return True
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        if self.get_form_save_and_test_available():
+            extra_buttons = list(
+                context.get('extra_buttons') or ()
+            )
+            extra_buttons.append(
+                {
+                    'label': self.form_save_and_test_label,
+                    'name': self.form_save_and_test_button_name
+                }
+            )
+            context['extra_buttons'] = extra_buttons
+
+        return context
+
+    def form_valid(self, form):
+        result = super().form_valid(form=form)
+
+        test_requested = self.form_save_and_test_button_name in self.request.POST
+        save_succeeded = isinstance(result, HttpResponseRedirect)
+
+        if test_requested and save_succeeded and self.get_form_save_and_test_available():
+            self.view_test()
+            return HttpResponseRedirect(
+                redirect_to=self.request.get_full_path()
+            )
+
+        return result
+
+    def view_test(self):
+        raise NotImplementedError(
+            'Subclasses must implement the `view_test` method.'
         )
 
-        if user_list_mode:
-            UserViewMode.objects.update_or_create(
-                defaults={
-                    'namespace': resolver_match.namespace,
-                    'value': user_list_mode
-                }, name=view_name, user=self.request.user
+
+class ListModeViewMixin:
+    list_mode_fixed = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        if self.list_mode_fixed:
+            context.update(
+                {
+                    'hide_list_mode_toggle': True,
+                }
             )
-            final_list_mode = user_list_mode
+            final_list_mode = LIST_MODE_CHOICE_ITEM
         else:
-            user_view_mode, created = UserViewMode.objects.get_or_create(
-                defaults={
-                    'namespace': resolver_match.namespace,
-                    'value': default_mode
-                }, name=view_name, user=self.request.user
+            if context.get(TEXT_LIST_AS_ITEMS_VARIABLE_NAME):
+                default_mode = LIST_MODE_CHOICE_ITEM
+            else:
+                default_mode = LIST_MODE_CHOICE_LIST
+
+            user_list_mode = self.request.GET.get(TEXT_LIST_AS_ITEMS_PARAMETER)
+
+            resolver_match = self.request.resolver_match
+
+            view_name = '{}:{}'.format(
+                resolver_match.namespace, resolver_match.url_name
             )
-            final_list_mode = user_view_mode.value
+
+            if user_list_mode:
+                UserViewMode.objects.update_or_create(
+                    defaults={
+                        'namespace': resolver_match.namespace,
+                        'value': user_list_mode
+                    }, name=view_name, user=self.request.user
+                )
+                final_list_mode = user_list_mode
+            else:
+                user_view_mode, created = UserViewMode.objects.get_or_create(
+                    defaults={
+                        'namespace': resolver_match.namespace,
+                        'value': default_mode
+                    }, name=view_name, user=self.request.user
+                )
+                final_list_mode = user_view_mode.value
 
         context.update(
             {
@@ -261,7 +346,7 @@ class ModelFormFieldsetsViewMixin(ModelFormMixin):
             return form_class
         else:
             class FormFieldsetForm(form_mixins.FormMixinFieldsets, form_class):
-                """New class with the form fieldset support."""
+                pass
 
             FormFieldsetForm.fieldsets = getattr(self, 'fieldsets', None)
             return FormFieldsetForm
@@ -297,12 +382,6 @@ class MultipleExternalObjectViewMixin(ExternalObjectBaseMixin):
 
 
 class MultipleObjectViewMixin(SingleObjectMixin):
-    """
-    Mixin that allows a view to work on a single or multiple objects. It can
-    receive a pk, a slug or a list of IDs via an id_list query.
-    The pk, slug, and ID list parameter name can be changed using the
-    attributes: pk_url_kwargs, slug_url_kwarg, and pk_list_key.
-    """
     pk_list_key = PK_LIST_KEY
     pk_list_separator = PK_LIST_SEPARATOR
 
@@ -314,43 +393,24 @@ class MultipleObjectViewMixin(SingleObjectMixin):
         return super().dispatch(request=request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
-        """
-        Override BaseDetailView.get()
-        """
         return super(SingleObjectMixin, self).get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
-        """
-        Override SingleObjectMixin.get_context_data()
-        """
         return super(SingleObjectMixin, self).get_context_data(**kwargs)
 
     def get_object(self):
-        """
-        Remove this method from the subclass
-        """
         raise AttributeError
 
     def get_object_first(self):
         return self.object_list.first()
 
     def get_object_list(self, queryset=None):
-        """
-        Returns the list of objects the view is displaying.
-
-        By default this requires `self.queryset` and a `pk`, `slug` or
-        `pk_list' argument in the `URLconf`, but subclasses can override this
-        to return any object.
-        """
         self.view_mode_multiple = False
         self.view_mode_single = False
 
-        # Use a custom queryset if provided; this is required for subclasses
-        # like `DateDetailView`.
         if queryset is None:
             queryset = self.get_queryset()
 
-        # Next, try looking up by primary key.
         pk = self.kwargs.get(self.pk_url_kwarg)
         slug = self.kwargs.get(self.slug_url_kwarg)
         pk_list = self.get_pk_list()
@@ -359,7 +419,6 @@ class MultipleObjectViewMixin(SingleObjectMixin):
             queryset = queryset.filter(pk=pk)
             self.view_mode_single = True
 
-        # Next, try looking up by slug.
         if slug is not None and (pk is None or self.query_pk_and_slug):
             slug_field = self.get_slug_field()
             queryset = queryset.filter(
@@ -371,7 +430,6 @@ class MultipleObjectViewMixin(SingleObjectMixin):
             queryset = queryset.filter(pk__in=pk_list)
             self.view_mode_multiple = True
 
-        # If none of those are defined, it's an error.
         if pk is None and slug is None and pk_list is None:
             raise AttributeError(
                 'View %s must be called with '
@@ -380,10 +438,8 @@ class MultipleObjectViewMixin(SingleObjectMixin):
             )
 
         try:
-            # Get the single item from the filtered queryset
             queryset.get()
         except queryset.model.MultipleObjectsReturned:
-            # Queryset has more than one item, this is good.
             return queryset
         except queryset.model.DoesNotExist:
             raise Http404(
@@ -391,13 +447,9 @@ class MultipleObjectViewMixin(SingleObjectMixin):
                 {'verbose_name': queryset.model._meta.verbose_name}
             )
         else:
-            # Queryset has one item, this is good.
             return queryset
 
     def get_pk_list(self):
-        # Accept pk_list even on POST request to allowing direct requests
-        # to the view bypassing the initial GET request to submit the form.
-        # Example: when the view is called from a test or a custom UI.
         result = self.request.GET.get(
             self.pk_list_key, self.request.POST.get(self.pk_list_key)
         )
@@ -409,12 +461,10 @@ class MultipleObjectViewMixin(SingleObjectMixin):
 
 
 class ObjectActionViewMixin:
-    """
-    Mixin that performs a user action on a queryset.
-    """
     error_message = _(
         message='Unable to perform operation on object %(instance)s; %(exception)s.'
     )
+    object_list_display_limit = None
     post_object_action_url = None
     success_message_plural = _(
         message='Operation performed on %(count)d objects.'
@@ -435,17 +485,61 @@ class ObjectActionViewMixin:
             if self.view_mode_single:
                 title = self.title_single % {'object': self.object}
             elif self.view_mode_multiple:
+                object_list_count = self.get_object_list_count()
+
                 title = ngettext(
                     singular=self.title_singular,
-                    plural=self.title_plural,
-                    number=self.object_list.count()
+                    plural=self.title_plural, number=object_list_count
                 ) % {
-                    'count': self.object_list.count()
+                    'count': object_list_count
                 }
 
             context['title'] = title
 
+        context.update(
+            {
+                'object_list_display': self.get_object_list_display(),
+                'object_list_display_excess_count': self.get_object_list_display_excess_count
+            }
+        )
+
         return context
+
+    def get_object_list_count(self):
+        try:
+            result = self._object_list_count
+        except AttributeError:
+            result = self.object_list.count()
+            self._object_list_count = result
+
+        return result
+
+    def get_object_list_display(self):
+        limit = self.get_object_list_display_limit()
+
+        if limit < 1:
+            return ()
+
+        if not self.view_mode_multiple:
+            return ()
+
+        return self.object_list[:limit]
+
+    def get_object_list_display_excess_count(self):
+        limit = self.get_object_list_display_limit()
+
+        if limit < 1:
+            return 0
+
+        excess_count = self.get_object_list_count() - limit
+
+        return max(excess_count, 0)
+
+    def get_object_list_display_limit(self):
+        if self.object_list_display_limit is None:
+            return setting_object_list_display_limit.value
+        else:
+            return self.object_list_display_limit
 
     def get_post_object_action_url(self):
         return self.post_object_action_url
@@ -464,7 +558,6 @@ class ObjectActionViewMixin:
             }
 
     def object_action(self, instance, form=None):
-        # User supplied method.
         raise NotImplementedError
 
     def view_action(self, form=None):
@@ -489,8 +582,6 @@ class ObjectActionViewMixin:
             request=self.request
         )
 
-        # Allow `get_post_object_action_url` to override the redirect URL
-        # with a calculated URL after all objects are processed.
         success_url = self.get_post_object_action_url()
         if success_url:
             self.success_url = success_url
@@ -539,44 +630,127 @@ class RedirectionViewMixin:
     def get_post_action_redirect(self):
         return self.post_action_redirect
 
+    def get_destination_url(self, argument_name, view_url):
+        url_home = reverse(setting_home_view.value)
+
+        url_referer = get_safe_redirect_url(
+            default_url=url_home, request=self.request,
+            url=get_request_referer(default=url_home, request=self.request)
+        )
+
+        url_view = get_safe_redirect_url(
+            default_url=url_referer, request=self.request, url=view_url
+        )
+
+        url_requested = self.request.POST.get(
+            argument_name, self.request.GET.get(argument_name, None)
+        )
+
+        return get_safe_redirect_url(
+            default_url=url_view, request=self.request, url=url_requested
+        )
+
     def get_next_url(self):
         if self.next_url:
             return self.next_url
         else:
-            post_action_redirect = self.get_post_action_redirect()
-
-            return self.request.POST.get(
-                'next', self.request.GET.get(
-                    'next', post_action_redirect if post_action_redirect else self.request.META.get(
-                        'HTTP_REFERER', reverse(setting_home_view.value)
-                    )
-                )
+            view_url = self.get_post_action_redirect()
+            return self.get_destination_url(
+                argument_name='next', view_url=view_url
             )
 
     def get_previous_url(self):
         if self.previous_url:
             return self.previous_url
         else:
-            action_cancel_redirect = self.get_action_cancel_redirect()
-
-            return self.request.POST.get(
-                'previous', self.request.GET.get(
-                    'previous', action_cancel_redirect if action_cancel_redirect else self.request.META.get(
-                        'HTTP_REFERER', reverse(setting_home_view.value)
-                    )
-                )
+            view_url = self.get_action_cancel_redirect()
+            return self.get_destination_url(
+                argument_name='previous', view_url=view_url
             )
 
     def get_success_url(self):
         return self.success_url or self.get_next_url() or self.get_previous_url()
 
 
+class RedirectWithPageReloadViewMixin:
+    def dispatch(self, request, *args, **kwargs):
+        response = super().dispatch(request=request, *args, **kwargs)
+
+        status_code = getattr(response, 'status_code', None)
+
+        if status_code in REDIRECT_STATUS_CODES:
+            if self.get_page_reload_enabled():
+                response[HEADER_NAME_PAGE_RELOAD] = 'true'
+
+        return response
+
+    def get_page_reload_enabled(self):
+        return True
+
+
+class ViewMixinModalFragment:
+    modal_fragment_disabled = False
+    template_name_modal = 'appearance/confirm_modal.html'
+
+    @classmethod
+    def get_modal_fragment_capable(cls):
+        return MODAL_FRAGMENT_ENABLED and not cls.modal_fragment_disabled
+
+    def dispatch(self, request, *args, **kwargs):
+        response = super().dispatch(request=request, *args, **kwargs)
+
+        if request.method == 'GET' and self.get_modal_fragment_capable():
+            patch_vary_headers(
+                response=response, newheaders=(HEADER_NAME_MODAL,)
+            )
+
+            if self.get_modal_fragment_requested():
+                if getattr(response, 'status_code', None) == 200:
+                    response[HEADER_NAME_MODAL] = 'true'
+
+        return response
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        if self.get_modal_fragment_capable() and self.get_modal_fragment_requested():
+            context.update(
+                {
+                    TEXT_MODAL_VARIABLE_NAME: True,
+                    'modal_form_action': self.get_modal_form_action()
+                }
+            )
+
+        return context
+
+    def get_modal_form_action(self):
+        query = self.request.GET.copy()
+        query.pop(TEXT_MODAL_PARAMETER, None)
+
+        url = URL(
+            path=self.request.path, query_string=query.urlencode()
+        )
+        return url.to_string()
+
+    def get_modal_fragment_requested(self):
+        modal_query = is_url_query_positive(
+            value=self.request.GET.get(TEXT_MODAL_PARAMETER)
+        )
+        modal_header = self.request.headers.get(
+            HEADER_NAME_MODAL
+        ) == 'true'
+
+        return bool(modal_query or modal_header)
+
+    def get_template_names(self):
+        if self.request.method == 'GET':
+            if self.get_modal_fragment_capable() and self.get_modal_fragment_requested():
+                return [self.template_name_modal]
+
+        return super().get_template_names()
+
+
 class RestrictedQuerysetViewMixin:
-    """
-    Restrict the view's queryset against a permission via ACL checking.
-    Used to restrict the object list of a multiple object view or the source
-    queryset of the .get_object() method.
-    """
     model = None
     object_permission = None
     source_queryset = None
@@ -679,7 +853,6 @@ class ViewMixinConfirmRemember:
                 remember = confirm_view.remember
 
         if isinstance(self, DeleteView):
-            # It is a single object delete view.
             if remember:
                 self.object = self.get_object()
 
@@ -688,7 +861,6 @@ class ViewMixinConfirmRemember:
             else:
                 return super().get(request=request, *args, **kwargs)
         else:
-            # It is a multiple object delete view or a confirmation view.
             if remember:
                 redirect_to = self.get_success_url()
 
@@ -782,6 +954,12 @@ class ViewMixinOwnerPlusFilteredQueryset:
         return queryset.distinct()
 
 
+class ViewMixinPagingArgument:
+    @property
+    def page_kwarg(self):
+        return setting_paging_argument.value
+
+
 class ViewMixinPostAction:
     def post(self, request, *args, **kwargs):
         self.view_action()
@@ -792,12 +970,6 @@ class ViewMixinPostAction:
 
 
 class ViewPermissionCheckViewMixin:
-    """
-    Restrict access to the view based on the user's direct permissions from
-    roles. This mixing is used for views whose objects don't support ACLs or
-    for views that perform actions that are not related to a specify object
-    or object's permission like maintenance views.
-    """
     view_permission = None
 
     def dispatch(self, request, *args, **kwargs):

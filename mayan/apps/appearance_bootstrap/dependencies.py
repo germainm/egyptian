@@ -12,7 +12,7 @@ GoogleFontDependency(
 
 JavaScriptDependency(
     environments=(environment_production,), label=_(message='Bootstrap'),
-    module=__name__, name='bootstrap', version_string='=3.4.1'
+    module=__name__, name='bootstrap', version_string='=5.3.8'
 )
 JavaScriptDependency(
     environments=(environment_production,), label=_(message='Bootswatch'),
@@ -22,10 +22,11 @@ JavaScriptDependency(
             'filename_pattern': 'bootstrap.*.css',
             'content_patterns': [
                 {
-                    'search': '"https://fonts.googleapis.com/css?family=Lato:400,700,400italic"',
-                    'replace': '../../../google_fonts/lato/import.css',
+                    'search': 'https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&display=swap',
+                    'replace': '../../../../google_fonts/lato/import.css'
                 }
             ]
         }
-    ], version_string='=3.4.1'
+    ],
+    version_string='=5.3.8'
 )

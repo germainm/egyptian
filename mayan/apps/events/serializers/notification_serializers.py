@@ -24,6 +24,6 @@ class NotificationSerializer(serializers.HyperlinkedModelSerializer):
                 'view_name': 'rest_api:notification-detail'
             }
         }
-        fields = ('action', 'read', 'url', 'user')
+        fields = ('action', 'id', 'read', 'url', 'user')
         model = Notification
-        read_only_fields = ('action', 'url', 'user')
+        read_only_fields = ('action', 'id', 'url', 'user')

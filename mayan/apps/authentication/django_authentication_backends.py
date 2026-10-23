@@ -13,8 +13,6 @@ class DjangoAuthenticationBackendModelEmail(ModelBackend):
         try:
             user = UserModel._default_manager.get(email=username)
         except UserModel.DoesNotExist:
-            # Execute the default password hasher to avoid valid user
-            # discovery via differential timing analysis.
             UserModel().set_password(raw_password=password)
         else:
             if user.check_password(raw_password=password) and self.user_can_authenticate(user=user):

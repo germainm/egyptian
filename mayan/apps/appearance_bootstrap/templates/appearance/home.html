@@ -10,38 +10,30 @@
 
 {% block title %}{% include 'appearance/partials/title.html' with non_html_title=True %}{% endblock %}
 
-{% block javascript %}
-    <script>
-        $(function() {
-            $('.match-height').matchHeight();
-        });
-    </script>
-{% endblock javascript %}
-
 {% block content %}
-    <div class="row">
-        <div class="col-xs-12">
-            {% if missing_list %}
-                <div class="panel panel-primary">
-                    <div class="panel-heading">
-                        <h3 class="panel-title">{% trans 'Getting started' %}</h3>
+    {% if missing_list %}
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="mayan-h3 mb-0">{% trans 'Getting started' %}</h3>
                     </div>
-                    <div class="panel-body">
+                    <div class="card-body">
                         {% trans 'Before you can fully use Mayan EDMS you need the following:' %}
 
                         <div class="list-group">
                             {% for missing in missing_list %}
                                 <a href="{% url missing.view %}" class="list-group-item">
-                                    <h4 class="list-group-item-heading">{{ missing.label }}</h4>
-                                    <p class="list-group-item-text">{{ missing.description }}</p>
+                                    <h4 class="mayan-h4 mb-1">{{ missing.label }}</h4>
+                                    <p class="mb-1">{{ missing.description }}</p>
                                 </a>
                             {% endfor %}
                         </div>
                     </div>
                 </div>
-            {% endif %}
+            </div>
         </div>
-    </div>
+    {% endif %}
 
     {% smart_setting "COMMON_HOME_VIEW_DASHBOARD_NAME" as home_view_dashboard_name %}
 

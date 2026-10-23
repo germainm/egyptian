@@ -51,7 +51,7 @@ def code_document_version_page_create(apps, schema_editor):
 
     class DummyDocumentVersion:
         def save(self):
-            """Does not do anything."""
+            pass
 
     document_file_id_last = None
     document_version = DummyDocumentVersion()

@@ -139,6 +139,7 @@ class DocumentTypeMetadataTypeRelationshipView(RelationshipView):
                 message='There are no metadata type relationships available'
             ),
             'object': self.get_object(),
+            'submit_label': _(message='Save'),
             'title': _(
                 message='Metadata type relationships for document type: %s'
             ) % self.get_object()
@@ -182,6 +183,7 @@ class MetadataTypesDocumentTypeRelationshipView(
         return {
             'form_display_mode_table': True,
             'object': self.get_object(),
+            'submit_label': _(message='Save'),
             'title': _(
                 message='Document type relationships for metadata type: %s'
             ) % self.get_object()

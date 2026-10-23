@@ -135,7 +135,6 @@ class WorkflowInstanceLogEntrySerializer(serializers.ModelSerializer):
         except DjangoValidationError as exception:
             raise ValidationError(detail=exception)
         else:
-            # Restore the original value.
             attrs['transition_id'] = transition
 
         return attrs
@@ -168,7 +167,6 @@ class WorkflowInstanceSerializer(serializers.ModelSerializer):
     log_entry_transitions_url = serializers.SerializerMethodField(
         label=_(message='Log entry transitions URL'), read_only=True
     )
-    # DEPRECATION: Remove in version 5.0.
     workflow_template_url = serializers.SerializerMethodField(
         label=_(message='Workflow template URL')
     )

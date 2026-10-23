@@ -47,7 +47,6 @@ class LoggingAppConfigMixin:
 
             logging_configuration.update(mayan_loggin_configuration)
 
-            # Convert to list to it mutable
             handlers = list(setting_logging_handlers.value)
 
             if 'logfile' in handlers:
@@ -55,8 +54,6 @@ class LoggingAppConfigMixin:
                 try:
                     path.touch()
                 except (FileNotFoundError, PermissionError):
-                    # The path's folder do not exists or we lack
-                    # permission to write the log file.
                     handlers.remove('logfile')
                 else:
                     logging_configuration['handlers']['logfile'] = {
@@ -69,11 +66,9 @@ class LoggingAppConfigMixin:
 
             loggers = {}
 
-            # Django loggers
             for key, value in logging_configuration['loggers'].items():
                 value['level'] = setting_logging_level.value
 
-            # Mayan apps loggers
             for project_app in apps.apps.get_app_configs():
                 loggers[project_app.name] = {
                     'handlers': handlers,

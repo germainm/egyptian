@@ -47,8 +47,6 @@ class MirrorFilesystem(LoggingMixIn, Operations):
     def _clean_queryset_end_of_lines(
         queryset, source_field_name, destination_field_name='clean_value'
     ):
-        # Remove newline carriage returns and the first and last space
-        # to make multiline indexes valid directory names.
         return queryset.annotate(
             **{
                 destination_field_name: Trim(
@@ -64,10 +62,6 @@ class MirrorFilesystem(LoggingMixIn, Operations):
     def _clean_queryset_slashes(
         queryset, source_field_name, destination_field_name='_no_slashes'
     ):
-        # This is a conditional expression that is executed only for
-        # items in the queryset that contain a slash ('/') in their source
-        # field. The slash ('/') character is replaced with an
-        # underscore ('_').
         return queryset.annotate(
             **{
                 destination_field_name: Case(
@@ -90,14 +84,10 @@ class MirrorFilesystem(LoggingMixIn, Operations):
         queryset, destination_field_name='_deduplicated',
         source_field_name='_no_slashes'
     ):
-        # Make second queryset of all duplicates.
         repeats = queryset.values(source_field_name).annotate(
             repeated_count=Count(source_field_name)
         ).filter(repeated_count__gt=1).values(source_field_name)
 
-        # This is a conditional expression that is executed only for
-        # duplicates. The primary key is appended inside a parenthesis to
-        # the source field.
         return queryset.annotate(
             **{
                 destination_field_name: Case(
@@ -226,9 +216,6 @@ class MirrorFilesystem(LoggingMixIn, Operations):
         if not result:
             raise FuseOSError(ENOENT)
 
-        # st_nlink tracks the number of hard links to a file.
-        # Must be 2 for directories and at least 1 for files.
-        # https://www.gnu.org/software/libc/manual/html_node/Attribute-Meanings.html
         if isinstance(result, Document):
             function_result = {
                 'st_mode': (S_IFREG | FILE_MODE),
@@ -281,7 +268,6 @@ class MirrorFilesystem(LoggingMixIn, Operations):
         yield '.'
         yield '..'
 
-        # Serve nodes as directories.
         queryset = MirrorFilesystem._clean_queryset(
             queryset=node.get_children(),
             source_field_name=self.node_text_attribute,
@@ -291,7 +277,6 @@ class MirrorFilesystem(LoggingMixIn, Operations):
         for value in queryset.values_list('value_clean', flat=True):
             yield value
 
-        # Then serve nodes documents as files.
         queryset = MirrorFilesystem._clean_queryset(
             destination_field_name='label_clean',
             queryset=node._get_documents(), source_field_name='label'

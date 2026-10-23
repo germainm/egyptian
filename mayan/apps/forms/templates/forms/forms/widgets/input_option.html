@@ -1,0 +1,2 @@
+<input class="form-check-input{% if 'aria-invalid' in widget.attrs %} is-invalid{% endif %}" type="{{ widget.type }}" name="{{ widget.name }}"{% if widget.value != None %} value="{{ widget.value|stringformat:'s' }}"{% endif %}{% include 'django/forms/widgets/attrs.html' %}>
+<label class="form-check-label"{% if widget.attrs.id %} for="{{ widget.attrs.id }}"{% endif %}>{{ widget.label }}</label>

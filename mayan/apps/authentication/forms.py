@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from mayan.apps.forms import form_fields, forms
 from mayan.apps.user_management.querysets import get_user_queryset
 
+from .classes import AuthenticationBackend
 from .permissions import permission_users_impersonate
 
 
@@ -27,6 +28,24 @@ class AuthenticationFormBase(forms.Form):
         return self.user_cache
 
 
+class AuthenticationFormMixinMayanBackend:
+    def clean(self):
+        username = self.cleaned_data.get('username')
+        password = self.cleaned_data.get('password')
+
+        if username is not None and password:
+            authentication_backend = AuthenticationBackend.cls_get_instance()
+            self.user_cache = authentication_backend.authenticate(
+                password=password, request=self.request, username=username
+            )
+            if self.user_cache is None:
+                raise self.get_invalid_login_error()
+            else:
+                self.confirm_login_allowed(user=self.user_cache)
+
+        return self.cleaned_data
+
+
 class AuthenticationFormMixinRememberMe(forms.Form):
     _form_field_name_remember_me = 'remember_me'
     remember_me = form_fields.BooleanField(
@@ -45,11 +64,9 @@ class AuthenticationFormMixinRememberMe(forms.Form):
 
 
 class AuthenticationFormEmailPassword(
-    AuthenticationFormMixinRememberMe, AuthenticationForm
+    AuthenticationFormMixinMayanBackend, AuthenticationFormMixinRememberMe,
+    AuthenticationForm
 ):
-    """
-    A form to use email address authentication.
-    """
     PASSWORD_FIELD = 'email'
 
     def __init__(self, *args, **kwargs):
@@ -65,11 +82,9 @@ class AuthenticationFormEmailPassword(
 
 
 class AuthenticationFormUsernamePassword(
-    AuthenticationFormMixinRememberMe, AuthenticationForm
+    AuthenticationFormMixinMayanBackend, AuthenticationFormMixinRememberMe,
+    AuthenticationForm
 ):
-    """
-    Modified authentication form to include the "Remember me" field.
-    """
     PASSWORD_FIELD = 'username'
 
 

@@ -3,7 +3,7 @@ from django.urls import re_path
 from .api_views import APIContentTypeDetailView, APIContentTypeListView
 from .views import (
     AboutView, FaviconRedirectView, HomeView, LicenseView, ObjectCopyView,
-    RootView, SetupListView, ToolsListView
+    RootView, SetupListView, ToolsListView, TrademarkPolicyView
 )
 
 urlpatterns_misc = [
@@ -28,6 +28,10 @@ urlpatterns = [
     ),
     re_path(
         route=r'^license/$', name='license_view', view=LicenseView.as_view()
+    ),
+    re_path(
+        route=r'^trademark_policy/$', name='trademark_policy_view',
+        view=TrademarkPolicyView.as_view()
     ),
     re_path(
         route=r'^setup/$', name='setup_list', view=SetupListView.as_view()

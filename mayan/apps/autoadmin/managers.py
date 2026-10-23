@@ -7,7 +7,9 @@ from django.db import models
 from mayan.apps.authentication.secrets import get_random_password
 
 from .literals import COMMAND_NAME_CREATESUPERUSER
-from .settings import setting_email, setting_password, setting_username
+from .settings import (
+    setting_email, setting_log_credentials, setting_password, setting_username
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -26,10 +28,12 @@ class AutoAdminSingletonManager(models.Manager):
                 **{UserModel.USERNAME_FIELD: setting_username.value}
             )
         except UserModel.DoesNotExist:
-            logger.info(
-                'Creating super user -- login: %s, email: %s, password: %s',
-                setting_username.value, setting_email.value, password
-            )
+            if setting_log_credentials.value:
+                logger.info(
+                    'Creating super user -- login: %s, email: %s, password: %s',
+                    setting_username.value, setting_email.value, password
+                )
+
             management.call_command(
                 COMMAND_NAME_CREATESUPERUSER,
                 **{
@@ -44,9 +48,7 @@ class AutoAdminSingletonManager(models.Manager):
             )
             account.set_password(raw_password=password)
             account.save()
-            # Store the auto admin password properties to display the
-            # first login message
-            auto_admin_properties, created = self.get_or_create()  # NOQA
+            auto_admin_properties, created = self.get_or_create()
             auto_admin_properties.account = account
             auto_admin_properties.password = password
             auto_admin_properties.password_hash = account.password

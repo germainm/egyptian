@@ -7,13 +7,18 @@ from mayan.apps.acls.permissions import (
     permission_acl_edit, permission_acl_view
 )
 from mayan.apps.app_manager.apps import MayanAppConfig
+from mayan.apps.app_manager.classes import InitializationStep
+from mayan.apps.app_manager.literals import PROCESS_UPGRADE
+from mayan.apps.app_manager.runlevels import runlevel_maintenance
 from mayan.apps.common.classes import MissingItem
 from mayan.apps.common.menus import (
     menu_list_facet, menu_object, menu_return, menu_secondary, menu_setup
 )
-from mayan.apps.common.signals import signal_post_upgrade
 from mayan.apps.converter.links import link_transformation_list
 from mayan.apps.databases.classes import ModelFieldRelated, ModelProperty
+from mayan.apps.documents.dashboard_widgets import (
+    DashboardWidgetUserRecentlyCreatedDocuments
+)
 from mayan.apps.documents.menus import menu_documents
 from mayan.apps.documents.permissions import (
     permission_document_create, permission_document_file_new
@@ -27,16 +32,18 @@ from mayan.apps.rest_api.fields import DynamicSerializerField
 from .classes import DocumentCreateWizardStep
 from .events import event_source_edited
 from .handlers import (
-    handler_create_source_cache, handler_delete_interval_source_periodic_task,
-    handler_initialize_periodic_tasks
+    handler_create_source_cache, handler_delete_interval_source_periodic_task
 )
+from .initializers import initializer_setup_periodic_tasks
 from .links import (
     link_document_file_source_metadata_list, link_document_file_upload,
     link_document_upload_wizard, link_source_backend_selection,
     link_source_delete, link_source_edit, link_source_list, link_source_setup,
     link_source_test
 )
-from .literals import ERROR_LOG_DOMAIN_NAME
+from .literals import (
+    ERROR_LOG_DOMAIN_NAME, SOURCE_ERROR_LOG_PARTITION_ENTRY_LIMIT
+)
 from .permissions import (
     permission_document_file_sources_metadata_view, permission_sources_delete,
     permission_sources_edit, permission_sources_view
@@ -92,7 +99,9 @@ class SourcesApp(MayanAppConfig):
             value=DocumentFileSourceMetadataHelper.constructor
         )
 
-        error_log = ErrorLog(app_config=self)
+        error_log = ErrorLog(
+            app_config=self, limit=SOURCE_ERROR_LOG_PARTITION_ENTRY_LIMIT
+        )
         error_log.register_model(model=Source)
 
         ErrorLogDomain(
@@ -100,6 +109,13 @@ class SourcesApp(MayanAppConfig):
         )
 
         EventModelRegistry.register(model=Source)
+
+        InitializationStep(
+            function=initializer_setup_periodic_tasks,
+            label=_(message='Initialize source periodic tasks'),
+            name='sources.initialize_periodic_tasks',
+            process=PROCESS_UPGRADE, runlevel=runlevel_maintenance
+        )
 
         ModelEventType.register(
             model=Source, event_types=(event_source_edited,)
@@ -150,7 +166,6 @@ class SourcesApp(MayanAppConfig):
             name='source_metadata_value_of.< key >'
         )
 
-        # Document file source metadata
 
         SourceColumn(
             attribute='key', is_identifier=True, is_sortable=True,
@@ -161,7 +176,6 @@ class SourcesApp(MayanAppConfig):
             source=DocumentFileSourceMetadata
         )
 
-        # Sources
 
         SourceColumn(
             attribute='label', is_identifier=True, is_sortable=True,
@@ -179,6 +193,13 @@ class SourcesApp(MayanAppConfig):
         menu_documents.bind_links(
             links=(link_document_upload_wizard,)
         )
+
+        DashboardWidgetUserRecentlyCreatedDocuments.empty_link_navigation = link_document_upload_wizard
+
+        from mayan.apps.documents.views.document_file_views import (
+            DocumentFileListView
+        )
+        DocumentFileListView.no_results_main_link = link_document_file_upload
 
         menu_list_facet.bind_links(
             links=(link_document_file_source_metadata_list,),
@@ -219,14 +240,10 @@ class SourcesApp(MayanAppConfig):
         )
         post_migrate.connect(
             dispatch_uid='sources_handler_create_source_cache',
-            receiver=handler_create_source_cache
+            receiver=handler_create_source_cache, sender=self
         )
         pre_delete.connect(
             dispatch_uid='sources_handler_delete_interval_source_periodic_task',
             receiver=handler_delete_interval_source_periodic_task,
             sender=DocumentType
-        )
-        signal_post_upgrade.connect(
-            dispatch_uid='sources_handler_initialize_periodic_tasks',
-            receiver=handler_initialize_periodic_tasks
         )

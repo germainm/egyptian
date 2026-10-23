@@ -1,25 +1,26 @@
 class SourceException(Exception):
-    """Base sources warning"""
+    pass
 
 
 class SourceActionException(SourceException):
-    """Raised when a source does not have the request action."""
+    pass
+
+
+class SourceActionExceptionRejected(SourceActionException):
+    pass
 
 
 class SourceActionExceptionUnknown(SourceActionException):
-    """Raised when a source does not have the request action."""
+    pass
 
 
 class SourceActionExceptionInterface(SourceActionException):
-    """Base exception for all things related to the action interfaces."""
+    pass
 
 
 class SourceActionExceptionInterfaceArgumentMissing(SourceActionExceptionInterface):
-    """
-    Raised when an action does not supply a required interface argument
-    which does not have a default value.
-    """
+    pass
 
 
 class SourceActionExceptionInterfaceUnknown(SourceActionExceptionInterface):
-    """Raised when an action does not support the specified interface."""
+    pass

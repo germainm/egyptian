@@ -1,13 +1,13 @@
+from google.cloud import storage
+
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured
-
-from google.cloud import storage
 
 from .base import DownloadBackend
 
 
 class DownloadBackendGoogleCloudStorageSignedURL(DownloadBackend):
-    DEFAULT_EXPIRATION = 3600  # 1 hour
+    DEFAULT_EXPIRATION = 3600
 
     def __init__(
         self, bucket_name, stored_credential_internal_name, expiration=None

@@ -4,14 +4,8 @@ from django.db.migrations.loader import MigrationLoader
 
 
 def code_drop_btree_index(apps, schema_editor):
-    """
-    Process BTREE indexes that were not renamed along with their respective
-    models.
-    """
     index_hashes = ('30bada95', '42757b7a')
 
-    # Access the model from the previous migration to allow deleting the
-    # indexes.
     loader = MigrationLoader(connection=connection)
     state = loader.project_state(
         nodes=('documents', '0056_auto_20200916_0959')
@@ -26,8 +20,6 @@ def code_drop_btree_index(apps, schema_editor):
         for index_hash in index_hashes:
             if index_hash in index_name:
                 if '_fk_' not in index_name:
-                    # Index is needed in a foreign key constraint as it
-                    # happens with MySQL. Ignore dropping the index.
                     schema_editor.execute(
                         sql=schema_editor._delete_index_sql(
                             model=DocumentVersion, name=index_name
@@ -36,10 +28,6 @@ def code_drop_btree_index(apps, schema_editor):
 
 
 def code_drop_btree_index_reverse(apps, schema_editor):
-    """
-    Create the BTREE indexes that were not renamed along with their
-    respective models.
-    """
     loader = MigrationLoader(connection=connection)
     state = loader.project_state(
         nodes=('documents', '0056_auto_20200916_0959')
@@ -53,7 +41,7 @@ def code_drop_btree_index_reverse(apps, schema_editor):
 
     for field_name in field_names:
         fields = (
-            DocumentVersion._meta.get_field(field_name=field_name),  # Comma as `fields` is expecting an iterable.
+            DocumentVersion._meta.get_field(field_name=field_name),
         )
 
         tablespace_sql = schema_editor._get_index_tablespace_sql(

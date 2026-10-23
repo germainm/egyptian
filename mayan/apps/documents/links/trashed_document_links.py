@@ -14,7 +14,6 @@ from ..permissions import (
     permission_trashed_document_delete, permission_trashed_document_restore
 )
 
-# Document
 
 link_document_trash_multiple = Link(
     icon=icon_document_trash_multiple, tags='dangerous',
@@ -26,7 +25,6 @@ link_document_trash_single = Link(
     text=_(message='Move to trash'), view='documents:document_trash'
 )
 
-# Trashed document
 
 link_trash_can_empty = Link(
     icon=icon_trash_can_empty, permission=permission_trash_empty,

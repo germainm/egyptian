@@ -15,10 +15,6 @@ class AccessControlListBusinessLogicMixin:
         )
 
     def get_permission_count(self):
-        """
-        Return the numeric count of permissions that have this role
-        has granted. The count is filtered by access.
-        """
         return self.permissions.count()
     get_permission_count.short_description = _(message='Permission count')
 
@@ -27,8 +23,7 @@ class AccessControlListBusinessLogicMixin:
             self.permissions.add(obj)
 
         event_acl_edited.commit(
-            action_object=self.content_object,
-            actor=user, target=self
+            action_object=self.content_object, actor=user, target=self
         )
 
     def permissions_remove(self, queryset, user):
@@ -36,6 +31,5 @@ class AccessControlListBusinessLogicMixin:
             self.permissions.remove(obj)
 
         event_acl_edited.commit(
-            action_object=self.content_object,
-            actor=user or self._event_actor, target=self
+            action_object=self.content_object, actor=user, target=self
         )

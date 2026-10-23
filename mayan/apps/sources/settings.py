@@ -12,7 +12,7 @@ from .setting_migrations import SourcesSettingMigration
 
 setting_namespace = setting_cluster.do_namespace_add(
     label=_(message='Sources'), migration_class=SourcesSettingMigration,
-    name='sources', version='0003'
+    name='sources', version='0004'
 )
 
 setting_backend_arguments = setting_namespace.do_setting_add(

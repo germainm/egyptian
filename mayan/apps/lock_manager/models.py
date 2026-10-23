@@ -8,9 +8,6 @@ from .settings import setting_default_lock_timeout
 
 
 class Lock(LockBusinessLogicMixin, models.Model):
-    """
-    Model to provide distributed resource locking using the database.
-    """
     creation_datetime = models.DateTimeField(
         auto_now_add=True, verbose_name=_(message='Creation datetime')
     )
@@ -32,7 +29,7 @@ class Lock(LockBusinessLogicMixin, models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        if not self.timeout and not kwargs.get('timeout'):
+        if not self.timeout:
             self.timeout = setting_default_lock_timeout.value
 
         super().save(*args, **kwargs)

@@ -11,7 +11,10 @@ class PrintForm(forms.Form):
         label=_(message='Page group'), widget=form_widgets.RadioSelect
     )
     page_range = form_fields.CharField(
-        label=_(message='Page range'), required=False
+        help_text=_(
+            message='Page numbers or page ranges separated by commas. '
+            'Example: 1,3,5-8'
+        ), label=_(message='Page range'), required=False
     )
 
 

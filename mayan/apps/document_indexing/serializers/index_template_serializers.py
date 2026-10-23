@@ -27,10 +27,6 @@ class IndexTemplateNodeSerializer(serializers.ModelSerializer):
         label=_(message='URL'), read_only=True
     )
 
-    # DEPRECATION: Version 5.0, remove 'parent' from GET fields as this
-    # is replaced by 'parent_id'.
-    # DEPRECATION: Version 5.0, remove 'index' from GET fields as this
-    # is replaced by 'index_id'.
     class Meta:
         fields = (
             'children', 'enabled', 'expression', 'id', 'index', 'index_id',

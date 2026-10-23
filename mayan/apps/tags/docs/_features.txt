@@ -1,6 +1,0 @@
-- Color coded tags.
-
-  - Labeled and color coded tags can be assigned for intuitive recognition.
-  - Tag may be used on their own, as automatic markers applied with the
-    system, or as triggers for document actions.
-

@@ -34,10 +34,6 @@ class MetadataTypeBusinessLogicMixin:
         return parser
 
     def get_required_for(self, document_type):
-        """
-        Determine if the metadata type is required for the specified document
-        type.
-        """
         queryset = document_type.metadata.filter(
             required=True, metadata_type=self
         )

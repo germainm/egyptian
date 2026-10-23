@@ -11,9 +11,6 @@ from .arguments import argument_query_string
 
 
 class SourceBackendActionMixinCallbackPostDocumentCreateUserInteractive:
-    """
-    Inject the user into the post document create callback kwargs.
-    """
     def get_callback_kwargs_post_document_create(self, task_kwargs):
         result = super().get_callback_kwargs_post_document_create(
             task_kwargs=task_kwargs
@@ -26,9 +23,6 @@ class SourceBackendActionMixinCallbackPostDocumentCreateUserInteractive:
 
 
 class SourceBackendActionMixinCallbackPostDocumentFileUploadUserInteractive:
-    """
-    Inject the user into the post document file upload callback kwargs.
-    """
     def get_callback_kwargs_post_document_file_upload(self, task_kwargs):
         result = super().get_callback_kwargs_post_document_file_upload(
             task_kwargs=task_kwargs
@@ -41,9 +35,6 @@ class SourceBackendActionMixinCallbackPostDocumentFileUploadUserInteractive:
 
 
 class SourceBackendActionMixinCallbackPostDocumentUploadQueryStringInteractive:
-    """
-    Inject the query string into the post document create callback kwargs.
-    """
     class Interface:
         class Model(SourceBackendActionInterface):
             class Argument:
@@ -58,9 +49,7 @@ class SourceBackendActionMixinCallbackPostDocumentUploadQueryStringInteractive:
             def process_interface_context(self):
                 super().process_interface_context()
 
-                self.action_kwargs['query_string'] = self.action.get_query_string(
-                    request=self.context['request']
-                )
+                self.action_kwargs['query_string'] = ''
 
         class Task(SourceBackendActionInterfaceTask):
             class Argument:
@@ -94,8 +83,6 @@ class SourceBackendActionMixinCallbackPostDocumentUploadQueryStringInteractive:
         query_dict = request.GET.copy()
         query_dict.update(request.POST)
 
-        # Convert into a string. Make sure it is a `QueryDict` object from a
-        # request and not just a simple dictionary.
         if hasattr(query_dict, 'urlencode'):
             query_string = query_dict.urlencode()
 
@@ -115,15 +102,11 @@ class SourceBackendActionMixinCallbackDocumentUploadInteractive(
     SourceBackendActionMixinCallbackPostDocumentCreateUserInteractive,
     SourceBackendActionMixinCallbackDocumentUpload
 ):
-    """
-    Interactive callback mixin for document uploads.
-    """
+    pass
 
 
 class SourceBackendActionMixinCallbackDocumentFileUploadInteractive(
     SourceBackendActionMixinCallbackPostDocumentFileUploadUserInteractive,
     SourceBackendActionMixinCallbackDocumentFileUpload
 ):
-    """
-    Interactive callback mixin for document file uploads.
-    """
+    pass

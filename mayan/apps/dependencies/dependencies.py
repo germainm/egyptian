@@ -1,9 +1,9 @@
-from mayan.apps.dependencies.environments import (
-    environment_build, environment_production
-)
 from mayan.literals import PYTHON_PACKAGING_VERSION
 
 from .classes import PythonDependency
+from .environments import (
+    environment_build, environment_production
+)
 
 PythonDependency(
     environments=(environment_production,), module=__name__,

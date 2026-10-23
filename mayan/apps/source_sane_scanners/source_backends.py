@@ -14,11 +14,11 @@ from mayan.apps.source_generated_files.source_backend_actions.generated_file_act
 from mayan.apps.source_interactive.source_backends.mixins import (
     SourceBackendMixinInteractive
 )
-from mayan.apps.sources.settings import setting_backend_arguments
 from mayan.apps.sources.source_backends.base import SourceBackend
 from mayan.apps.storage.utils import NamedTemporaryFile, touch
 
-from .literals import DEFAULT_BINARY_SCANIMAGE_PATH
+from .literals import DEFAULT_SCANIMAGE_TIMEOUT
+from .utils import get_command_path_scanimage
 
 logger = logging.getLogger(name=__name__)
 
@@ -86,15 +86,9 @@ class SourceBackendSANEScanner(SourceBackendMixinInteractive, SourceBackend):
 
     def action_file_get(self, file_identifier):
         with NamedTemporaryFile() as file_object:
-            # The output_file argument is only supported in version 1.0.28
-            # https://gitlab.com/sane-project/backends/-/releases/1.0.28
-            # Using redirection make this compatible with more versions.
             try:
                 self.call_command_scanimage(_out=file_object.name)
             except sh.ErrorReturnCode:
-                # The shell command is deleting the temporary file on errors.
-                # Recreate it so that `NamedTemporaryFile` is able to delete
-                # it when the context exits.
                 touch(filename=file_object.name)
                 raise
             else:
@@ -108,24 +102,33 @@ class SourceBackendSANEScanner(SourceBackendMixinInteractive, SourceBackend):
                 }
 
     def call_command_scanimage(self, **kwargs):
-        command_path = setting_backend_arguments.value.get(
-            'mayan.apps.sources.source_backends.SourceBackendSANEScanner', {}
-        ).get('scanimage_path', DEFAULT_BINARY_SCANIMAGE_PATH)
+        command_scanimage = self.get_command_scanimage()
 
-        command_scanimage = sh.Command(path=command_path)
+        command_arguments = self.get_command_arguments(**kwargs)
 
-        command_scanimage = command_scanimage.bake(
-            device_name=self.kwargs['device_name'],
-            format='tiff'
-        )
+        command_scanimage(**command_arguments)
 
+    def get_command_arguments(self, **kwargs):
         loaded_arguments = yaml_load(
             stream=self.kwargs.get('arguments', '{}')
         ) or {}
 
         loaded_arguments.update(**kwargs)
 
-        command_scanimage(**loaded_arguments)
+        loaded_arguments.setdefault('_timeout', DEFAULT_SCANIMAGE_TIMEOUT)
+
+        return loaded_arguments
+
+    def get_command_scanimage(self):
+        command_path = get_command_path_scanimage(
+            dotted_name=self.backend_class_path
+        )
+
+        command_scanimage = sh.Command(path=command_path)
+
+        return command_scanimage.bake(
+            device_name=self.kwargs['device_name'], format='tiff'
+        )
 
     def get_view_context(self, context, request):
         return {

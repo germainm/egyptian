@@ -35,10 +35,23 @@ class SettingValueEditView(FormView):
             stream=form.cleaned_data['value']
         )
         self.object.do_value_pending_set(value=value_deserialized)
-        messages.success(
-            message=_(message='Setting updated successfully.'),
-            request=self.request
-        )
+
+        value_error = self.object.value_error
+
+        if value_error is None:
+            messages.success(
+                message=_(message='Setting updated successfully.'),
+                request=self.request
+            )
+        else:
+            self.object.value_error = None
+
+            messages.error(
+                message=_(
+                    message='Error updating setting; %s'
+                ) % value_error, request=self.request
+            )
+
         return super().form_valid(form=form)
 
     def get_extra_context(self):
@@ -90,7 +103,8 @@ class SettingValueRevertView(MultipleObjectConfirmActionView):
         result = {
             'message': _(
                 message='Unsaved changes will be lost.'
-            )
+            ),
+            'submit_label': _(message='Revert')
         }
 
         if len(object_list) == 1:

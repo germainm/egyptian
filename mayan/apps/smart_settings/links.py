@@ -57,7 +57,6 @@ link_setting_namespace_detail = Link(
     permission=permission_settings_view, text=_(message='Settings'),
     view='settings:setting_namespace_detail'
 )
-# Duplicate the link to use a different name.
 link_setting_namespace_list = Link(
     icon=icon_setting_cluster_namespace_list,
     permission=permission_settings_view,

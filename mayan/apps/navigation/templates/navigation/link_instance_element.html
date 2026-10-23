@@ -1,0 +1,34 @@
+{% load navigation_tags %}
+
+
+
+{% navigation_link_get_icon link=link as link_icon %}
+
+{% if link.method == 'get' %}
+    <a
+        class="{{ link.html_extra_classes }} {% if link_classes %} {{ link_classes }} {% if 'dangerous' in link.tags %} text-danger {% endif %} {% else %} btn {% if 'dangerous' in link.tags %} btn-danger {% else %} btn-primary {% endif %} btn-sm py-0 px-1 fs-7 {% endif %} {% if link.active %} {{ link_class_active }} {% endif %} {% if 'new_window' in link.tags %} new_window {% endif %}"
+        {% for key,value in link.html_data.items %}
+            data-{{ key }}="{{ value }}"
+        {% endfor %}
+    {% if link.url %}href="{{ link.url }}"{% endif %}
+    {% if link.title %}title="{{ link.title }}"{% endif %}
+    >{% if link_body_template %}{% include link_body_template %}{% else %}{% if link_icon and not hide_icon %}{% if link.badge_text %}<span class="position-relative">{{ link_icon.render }}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-success">{{ link.badge_text }}</span></span>{% else %}{{ link_icon.render }}{% endif %}{% endif %}
+    {{ link.text|default:'' }}{% if show_menu_label %}<span class="d-md-none ms-2">{{ link.text|default:link.title }}</span>{% endif %}{% if link.badge_text and not link_icon %}<span class="ms-1 badge rounded-pill text-bg-success">{{ link.badge_text }}</span>{% endif %}{% if link.error %} - {{ link.error }}{% endif %}{% endif %}
+    </a>
+{% elif link.method == 'post' %}
+    <form action="{{ link.url }}"{% if link_form_classes %} class="{{ link_form_classes }}"{% endif %} method="{{ link.method }}"{% if link_form_style %} style="{{ link_form_style }}"{% endif %}>
+        <!--mayan-templating-hash-exclude-start-->
+        {% csrf_token %}
+        <!--mayan-templating-hash-exclude-end-->
+        <button
+            class="{{ link.html_extra_classes }} {% if link_classes %}{{ link_classes }} {% if 'dangerous' in link.tags %}text-danger{% endif %} {% else %}btn {% if 'dangerous' in link.tags %}btn-danger{% else %}btn-primary{% endif %} btn-sm fs-7 py-0 px-1 {% endif %} {% if link.active %}{{ link_class_active }}{% endif %}"
+            {% for key,value in link.html_data.items %}
+                data-{{ key }}="{{ value }}"
+            {% endfor %}
+            {% if link.title %}title="{{ link.title }}"{% endif %}
+            type="submit"
+        >{% if link_body_template %}{% include link_body_template %}{% else %}{% if link_icon and not hide_icon %}{% if link.badge_text %}<span class="position-relative">{{ link_icon.render }}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-success">{{ link.badge_text }}</span></span>{% else %}{{ link_icon.render }}{% endif %}{% endif %}
+        {{ link.text|default:'' }}{% if link.badge_text and not link_icon %}<span class="ms-1 badge rounded-pill text-bg-success">{{ link.badge_text }}</span>{% endif %}{% if link.error %} - {{ link.error }}{% endif %}{% endif %}
+        </button>
+    </form>
+{% endif %}

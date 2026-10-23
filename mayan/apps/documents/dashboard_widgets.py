@@ -13,9 +13,9 @@ from .icons import (
     icon_dashboard_total_document, icon_document_recently_accessed_list
 )
 from .links.document_links import (
-    link_document_recently_accessed_list, link_document_recently_created_list
+    link_document_list, link_document_recently_accessed_list,
+    link_document_recently_created_list
 )
-from .links.favorite_links import link_document_favorites_list
 from .permissions import (
     permission_document_type_view, permission_document_view
 )
@@ -131,6 +131,9 @@ class DashboardWidgetDocumentsPagesNewThisMonth(DashboardWidgetNumeric):
 
 class DashboardWidgetUserRecentlyAccessedDocuments(DashboardWidgetList):
     columns = ('datetime_accessed', 'label',)
+    empty_link_text = _(message='Browse documents')
+    empty_link_url = reverse_lazy(viewname=link_document_list.view)
+    empty_text = _(message='You have not accessed any documents yet.')
     icon = icon_document_recently_accessed_list
     label = link_document_recently_accessed_list.text
     link = reverse_lazy(
@@ -149,6 +152,9 @@ class DashboardWidgetUserRecentlyAccessedDocuments(DashboardWidgetList):
 
 class DashboardWidgetUserRecentlyCreatedDocuments(DashboardWidgetList):
     columns = ('datetime_created', 'label',)
+    empty_link_text = _(message='Browse documents')
+    empty_link_url = reverse_lazy(viewname=link_document_list.view)
+    empty_text = _(message='No documents have been created yet.')
     icon = link_document_recently_created_list.get_icon()
     label = link_document_recently_created_list.text
     link = reverse_lazy(
@@ -168,22 +174,4 @@ class DashboardWidgetUserRecentlyCreatedDocuments(DashboardWidgetList):
         return AccessControlList.objects.restrict_queryset(
             permission=permission_document_view, user=self.request.user,
             queryset=queryset
-        )
-
-
-class DashboardWidgetUserFavoriteDocuments(DashboardWidgetList):
-    columns = ('datetime_added', 'label',)
-    icon = link_document_favorites_list.get_icon()
-    label = link_document_favorites_list.text
-    link = reverse_lazy(
-        viewname=link_document_favorites_list.view
-    )
-
-    def get_object_list(self):
-        FavoriteDocument = apps.get_model(
-            app_label='documents', model_name='FavoriteDocument'
-        )
-
-        return FavoriteDocument.valid.get_for_user(
-            user=self.request.user
         )

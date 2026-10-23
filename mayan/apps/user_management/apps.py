@@ -14,6 +14,7 @@ from mayan.apps.common.menus import (
     menu_secondary, menu_setup, menu_user
 )
 from mayan.apps.dashboards.dashboards import dashboard_administrator
+from mayan.apps.databases.utils import set_field_help_text
 from mayan.apps.events.classes import EventModelRegistry, ModelEventType
 from mayan.apps.forms import column_widgets
 from mayan.apps.logging.classes import ErrorLog
@@ -110,9 +111,10 @@ class UserManagementApp(MayanAppConfig):
         User._meta.get_field(
             field_name='first_name'
         ).verbose_name = _(message='First name')
-        User._meta.get_field(
-            field_name='first_name'
-        ).help_text = _(message='The given name of the user.')
+        set_field_help_text(
+            field=User._meta.get_field(field_name='first_name'),
+            help_text=_(message='The given name of the user.')
+        )
         User._meta.get_field(field_name='groups').verbose_name = _(
             message='Groups'
         )
@@ -121,10 +123,11 @@ class UserManagementApp(MayanAppConfig):
         ).verbose_name = _(message='Last login')
         User._meta.get_field(
             field_name='last_name'
-        ).help_text = _(message='The family name of the user.')
-        User._meta.get_field(
-            field_name='last_name'
         ).verbose_name = _(message='Last name')
+        set_field_help_text(
+            field=User._meta.get_field(field_name='last_name'),
+            help_text=_(message='The family name of the user.')
+        )
         User._meta.get_field(
             field_name='is_active'
         ).verbose_name = _(message='Is active?')
@@ -275,6 +278,10 @@ class UserManagementApp(MayanAppConfig):
             attribute='has_usable_password', include_label=True, source=User,
             widget=column_widgets.TwoStateWidget
         )
+        SourceColumn(
+            attribute='groups.count', include_label=True,
+            label=_(message='Groups'), source=User
+        )
 
         dashboard_administrator.add_widget(
             widget=DashboardWidgetUserTotal, order=99
@@ -286,7 +293,6 @@ class UserManagementApp(MayanAppConfig):
         error_log = ErrorLog(app_config=self)
         error_log.register_model(model=User)
 
-        # Group
 
         menu_list_facet.bind_links(
             links=(
@@ -326,7 +332,6 @@ class UserManagementApp(MayanAppConfig):
             )
         )
 
-        # User
 
         menu_list_facet.bind_links(
             links=(

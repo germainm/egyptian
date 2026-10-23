@@ -6,7 +6,6 @@ namespace = PermissionNamespace(
     label=_(message='Documents'), name='documents'
 )
 
-# Document
 
 permission_document_change_type = namespace.add_permission(
     label=_(message='Change type of documents'), name='document_change_type'
@@ -27,7 +26,6 @@ permission_document_view = namespace.add_permission(
     label=_(message='View documents'), name='document_view'
 )
 
-# Document file
 
 permission_document_file_delete = namespace.add_permission(
     label=_(message='Delete document files'), name='document_file_delete'
@@ -50,7 +48,6 @@ permission_document_file_view = namespace.add_permission(
     name='document_file_view'
 )
 
-# Document version
 
 permission_document_version_create = namespace.add_permission(
     label=_(message='Create document versions'),
@@ -72,7 +69,6 @@ permission_document_version_view = namespace.add_permission(
     name='document_version_view'
 )
 
-# Document type
 
 document_type_namespace = PermissionNamespace(
     label=_(message='Document types'), name='documents_types'
@@ -90,7 +86,6 @@ permission_document_type_view = document_type_namespace.add_permission(
     label=_(message='View document types'), name='document_type_view'
 )
 
-# Trashed document
 
 permission_trashed_document_restore = namespace.add_permission(
     label=_(message='Restore trashed document'), name='document_restore'

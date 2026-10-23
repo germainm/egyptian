@@ -7,9 +7,6 @@ from .permissions import permission_cabinet_view
 
 
 class DocumentCabinetWidget(SourceColumnWidget):
-    """
-    A widget that displays the cabinets containing the given document.
-    """
     template_name = 'cabinets/document_cabinets_widget.html'
 
     def get_extra_context(self):

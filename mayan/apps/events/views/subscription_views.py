@@ -69,14 +69,8 @@ class EventTypeSubscriptionListView(FormView):
         return self.request.user
 
     def get_queryset(self):
-        # Return the queryset by name from the sorted list of the class
         event_type_ids = [event_type.id for event_type in EventType.all()]
 
-        # Preserve the queryset order to that of the sorted ID list by
-        # namespace label and event label.
-        # Create a conditional statement to annotate each row with the sort
-        # index number. Then sort the query set by the custom sort index
-        # field.
         when_list = []
         for sort_index, event_type_id in enumerate(iterable=event_type_ids):
             when_list.append(

@@ -9,8 +9,6 @@ def code_remove_duplicates(apps, schema_editor):
         app_label='file_metadata', model_name='DocumentVersionDriverEntry'
     )
 
-    # This logic assumes only one type of file metadata backend exists at
-    # this point of time.
     driver = StoredDriver.objects.first()
     if driver:
         DocumentVersionDriverEntry.objects.using(

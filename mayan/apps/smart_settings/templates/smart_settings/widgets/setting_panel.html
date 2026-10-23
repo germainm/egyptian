@@ -1,0 +1,59 @@
+{% load i18n %}
+
+{% load navigation_tags %}
+
+{% navigation_resolve_menus names='object' sort_results=True source=object as object_menus_link_results %}
+
+{% with setting_is_overridden=object.get_is_overridden setting_has_load_error=object.get_has_load_error %}
+    <div class="{{ column_class|default:'col-12' }}">
+        <div class="smart_settings-item-surface bg-body border p-3 rounded">
+            <div class="align-items-center d-flex flex-wrap gap-2 mb-1">
+                
+                
+                <span class="smart_settings-flex-truncate flex-grow-1 font-monospace fw-bold text-body text-truncate" title="{{ object.global_name }}">{{ object.global_name }}</span>
+
+                
+                
+                {% if setting_is_overridden %}
+                    <span class="badge rounded-pill text-bg-secondary">{% translate 'Overridden' %}</span>
+                {% endif %}
+
+                {% if object.get_has_value_new %}
+                    <span class="badge rounded-pill text-bg-info">{% translate 'Modified' %}</span>
+                {% endif %}
+
+                {% if setting_has_load_error %}
+                    <span class="badge rounded-pill text-bg-danger">{% translate 'Error' %}</span>
+                {% endif %}
+
+                {% if not hide_links and object_menus_link_results %}
+                    <div class="align-items-center d-flex gap-1 ms-auto">
+                        {% include 'appearance/partials/list/column_object_links.html' %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if object.help_text %}
+                <p class="smart_settings-measure mb-2 small text-body-secondary">{{ object.help_text }}</p>
+            {% endif %}
+
+            {% if setting_has_load_error %}
+                <div class="alert alert-danger mb-2 px-2 py-1 small" role="alert">{{ object.get_load_error_text }}</div>
+            {% endif %}
+
+            <div class="g-2 row">
+                <div class="{% if setting_is_overridden %}col-12 col-lg-7{% else %}col-12{% endif %}">
+                    <div class="fw-semibold mb-1 small text-body-secondary text-uppercase">{% translate 'Current value' %}</div>
+                    <pre class="smart_settings-value-box border font-monospace mb-0 overflow-auto p-2 rounded small"><code>{{ object.get_display_value }}</code></pre>
+                </div>
+
+                {% if setting_is_overridden %}
+                    <div class="col-12 col-lg-5">
+                        <div class="fw-semibold mb-1 small text-body-secondary text-uppercase">{% translate 'Default' %}</div>
+                        <pre class="smart_settings-value-box border font-monospace mb-0 overflow-auto p-2 rounded small text-body-secondary"><code>{{ object.get_display_default_value }}</code></pre>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endwith %}

@@ -1,0 +1,12 @@
+{% load icons_tags %}
+
+{% spaceless %}
+<ul class="list-group">
+    {% for item in item_list %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center {% if item.active %}active{% endif %}" href="{{ item.url }}">
+            <div>{% if item.icon %}{% icons_icon_render item.icon %}{% endif %} {{ item.text }}</div>
+            <span class="badge rounded-pill {% if item.active %}bg-body text-body{% else %}text-bg-primary{% endif %}">{{ item.count }}</span>
+        </a>
+    {% endfor %}
+</ul>
+{% endspaceless %}

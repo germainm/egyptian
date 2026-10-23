@@ -1,14 +1,15 @@
 from furl import furl
-from PIL import Image
 
 from django.apps import apps
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.converter.utils import object_list_export_to_pdf
 from mayan.apps.locales.utils import to_language
 
 from .events import event_document_version_exported
 from .literals import (
+    DEFAULT_DOCUMENT_VERSION_EXPORT_RESOLUTION,
     DOCUMENT_VERSION_EXPORT_MESSAGE_BODY,
     DOCUMENT_VERSION_EXPORT_MESSAGE_SUBJECT
 )
@@ -18,31 +19,21 @@ class DocumentVersionExporter:
     def __init__(self, document_version):
         self.document_version = document_version
 
-    def page_export(self, file_object, page, append=False, resolution=None):
+    def get_page_list(self):
+        return [
+            page for page in self.document_version.pages if page.content_object
+        ]
+
+    def export(self, file_object, resolution=None):
         if not resolution:
-            resolution = 300.0
+            resolution = DEFAULT_DOCUMENT_VERSION_EXPORT_RESOLUTION
 
-        cache_filename = page.generate_image()
-        with page.cache_partition.get_file(filename=cache_filename).open() as image_file_object:
-            Image.open(fp=image_file_object).save(
-                append=append, format='PDF', fp=file_object,
-                resolution=resolution
-            )
+        page_list = self.get_page_list()
 
-    def export(self, file_object):
-        queryset_pages = self.document_version.pages
-
-        if queryset_pages.exists():
-            # Only export the version if there is at least one page.
-            export_file_created = False
-            for page in queryset_pages:
-                if page.content_object:
-                    # Ensure only pages that point to actual content are
-                    # exported.
-                    if not export_file_created:
-                        self.page_export(file_object=file_object, page=page)
-                    else:
-                        self.page_export(append=True, file_object=file_object, page=page)
+        return object_list_export_to_pdf(
+            file_object=file_object, object_list=page_list,
+            resolution=resolution
+        )
 
     def export_to_download_file(
         self, organization_installation_url='', user=None
@@ -54,16 +45,11 @@ class DocumentVersionExporter:
             app_label='messaging', model_name='Message'
         )
 
-        download_file = DownloadFile(
+        download_file = DownloadFile.objects.create_from_content_function(
+            content_function=self.export,
             filename='{}.pdf'.format(self.document_version),
-            label=_(message='Document version export to PDF'),
-            user=user
+            label=_(message='Document version export to PDF'), user=user
         )
-        download_file._event_actor = user
-        download_file.save()
-
-        with download_file.open(mode='wb+') as file_object:
-            self.export(file_object=file_object)
 
         event_document_version_exported.commit(
             action_object=download_file, actor=user,

@@ -42,7 +42,7 @@ class WorkflowInstanceListView(ExternalObjectViewMixin, SingleObjectListView):
             'no_results_icon': icon_workflow_template_list,
             'no_results_text': _(
                 message='Assign workflows to the document type of this '
-                'document to have this document execute those workflows. '
+                'document to have this document execute those workflows.'
             ),
             'no_results_title': _(
                 message='There are no workflows for this document'
@@ -86,8 +86,6 @@ class WorkflowInstanceDeleteView(MultipleObjectDeleteView):
         }
 
     def get_post_action_redirect(self):
-        # Use [0] instead of first(). First returns None and it is not
-        # usable.
         return reverse(
             kwargs={
                 'document_id': self.object_list[0].document_id
@@ -186,7 +184,6 @@ class WorkflowInstanceTransitionExecuteView(
     def get_external_object_queryset_filtered(self):
         queryset = super().get_external_object_queryset_filtered()
 
-        # Filter further down by document access.
         queryset_documents = AccessControlList.objects.restrict_queryset(
             permission=permission_workflow_instance_transition,
             queryset=Document.valid.all(),
@@ -199,6 +196,7 @@ class WorkflowInstanceTransitionExecuteView(
         return {
             'navigation_object_list': ('object', 'workflow_instance'),
             'object': self.external_object.document,
+            'submit_label': _(message='Execute'),
             'title': _(
                 message='Execute transition "%(transition)s" for workflow: '
                 '%(workflow)s'
@@ -289,7 +287,6 @@ class WorkflowInstanceTransitionSelectView(
     def get_external_object_queryset_filtered(self):
         queryset = super().get_external_object_queryset_filtered()
 
-        # Filter further down by document access.
         queryset_documents = AccessControlList.objects.restrict_queryset(
             permission=permission_workflow_instance_transition,
             queryset=Document.valid.all(),

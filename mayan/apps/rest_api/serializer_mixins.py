@@ -7,8 +7,6 @@ class CreateOnlyFieldSerializerMixin:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.is_create_view():
-            # Remove the create only fields if the view is anything other
-            # than a create view.
             self._excluded_fields.update(
                 getattr(
                     self.Meta, 'create_only_fields', ()
@@ -21,7 +19,6 @@ class CreateOnlyFieldSerializerMixin:
 
         if request and view:
             if isinstance(view, CreateModelMixin) and request.method.lower() == 'post':
-                # This is a create view with a request to create an instance.
                 return True
 
         return False
@@ -33,7 +30,6 @@ class DynamicFieldListSerializerMixin:
 
         self._excluded_fields = set()
 
-        # Handle top level fields.
         fields_exclude = self.context.get('fields_exclude', '').split(',')
         fields_only = self.context.get('fields_only', '').split(',')
         matched_exclude = []
@@ -59,10 +55,7 @@ class DynamicFieldListSerializerMixin:
     def bind(self, field_name, parent):
         super().bind(field_name=field_name, parent=parent)
 
-        # Handle fields from included serializers.
 
-        # Context retrieval is repeated to ensure context is available after
-        # __init__.
         fields_exclude = self.context.get('fields_exclude', '').split(',')
         fields_only = self.context.get('fields_only', '').split(',')
         matched_exclude = []
@@ -93,7 +86,6 @@ class DynamicFieldListSerializerMixin:
     def get_fields(self):
         fields = super().get_fields()
 
-        # Copy keys to avoid modifying them in the loop.
         field_names = list(
             fields.keys()
         )

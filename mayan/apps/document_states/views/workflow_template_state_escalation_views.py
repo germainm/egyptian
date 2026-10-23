@@ -153,7 +153,7 @@ class WorkflowTemplateStateEscalationListView(
                 'of time.'
             ),
             'no_results_title': _(
-                message='There are no escalations for this workflow state.'
+                message='There are no escalations for this workflow state'
             ),
             'title': _(
                 message='Escalations for workflow template state: %s'

@@ -21,10 +21,6 @@ from .metadata_type_models import MetadataType
 class DocumentMetadata(
     DocumentMetadataBusinessLogicMixin, ExtraDataModelMixin, models.Model
 ):
-    """
-    Model used to link an instance of a metadata type with a value to a
-    document.
-    """
     _ordering_fields = ('value',)
 
     document = models.ForeignKey(
@@ -53,10 +49,6 @@ class DocumentMetadata(
         return str(self.metadata_type)
 
     def clean_fields(self, *args, **kwargs):
-        """
-        Pass the value of the metadata being created to the parsers and
-        validators for cleanup before saving.
-        """
         super().clean_fields(*args, **kwargs)
 
         self.value = self.metadata_type.validate_value(
@@ -70,12 +62,6 @@ class DocumentMetadata(
         target='document'
     )
     def delete(self, enforce_required=True, *args, **kwargs):
-        """
-        Delete a metadata from a document. enforce_required which defaults
-        to True, prevents deletion of required metadata at the model level.
-        It used set to False when deleting document metadata on document
-        type change.
-        """
         is_required_for_document_type = enforce_required and self.document.document_type.metadata.filter(
             required=True
         ).filter(metadata_type=self.metadata_type).exists()

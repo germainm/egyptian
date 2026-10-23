@@ -34,7 +34,6 @@ class DocumentTypeFileMetadataDriverConfigurationEditView(
     external_object_class = DocumentType
     external_object_permission = permission_document_type_file_metadata_setup
     external_object_pk_url_kwarg = 'document_type_id'
-    # Use a slug because Django does not support `pk_field`.
     slug_field = 'stored_driver_id'
     slug_url_kwarg = 'stored_driver_id'
     view_icon = icon_document_type_file_metadata_driver_configuration_edit
@@ -86,7 +85,7 @@ class DocumentTypeFileMetadataDriverConfigurationListView(
             ),
             'no_results_title': _(
                 message='No file metadata drivers available for this '
-                'document type.'
+                'document type'
             ),
             'title': _(
                 message='File metadata driver configuration for document '
@@ -102,6 +101,7 @@ class DocumentTypeFileMetadataDriverConfigurationListView(
 
 class DocumentTypeFileMetadataSubmitView(FormView):
     extra_context = {
+        'submit_label': _(message='Submit'),
         'title': _(
             message='Submit all documents of a type for file metadata '
             'processing.'

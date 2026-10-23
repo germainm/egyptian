@@ -3,6 +3,7 @@ import logging
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.common.utils import parse_range
+from mayan.apps.common.validators import RangeValidator
 from mayan.apps.document_states.classes import WorkflowAction
 from mayan.apps.document_states.models.workflow_instance_models import (
     WorkflowInstance
@@ -32,7 +33,9 @@ class TransformationAddAction(WorkflowAction):
                     message='Pages to which the new transformations will be '
                     'added. Separate by commas and/or use a dashes for a '
                     'ranges. Leave blank to select all pages.'
-                ), 'required': False
+                ), 'required': False, 'validators': (
+                    RangeValidator(),
+                )
             }
         },
         'transformation_class': {

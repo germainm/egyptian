@@ -3,9 +3,6 @@ from django.utils.timezone import now
 
 
 def code_duplicated_document_old_copy(apps, schema_editor):
-    # Remove duplicated entries.
-    # `DuplicatedDocument` allowed duplicates, `DuplicateBackendEntry` does
-    # not.
     cursor_primary = schema_editor.connection.cursor()
     cursor_secondary = schema_editor.connection.cursor()
     cursor_tertiary = schema_editor.connection.cursor()
@@ -69,18 +66,6 @@ def code_duplicated_document_old_copy(apps, schema_editor):
 
     for row in cursor_primary.fetchall():
         if last_document_id != row[0]:
-            cursor_tertiary.execute(
-                duplicated_document_insert_query, (
-                    row[0], now_text
-                )
-            )
-            cursor_tertiary.execute(
-                duplicated_document_select_query, (
-                    row[0],
-                )
-            )
-            new_instance_pk = cursor_tertiary.fetchone()[0]
-
             if document_list:
                 final_query = document_insert_query.format(
                     (
@@ -93,9 +78,22 @@ def code_duplicated_document_old_copy(apps, schema_editor):
                     final_query, document_list
                 )
 
+            cursor_tertiary.execute(
+                duplicated_document_insert_query, (
+                    row[0], now_text
+                )
+            )
+            cursor_tertiary.execute(
+                duplicated_document_select_query, (
+                    row[0],
+                )
+            )
+            new_instance_pk = cursor_tertiary.fetchone()[0]
+
             document_list = []
             last_document_id = row[0]
-        else:
+
+        if row[1] is not None:
             document_list.extend(
                 (
                     new_instance_pk, row[1]

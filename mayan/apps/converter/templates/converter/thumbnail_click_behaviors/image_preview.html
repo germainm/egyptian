@@ -1,0 +1,13 @@
+<a
+    class="fancybox"
+    {% if disable_title_link %}
+        data-caption="{{ instance }}"
+    {% else %}
+        data-caption="<a class='a-caption' href='{{ instance.get_absolute_url }}'>{{ instance }} <i class='fa-solid fa-up-right-from-square'></i></a>"
+    {% endif %}
+    href="{{ object_image_data.url }}"
+    data-type="image"
+    {% if gallery_name %}data-fancybox="{{ gallery_name }}"{% endif %}
+>
+    {% include image_template_name %}
+</a>

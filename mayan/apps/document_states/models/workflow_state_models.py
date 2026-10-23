@@ -21,16 +21,6 @@ __all__ = ('WorkflowState', 'WorkflowStateRuntimeProxy')
 class WorkflowState(
     ExtraDataModelMixin, WorkflowStateBusinessLogicMixin, models.Model
 ):
-    """
-    Fields:
-    * completion - Completion Amount - A user defined numerical value to help
-    determine if the workflow of the document is nearing completion (100%).
-    The Completion Amount will be determined by the completion value of the
-    Actual State. Example: If the workflow has 3 states: registered, approved,
-    archived; the admin could give the follow completion values to the
-    states: 33%, 66%, 100%. If the Actual State of the document if approved,
-    the Completion Amount will show 66%.
-    """
     _ordering_fields = ('completion', 'final', 'initial', 'label')
 
     workflow = models.ForeignKey(
@@ -94,10 +84,6 @@ class WorkflowState(
         }
     )
     def save(self, *args, **kwargs):
-        # Solve issue #557 "Break workflows with invalid input"
-        # without using a migration.
-        # Remove blank=True, remove this, and create a migration in the next
-        # minor version.
 
         try:
             self.completion = int(self.completion)

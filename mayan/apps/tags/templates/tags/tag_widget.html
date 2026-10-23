@@ -1,1 +1,1 @@
-<span class="label label-tag" style="background: {{ tag.color }}"><a href="{{ tag.get_absolute_url }}">{{ tag.label }}</a></span>
+<span class="badge label-tag" style="background: {{ tag.color }}; color: {{ tag.get_color_contrast }}"><a href="{{ tag.get_absolute_url }}">{{ tag.label }}</a></span>

@@ -11,11 +11,15 @@
 {% block title %}{% trans 'About' %}{% endblock %}
 
 {% block content %}
+    {% common_project_information '__author__' as project_author %}
     {% common_project_information '__build_string__' as project_build_number %}
     {% common_project_information '__copyright__' as project_copyright %}
+    {% common_project_information '__copyright_registration__' as project_copyright_registration %}
     {% common_project_information '__description__' as project_description %}
     {% common_project_information '__license__' as license_information %}
     {% common_project_information '__title__' as project_title %}
+    {% common_project_information '__trademark_registration_design__' as project_trademark_registration_design %}
+    {% common_project_information '__trademark_registration_word__' as project_trademark_registration_word %}
     {% common_project_information '__version__' as project_version %}
     {% common_project_information '__website__' as project_website %}
 
@@ -28,11 +32,11 @@
     {% navigation_get_link 'mayan.apps.common.links.link_support' as link_support %}
 
     <div id="row">
-        <div class="col-xs-10 col-xs-offset-1 col-sm-8 col-sm-offset-2 col-md-6 col-md-offset-3 col-lg-6 col-lg-offset-3">
-            <div class="well">
+        <div class="col-10 offset-1 col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-6 offset-lg-3">
+            <div class="card card-body bg-body-secondary border-0">
 
                 <div id="about-image-wrapper">
-                    <img class="center-block img-responsive" id="about-image-top" src="{% static 'appearance/images/about-top.jpg' %}" />
+                    <img class="mx-auto img-fluid" id="about-image-top" src="{% static 'appearance/images/about-top.jpg' %}" />
                 </div>
 
                 <p></p>
@@ -49,68 +53,99 @@
                     {% trans 'Released under the license:' %} {% trans license_information %}
                 </p>
 
+                
+                
+                
+                <p class="text-center small">
+                    {% blocktrans %}{{ project_title }}&reg; and the {{ project_title }} logo are registered trademarks of {{ project_author }}.{% endblocktrans %}
+                </p>
+
+                <p class="text-center small">
+                    {% blocktrans with project_trademark_registration_word as registration %}Word mark: U.S. Reg. No. {{ registration }}{% endblocktrans %}<br />
+                    {% blocktrans with project_trademark_registration_design as registration %}Design mark: U.S. Reg. No. {{ registration }}{% endblocktrans %}<br />
+                    {% blocktrans with project_copyright_registration as registration %}Software copyright: U.S. Reg. No. {{ registration }}{% endblocktrans %}
+                </p>
+
                 {% appearance_app_templates template_name='about' %}
 
-                <ul class="media-list media-list-about">
-                    <li class="media">
-                        <div class="media-left">
+                <ul class="list-unstyled mx-1">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_mailing_list' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_mailing_list.url as link_mailing_list_url %}To get the latest news subscribe to the <a class="new_window" href="{{ link_mailing_list_url }}"> Mailing list</a>.{% endblocktrans %}
                         </div>
                     </li>
 
-                    <li class="media">
-                        <div class="media-left">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_knowledge_base' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_knowledge_base.url as link_knowledge_base_url %}For articles, tutorials, troubleshooting, subscribe to the <a class="new_window" href="{{ link_knowledge_base_url }}"> Knowledge base</a>.{% endblocktrans %}
                         </div>
                     </li>
 
-                    <li class="media">
-                        <div class="media-left">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_support' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_support.url as link_support_url%}Need professional help? Check out the <a class="new_window" href="{{ link_support_url }}"> Support</a> offerings.{% endblocktrans %}
                         </div>
                     </li>
 
-                    <li class="media">
-                        <div class="media-left">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_forum' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_forum.url as link_forum_url %}For discussions visit the <a class="new_window" href="{{ link_forum_url }}">Community forum</a>.{% endblocktrans %}
                         </div>
                     </li>
 
-                    <li class="media">
-                        <div class="media-left">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_release_notes' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_release_notes.url as link_release_notes_url %}The complete list of changes is available via the <a class="new_window" href="{{ link_release_notes_url }}">Release notes</a>.{% endblocktrans %}
                         </div>
                     </li>
 
-                    <li class="media">
-                        <div class="media-left">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_documentation' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_documentation.url as link_documentation_url %}For questions check the <a class="new_window" href="{{ link_documentation_url }}">Documentation</a>.{% endblocktrans %}
                         </div>
                     </li>
 
-                    <li class="media">
-                        <div class="media-left">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
+                            {% icons_get_icon 'mayan.apps.common.icons.icon_website' %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            {% blocktrans %}More more details check the <a class="new_window" href="{{ project_website }}">Website</a>.{% endblocktrans %}
+                        </div>
+                    </li>
+
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
+                            {% icons_get_icon 'mayan.apps.common.icons.icon_trademark_policy' %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            {% url 'common:trademark_policy_view' as url_trademark_policy %}{% blocktrans with url_trademark_policy=url_trademark_policy %}What the marks above permit is set out in the <a href="{{ url_trademark_policy }}">Trademark policy</a>.{% endblocktrans %}
+                        </div>
+                    </li>
+
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_source_code' %}
                         </div>
-                        <div class="media-body">
+                        <div class="flex-grow-1 ms-3">
                             {% blocktrans with link_source_code.url as link_source_code_url %}If you found a bug or have a feature idea open a ticket in the <a class="new_window" href="{{ link_source_code_url }}">Source code repository</a>.{% endblocktrans %}
                         </div>
                     </li>

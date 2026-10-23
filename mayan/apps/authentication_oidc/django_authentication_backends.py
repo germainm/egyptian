@@ -15,6 +15,24 @@ class DjangoAuthenticationBackendOIDC(OIDCAuthenticationBackend):
 
         return user
 
+    def get_or_create_user(self, access_token, id_token, payload):
+        user = super().get_or_create_user(
+            access_token=access_token, id_token=id_token, payload=payload
+        )
+
+        if user and self.user_can_authenticate(user=user):
+            return user
+
+        return None
+
+    def get_user(self, user_id):
+        user = super().get_user(user_id=user_id)
+
+        if user and self.user_can_authenticate(user=user):
+            return user
+
+        return None
+
     def update_user(self, user, claims):
         user = super().update_user(user=user, claims=claims)
 

@@ -10,13 +10,17 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.backends.classes import BaseBackend
 from mayan.apps.common.serialization import yaml_dump, yaml_load
+from mayan.apps.logging.literals import DEFAULT_LOGGING_LEVEL
 from mayan.apps.task_manager.classes import Worker
 from mayan.literals import (
-    DEFAULT_DIRECTORY_INSTALLATION, DEFAULT_OS_USERNAME,
-    DEFAULT_USER_SETTINGS_FOLDER, GUNICORN_LIMIT_REQUEST_LINE,
-    GUNICORN_MAX_REQUESTS, GUNICORN_REQUESTS_JITTER, GUNICORN_TIMEOUT,
-    GUNICORN_WORKER_CLASS, GUNICORN_WORKERS
+    BEAT_NICE_LEVEL, DEFAULT_DIRECTORY_INSTALLATION, DEFAULT_OS_USERNAME,
+    DEFAULT_USER_SETTINGS_FOLDER, GUNICORN_BIND_ADDRESS,
+    GUNICORN_LIMIT_REQUEST_LINE, GUNICORN_MAX_REQUESTS,
+    GUNICORN_REQUESTS_JITTER, GUNICORN_TIMEOUT, GUNICORN_WORKER_CLASS,
+    GUNICORN_WORKERS
 )
+
+from .literals import DEFAULT_ALLOWED_HOSTS
 
 
 class Variable:
@@ -92,10 +96,6 @@ class PlatformTemplate(BaseBackend):
         return result
 
     def render(self, context_string=None):
-        """
-        context_string allows the management command to pass context to this
-        method as a JSON string
-        """
         context = {}
 
         context.update(
@@ -107,7 +107,6 @@ class PlatformTemplate(BaseBackend):
         context.update(
             self.get_variables_context()
         )
-        # get_context goes last to serve as the override.
         context.update(
             self.get_context()
         )
@@ -134,6 +133,24 @@ class PlatformTemplateSupervisord(PlatformTemplate):
 
     def __init__(self):
         self.variables = (
+            YAMLVariable(
+                name='ALLOWED_HOSTS', default=DEFAULT_ALLOWED_HOSTS,
+                environment_name='MAYAN_ALLOWED_HOSTS'
+            ),
+            Variable(
+                name='BEAT_NICE_LEVEL', default=BEAT_NICE_LEVEL,
+                environment_name='MAYAN_BEAT_NICE_LEVEL'
+            ),
+            Variable(
+                name='GUNICORN_BIND_ADDRESS',
+                default=GUNICORN_BIND_ADDRESS,
+                environment_name='MAYAN_GUNICORN_BIND_ADDRESS'
+            ),
+            Variable(
+                name='LOGGING_LEVEL',
+                default=DEFAULT_LOGGING_LEVEL,
+                environment_name='MAYAN_LOGGING_LEVEL'
+            ),
             Variable(
                 name='GUNICORN_REQUESTS_JITTER',
                 default=GUNICORN_REQUESTS_JITTER,
@@ -142,7 +159,7 @@ class PlatformTemplateSupervisord(PlatformTemplate):
             Variable(
                 name='GUNICORN_LIMIT_REQUEST_LINE',
                 default=GUNICORN_LIMIT_REQUEST_LINE,
-                environment_name='MAYAN_GUNICORN_GUNICORN_LIMIT_REQUEST_LINE'
+                environment_name='MAYAN_GUNICORN_LIMIT_REQUEST_LINE'
             ),
             Variable(
                 name='GUNICORN_MAX_REQUESTS',
@@ -163,11 +180,6 @@ class PlatformTemplateSupervisord(PlatformTemplate):
                 name='GUNICORN_WORKERS',
                 default=GUNICORN_WORKERS,
                 environment_name='MAYAN_GUNICORN_WORKERS'
-            ),
-            Variable(
-                name='GUNICORN_TIMEOUT',
-                default=GUNICORN_TIMEOUT,
-                environment_name='MAYAN_GUNICORN_TIMEOUT'
             ),
             Variable(
                 name='INSTALLATION_PATH',

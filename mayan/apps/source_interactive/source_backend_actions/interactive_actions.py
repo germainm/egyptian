@@ -29,9 +29,7 @@ from .file_mixins import SourceBackendActionMixinFileUser
 class SourceBackendActionInteractiveBase(
     SourceBackendActionMixinFileUser, SourceBackendAction
 ):
-    """
-    Base class for all interactive source actions.
-    """
+    pass
 
 
 class SourceBackendActionInteractiveDocumentFileUpload(

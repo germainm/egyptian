@@ -11,7 +11,6 @@ def method_event(event_manager_class, **event_manager_kwargs):
                 instance=self, **event_manager_kwargs
             )
             event_manager.prepare()
-            # Gather everything set before the wrapped function.
             event_manager.pop_event_attributes()
 
             if event_manager.order == EVENT_MANAGER_ORDER_BEFORE:
@@ -19,8 +18,6 @@ def method_event(event_manager_class, **event_manager_kwargs):
 
             result = func(self, *args, **kwargs)
 
-            # Call `pop_event_attributes` again to gather anything else
-            # set inside the wrapped function itself.
             event_manager.pop_event_attributes()
 
             if event_manager.order == EVENT_MANAGER_ORDER_AFTER:

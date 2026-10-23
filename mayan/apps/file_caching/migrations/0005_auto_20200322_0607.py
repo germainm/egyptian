@@ -13,10 +13,7 @@ logger = logging.getLogger(name=__name__)
 
 class DummyStorage(Storage):
     def delete(self, name):
-        """
-        Do nothing. This dummy storage avoids an if in the
-        `cache_partition_file` loop.
-        """
+        pass
 
 
 def code_purge_and_delete_caches(apps, schema_editor):

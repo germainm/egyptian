@@ -1,0 +1,112 @@
+{% load i18n %}
+
+{% load appearance_bootstrap_tags %}
+{% load common_tags %}
+
+{% appearance_bootstrap_color_mode_get as appearance_color_mode %}
+{% appearance_bootstrap_text_direction_get as appearance_text_direction %}
+
+{% common_get_project_title as project_title %}
+
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}" dir="{{ appearance_text_direction|default:'ltr' }}" data-bs-theme="{{ appearance_color_mode.name|default:'light' }}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex, nofollow">
+        <title>{% trans 'Service temporarily unavailable' %} &ndash; {{ project_title|default:'Mayan EDMS' }}</title>
+
+        
+        
+        
+        
+        
+        {% for stylesheet_url in stylesheet_url_list %}
+            <link href="{{ stylesheet_url }}" media="screen" rel="stylesheet" type="text/css" />
+        {% endfor %}
+
+        <style>
+            /* Critical styles only: keep the card centered and the inline */
+            /* SVG icons sized even if the theme stylesheet cannot load.   */
+            body {
+                align-items: center;
+                display: flex;
+                justify-content: center;
+                min-height: 100vh;
+            }
+
+            .service-worker-status-icon {
+                height: 3rem;
+                width: 3rem;
+            }
+
+            .service-worker-button-icon {
+                height: 1em;
+                vertical-align: -0.125em;
+                width: 1em;
+            }
+        </style>
+    </head>
+    <body>
+        <main aria-live="assertive" class="container py-4" role="alert">
+            <div class="row justify-content-center">
+                <div class="col-12 col-sm-10 col-md-8 col-lg-6">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-center text-white">
+                            <span class="fs-5 fw-semibold">{{ project_title|default:'Mayan EDMS' }}</span>
+                        </div>
+                        <div class="card-body p-4 p-md-5 text-center">
+                            <p class="mb-3 text-primary">
+                                {% include 'service_workers/partials/service_worker_status_icon.svg' %}
+                            </p>
+                            <h1 class="h4 mb-3">{% trans 'Service temporarily unavailable' %}</h1>
+                            <p class="mb-2 text-muted">{% blocktrans %}The server is busy or restarting and could not respond in time. This is usually temporary.{% endblocktrans %}</p>
+                            <p class="mb-4 text-muted">{% blocktrans %}The page will retry automatically, or you can retry now.{% endblocktrans %}</p>
+                            <button class="btn btn-primary" type="button" id="service-worker-retry-button">
+                                {% include 'service_workers/partials/service_worker_retry_icon.svg' %}<span class="ms-2">{% trans 'Retry now' %}</span>
+                            </button>
+                            <div class="mt-3 small text-muted" id="service-worker-countdown"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        {% trans 'Retrying automatically in %(seconds)s seconds…' as service_worker_retry_message %}
+        <script>
+            (function () {
+                'use strict';
+
+                var retryButton = document.getElementById('service-worker-retry-button');
+                var countdownElement = document.getElementById('service-worker-countdown');
+                var secondsRemaining = {{ retry_interval|default:30 }};
+
+                var retryMessage = '{{ service_worker_retry_message|escapejs }}';
+
+                function reload() {
+                    window.location.reload();
+                }
+
+                function tick() {
+                    if (secondsRemaining <= 0) {
+                        reload();
+                        return;
+                    }
+
+                    countdownElement.textContent = retryMessage.replace(
+                        '%(seconds)s', secondsRemaining
+                    );
+                    secondsRemaining -= 1;
+                }
+
+                retryButton.addEventListener('click', reload);
+
+                // A zero interval disables the automatic retry; the manual
+                // retry button remains available.
+                if (secondsRemaining > 0) {
+                    tick();
+                    window.setInterval(tick, 1000);
+                }
+            })();
+        </script>
+    </body>
+</html>

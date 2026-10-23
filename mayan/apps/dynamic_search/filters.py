@@ -3,9 +3,9 @@ import operator
 
 from django.conf import settings
 
-from mayan.apps.views.utils import get_request_data
-
 from rest_framework.filters import BaseFilterBackend
+
+from mayan.apps.views.utils import get_request_data
 
 from .exceptions import DynamicSearchException
 from .literals import QUERY_PARAMETER_ANY_FIELD

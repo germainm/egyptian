@@ -1,6 +1,8 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils.translation import gettext_lazy as _
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework.relations import HyperlinkedIdentityField
 
 from mayan.apps.common.utils import resolve_attribute
@@ -11,23 +13,18 @@ from .field_mixins import (
 )
 
 
+@extend_schema_field(field=OpenApiTypes.INT)
 class FilteredPrimaryKeyRelatedField(
     AutoHelpTextLabelFieldMixin, FilteredRelatedFieldMixin,
     serializers.PrimaryKeyRelatedField
 ):
-    """
-    PrimaryKeyRelatedField that allows runtime queryset filtering by ACL.
-    """
+    pass
 
 
 class FilteredSimplePrimaryKeyRelatedField(
     AutoHelpTextLabelFieldMixin, FilteredRelatedFieldMixin,
     serializers.RelatedField
 ):
-    """
-    PrimaryKeyRelatedField that allows runtime queryset filtering by ACL
-    and that only stores the primary key.
-    """
     default_error_messages = {
         'does_not_exist': _(
             message='Invalid pk "{pk_value}" - object does not exist.'
@@ -71,16 +68,6 @@ class MultiKwargHyperlinkedIdentityField(HyperlinkedIdentityField):
         super().__init__(*args, **kwargs)
 
     def get_url(self, obj, view_name, request, format):
-        """
-        Extends HyperlinkedRelatedField to allow passing more than one view
-        keyword argument.
-        ----
-        Given an object, return the URL that hyperlinks to the object.
-
-        May raise a `NoReverseMatch` if the `view_name` and `lookup_field`
-        attributes are not configured to correctly match the URL conf.
-        """
-        # Unsaved objects will not yet have a valid URL.
         if hasattr(obj, 'pk') and obj.pk in (None, ''):
             return None
 

@@ -23,9 +23,9 @@ def code_update_to_credentials(apps, schema_editor):
     StoredCredential.get_backend_data = get_backend_data
     StoredCredential.set_backend_data = set_backend_data
 
-    queryset = UserMailer.objects.using(
-        alias=schema_editor.connection.alias
-    ).filter(
+    alias = schema_editor.connection.alias
+
+    queryset = UserMailer.objects.using(alias=alias).filter(
         backend_path='mayan.apps.mailer.mailers.DjangoSMTP'
     )
 
@@ -44,7 +44,7 @@ def code_update_to_credentials(apps, schema_editor):
                 'username': obj_backend_data['username']
             }
         )
-        stored_credential.save()
+        stored_credential.save(using=alias)
 
         obj_backend_data.update(
             {'stored_credential_id': stored_credential.pk}
@@ -53,7 +53,7 @@ def code_update_to_credentials(apps, schema_editor):
         obj_backend_data.pop('username')
 
         obj.set_backend_data(obj=obj_backend_data)
-        obj.save()
+        obj.save(using=alias)
 
 
 def reverse_code_update_to_credentials(apps, schema_editor):
@@ -68,16 +68,18 @@ def reverse_code_update_to_credentials(apps, schema_editor):
     StoredCredential.get_backend_data = get_backend_data
     StoredCredential.set_backend_data = set_backend_data
 
-    queryset = UserMailer.objects.using(
-        alias=schema_editor.connection.alias
-    ).filter(
+    alias = schema_editor.connection.alias
+
+    queryset = UserMailer.objects.using(alias=alias).filter(
         backend_path='mayan.apps.mailer.mailers.DjangoSMTP'
     )
 
     for obj in queryset:
         obj_backend_data = obj.get_backend_data()
 
-        stored_credential = StoredCredential.objects.get(
+        stored_credential = StoredCredential.objects.using(
+            alias=alias
+        ).get(
             pk=obj_backend_data['stored_credential_id']
         )
         credential_backend_data = stored_credential.get_backend_data()
@@ -91,7 +93,9 @@ def reverse_code_update_to_credentials(apps, schema_editor):
         obj_backend_data.pop('stored_credential_id')
 
         obj.set_backend_data(obj=obj_backend_data)
-        obj.save()
+        obj.save(using=alias)
+
+        stored_credential.delete(using=alias)
 
 
 class Migration(migrations.Migration):

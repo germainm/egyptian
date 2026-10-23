@@ -1,10 +1,7 @@
 'use strict';
 
 $.fn.hasAnyClass = function() {
-    /*
-     *  Return true is an element has any of the passed classes
-     *  The classes are passed as an array.
-     */
+     
     for (const cssClass of arguments[0]) {
         if (this.hasClass(cssClass)) {
             return true;
@@ -17,52 +14,165 @@ class PartialNavigation {
     constructor (parameters) {
         parameters = parameters || {};
 
-        // lastLocation - used as the AJAX referer
+        
         this.lastLocation = null;
+         
+        this.responseRedirectPending = false;
 
-        // initialURL - the URL to send users when trying to access the / URL
+        
+        
+        
+        this.locationURLPrevious = null;
+
+        
         this.initialURL = parameters.initialURL || null;
 
-        // disabledAnchorClasses - Anchors with any of these classes will not be
-        // processes as AJAX anchors and their events nulled
+        
+        
         this.disabledAnchorClasses = parameters.disabledAnchorClasses || [];
 
-        // excludeAnchorClasses - Anchors with any of these classes will not be
-        // processes as AJAX anchors
+        
+        
         this.excludeAnchorClasses = parameters.excludeAnchorClasses || [];
 
-        this.redirectionCode = parameters.redirectionCode;
+        
+        
+        
+        
+        this.headerNames = parameters.headerNames;
 
-        if (!this.redirectionCode) {
-            alert('Need to setup redirectionCode');
-        }
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        this.modalFragmentTransport = 'header';
+
+        
+        
+        
+        
+        
+        this.modalFragmentLinkClass = parameters.modalFragmentLinkClass || 'mayan-link-modal';
 
         if (!this.initialURL) {
             alert('Need to setup initialURL');
         }
 
-        // AJAX request throttling and pending request cancellation.
-        // Default is 10 requests in 5 seconds of less.
+        if (!this.headerNames) {
+            alert('Need to setup headerNames');
+        }
+
+        
+        
         this.maximumAjaxRequests = parameters.maximumAjaxRequests || 10;
         this.ajaxRequestTimeout = parameters.ajaxRequestTimeout || 5000;
         this.ajaxThrottlingMessage = parameters.ajaxThrottlingMessage || 'Too many requests.';
 
-        this.currentAjaxRequest = null;
+        
+        
+        
+        
+        this.navigationController = null;
         this.AjaxRequestTimeOutList = [];
 
-        // AJAX Refresh button.
+        
+        
+        
+        
+        
+        this.eventNavigationStart = 'mayan:navigation-start';
+
+        
         this.ajaxRefreshButtonAnimationSpeed = 1000;
         this.ajaxRefreshButtonEnabled = true;
-        this.ajaxRefreshButtonTimer = setTimeout(null);
+        this.ajaxRefreshButtonTimer = null;
+
+        
+        
+        
+        
+        
+        this.errorHandlers = [];
 
         this.$ajaxContent = $('#ajax-content');
     }
 
     initialize () {
+        
+        
+        
+        
+        if (!this.$ajaxContent.length) {
+            return;
+        }
+
         this.setupAjaxAnchors();
         this.setupAjaxNavigation();
         this.setupAjaxForm();
         this.setupAjaxRefreshButton();
+        this.setupCommunicationErrorRetry();
+    }
+
+    getResponseHeader (response, headerName) {
+         
+        if (!response) {
+            return null;
+        }
+
+        if (response.headers && response.headers.get) {
+            return response.headers.get(headerName);
+        }
+
+        if (response.getResponseHeader) {
+            return response.getResponseHeader(headerName);
+        }
+
+        return null;
+    }
+
+    getResponseRedirectURL (response) {
+         
+        return this.getResponseHeader(
+            response, this.headerNames.redirectLocation
+        );
+    }
+
+    doResponseRedirect (response) {
+         
+        const newLocation = this.getResponseRedirectURL(response);
+
+        if (!newLocation) {
+            return null;
+        }
+
+        if (this.responseRedirectPending) {
+             
+            return newLocation;
+        }
+
+        if (this.getResponseHeader(response, this.headerNames.pageReload)) {
+            this.responseRedirectPending = true;
+            window.location = newLocation;
+
+            return newLocation;
+        }
+
+        this.setLocation(newLocation);
+
+        return newLocation;
+    }
+
+    registerErrorHandler (handler) {
+         
+        this.errorHandlers.push(handler);
     }
 
     ajaxContentSet (content) {
@@ -77,10 +187,65 @@ class PartialNavigation {
         return htmlContent;
     }
 
+    modalTransportURL (url) {
+         
+        if (
+            this.modalFragmentTransport === 'query' ||
+            this.modalFragmentTransport === 'both'
+        ) {
+            if (!/[?&]modal=/.test(url)) {
+                const separator = url.indexOf('?') === -1 ? '?' : '&';
+                return `${url}${separator}modal=1`;
+            }
+        }
+
+        return url;
+    }
+
+    modalFragmentShow (content) {
+         
+        const existingModal = document.getElementById('modal-confirm');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const $modal = $($.parseHTML(content)).filter('div.modal');
+        $modal.appendTo('body');
+
+        const modalElement = $modal.get(0);
+        if (!modalElement) {
+            return;
+        }
+
+        modalElement.addEventListener('hidden.bs.modal', function () {
+            modalElement.remove();
+        });
+
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    }
+
+    isExternalURL (locationString) {
+         
+        let url;
+
+        try {
+            url = new URL(locationString, window.location.origin);
+        } catch (error) {
+            if (error instanceof TypeError) {
+                return false;
+            } else {
+                throw error;
+            }
+        }
+
+        const isHttp = (url.protocol === 'http:' || url.protocol === 'https:');
+        const isSameOrigin = (url.origin === window.location.origin);
+
+        return isHttp && !isSameOrigin;
+    }
+
     filterLocation (newLocation) {
-        /*
-         * Method to validate new locations
-         */
+         
         let url;
 
         try {
@@ -93,8 +258,8 @@ class PartialNavigation {
             }
         }
 
-        // Only allow same-origin HTTP(S) navigation targets.
-        // This blocks `javascript:`, `data:`, and cross-origin redirects.
+        
+        
         const isHttp = (url.protocol === 'http:' || url.protocol === 'https:');
         const isSameOrigin = (url.origin === window.location.origin);
         if (!isHttp || !isSameOrigin) {
@@ -102,13 +267,22 @@ class PartialNavigation {
         }
 
         if (url.pathname === '/') {
-            // href with no path remain in the same location
-            // We strip the same location query and use the new href's one.
+            if (!url.search) {
+                
+                
+                
+                
+                
+                return this.initialURL;
+            }
+
+            
+            
             const currentHash = window.location.hash.substring(1);
             const basePath = (currentHash.startsWith('/') && !currentHash.startsWith('//')) ? currentHash : this.initialURL;
             const urlNew = new URL(basePath, window.location.origin);
 
-            urlNew.search = newLocation;
+            urlNew.search = url.search;
 
             if (urlNew.pathname === '/') {
                 return this.initialURL;
@@ -120,89 +294,166 @@ class PartialNavigation {
         return `${url.pathname}${url.search}`;
     }
 
-    loadAjaxContent (url) {
-        /*
-         *  Method to load and display partial backend views to the main
-         *  view port.
-         */
+    cancelCurrentNavigation () {
+         
+        if (!this.navigationController) {
+            return;
+        }
+
+        this.navigationController.abort();
+        this.navigationController = null;
+
+        $('body').css('cursor', 'progress');
+    }
+
+    loadAjaxContent (url, requestOptions) {
+         
         const app = this;
 
         url = this.filterLocation(url);
 
-        this.AjaxRequestTimeOutList.push(
-            setTimeout(function() {
-                app.AjaxRequestTimeOutList.shift();
-            }, app.ajaxRequestTimeout)
-        );
+        
+        
+        const modalFragment = Boolean(
+            requestOptions && requestOptions.modalFragment
+        ) && app.modalFragmentTransport !== 'off';
 
-        // Request exceeded maximum, ignoring.
+        const ajaxRequestHeaders = {};
+        let ajaxRequestURL = url;
+
+        if (modalFragment) {
+            if (
+                app.modalFragmentTransport === 'header' ||
+                app.modalFragmentTransport === 'both'
+            ) {
+                ajaxRequestHeaders[app.headerNames.modal] = 'true';
+            }
+            ajaxRequestURL = app.modalTransportURL(url);
+        }
+
+        
+        
+        
+        
+        
+        const throttleTimeout = setTimeout(function () {
+            const index = app.AjaxRequestTimeOutList.indexOf(throttleTimeout);
+            if (index !== -1) {
+                app.AjaxRequestTimeOutList.splice(index, 1);
+            }
+        }, app.ajaxRequestTimeout);
+        this.AjaxRequestTimeOutList.push(throttleTimeout);
+
+        
         if (this.AjaxRequestTimeOutList.length > app.maximumAjaxRequests) {
             let options = {};
 
             options['timeOut'] = 10000;
-            $('body').css('cursor', 'progress');
 
-            toastr['warning'](app.ajaxThrottlingMessage, '', options);
+            MayanApp.doAddToast(app.ajaxThrottlingMessage, 'warning', options);
+            $('body').css('cursor', 'default');
             return;
         }
 
-        // Another AJAX request is being processed. Cancel the previous
-        // one.
-        if (this.currentAjaxRequest) {
-            // Store and repaint the content area to avoid a '0' status
-            // server error message.
-            const htmlContent = app.ajaxContentSet();
+        
+        
+        
+        this.$ajaxContent.trigger(this.eventNavigationStart);
 
-            this.currentAjaxRequest.abort();
-            $('body').css('cursor', 'progress');
+        
+        
+        this.cancelCurrentNavigation();
 
-            app.ajaxContentSet(htmlContent);
-        }
+        const controller = new AbortController();
+        this.navigationController = controller;
 
-        this.currentAjaxRequest = $.ajax({
+        const jqXHR = $.ajax({
             async: true,
+            complete: function (jqXHR, textStatus) {
+                
+                
+                if (app.navigationController === controller) {
+                    app.navigationController = null;
+                }
+
+                if (textStatus === 'abort') {
+                    
+                    
+                    
+                    clearTimeout(throttleTimeout);
+                    const index = app.AjaxRequestTimeOutList.indexOf(
+                        throttleTimeout
+                    );
+                    if (index !== -1) {
+                        app.AjaxRequestTimeOutList.splice(index, 1);
+                    }
+                }
+            },
             dataType: 'html',
             error: function (jqXHR, textStatus, errorThrown) {
+                if (textStatus === 'abort') {
+                    
+                    
+                    return;
+                }
+
+                $('body').css('cursor', 'default');
                 app.processAjaxRequestError(jqXHR);
             },
-            // Need to set mimeType only when run from local file.
+            headers: ajaxRequestHeaders,
+            
             mimeType: 'text/html; charset=utf-8',
             success: function (data, textStatus, response) {
-                if (response.status == app.redirectionCode) {
-                    // Handle redirects.
-                    const newLocation = response.getResponseHeader('Location');
+                const newLocation = app.doResponseRedirect(response);
 
-                    app.setLocation(newLocation);
+                if (newLocation) {
                     app.lastLocation = newLocation;
                 } else {
-                    app.lastLocation = url;
                     if (response.getResponseHeader('Content-Disposition')) {
-                        window.location = this.url;
+                        app.lastLocation = url;
+                        window.location = url;
+                    } else if (response.getResponseHeader(app.headerNames.modal)) {
+                        
+                        
+                        
+                        
+                        
+                        if (app.locationURLPrevious) {
+                            history.replaceState(
+                                {}, '', app.locationURLPrevious
+                            );
+                        }
+                        app.modalFragmentShow(data);
+                        $('body').css('cursor', 'default');
                     } else {
+                        app.lastLocation = url;
                         app.ajaxContentSet(data);
                         $('body').css('cursor', 'default');
                     }
                 }
 
-                // Enable requests again.
-                app.currentAjaxRequest = null;
-
-                // Reset throttling.
+                
                 for (let item of app.AjaxRequestTimeOutList) {
                     clearTimeout(item);
                 }
                 app.AjaxRequestTimeOutList = [];
             },
             type: 'GET',
-            url: url
+            url: ajaxRequestURL
         });
+
+        
+        
+        
+        controller.signal.addEventListener('abort', function () {
+            jqXHR.abort();
+        }, {once: true});
     }
 
     onAnchorClick ($this, event) {
-        /*
-         * Anchor click event manager. We intercept all click events and
-         * route them to load the content via AJAX instead.
-         */
+         
+        const app = this;
+
         if ($this.hasAnyClass(this.excludeAnchorClasses)) {
             return true;
         }
@@ -222,13 +473,28 @@ class PartialNavigation {
         }
 
         if (url.indexOf('javascript:;') > -1) {
-            // Ignore/exclude links meant to execute javascript on click.
+            
             return true;
         }
 
         if (url === '#') {
-            // Ignore/exclude links with only a hash.
+            
             return true;
+        }
+
+        if (app.isExternalURL(url)) {
+            
+            
+            
+            
+            
+            
+            
+            event.preventDefault();
+
+            window.open(url, '_blank', 'noopener,noreferrer');
+
+            return false;
         }
 
         event.preventDefault();
@@ -239,41 +505,100 @@ class PartialNavigation {
         }
 
         if (!($this.hasClass('disabled') || $this.parent().hasClass('disabled'))) {
-            this.setLocation(url);
+            
+            
+            const requestOptions = {
+                modalFragment: $this.hasClass(app.modalFragmentLinkClass)
+            };
+            this.setLocation(url, undefined, requestOptions);
         }
     }
 
+    getErrorContent (statusCode) {
+         
+        const title = gettext('Service temporarily unavailable');
+        const message = gettext(
+            'The server is busy, restarting, or unreachable and could not ' +
+            'respond. This is usually temporary.'
+        );
+        const retryLabel = gettext('Retry');
+
+        let statusLine = '';
+        if (statusCode) {
+            statusLine = `<p class="mt-3 mb-0 small text-muted">${gettext('Status code')}: ${statusCode}</p>`;
+        }
+
+        return ` \
+            <div class="row justify-content-center"> \
+                <div class="col-12 col-sm-10 col-md-8 col-lg-6"> \
+                    <div aria-live="polite" class="card border-primary mt-4" role="alert"> \
+                        <div class="card-body p-4 p-md-5 text-center"> \
+                            <p class="mb-3 text-primary"> \
+                                <i aria-hidden="true" class="fa-solid fa-triangle-exclamation fa-3x"></i> \
+                            </p> \
+                            <h2 class="h4 mb-3">${title}</h2> \
+                            <p class="mb-0 text-muted">${message}</p> \
+                            <a class="btn btn-primary mt-4 appearance-communication-error-retry" href="#"> \
+                                <i aria-hidden="true" class="fa-solid fa-sync me-2"></i>${retryLabel} \
+                            </a> \
+                            ${statusLine} \
+                        </div> \
+                    </div> \
+                </div> \
+            </div> \
+        `;
+    }
+
     processAjaxRequestError (jqXHR) {
-        /*
-         * Method to process an AJAX request and make it presentable to the
-         * user.
-         */
+         
         const app = this;
 
-        if (djangoDEBUG) {
-            let errorMessage = null;
+        
+        if (jqXHR.status === 0 && jqXHR.statusText === 'abort') {
+            return;
+        }
 
-            if (jqXHR.status != 0) {
-                errorMessage = jqXHR.responseText || jqXHR.statusText;
-            } else {
-                errorMessage = 'Server communication error.';
+        
+        
+        
+        
+        for (const errorHandler of app.errorHandlers) {
+            if (errorHandler(jqXHR, app)) {
+                return;
             }
+        }
+
+        
+        
+        
+        
+        
+        const communicationStatusCodeList = [0, 502, 503, 504];
+        if (communicationStatusCodeList.indexOf(jqXHR.status) !== -1) {
+            app.ajaxContentSet(app.getErrorContent(jqXHR.status));
+            return;
+        }
+
+        if (djangoDEBUG) {
+            const errorMessage = jqXHR.responseText || jqXHR.statusText;
 
             app.ajaxContentSet(
                 ` \
-                    <div class="row">\
-                        <div class="col-xs-12">\
-                            <div id="banner-server-error">\
-                                <div class="alert alert-danger" role="alert"><i class="fa fa-exclamation-triangle"></i> Server error, status code: ${jqXHR.status}</div> \
-                                    <pre id="django-server-error"><code>${errorMessage}</code> \
-                                    </pre> \
-                                </div>\
-                            </div>\
-                    </div>\
+                    <div class="row"> \
+                        <div class="col-12"> \
+                            <div id="banner-server-error"> \
+                                <div class="alert alert-danger d-flex align-items-center" role="alert"> \
+                                    <i aria-hidden="true" class="fa-solid fa-triangle-exclamation me-2"></i> \
+                                    <span>Server error, status code: ${jqXHR.status}</span> \
+                                </div> \
+                                <pre id="django-server-error"><code>${errorMessage}</code></pre> \
+                            </div> \
+                        </div> \
+                    </div> \
                 `
             );
 
-            // Call Django's debug view initial JavaScript.
+            
             if (jqXHR.status === 500) {
                   hideAll(document.querySelectorAll('table.vars'));
                   hideAll(document.querySelectorAll('ol.pre-context'));
@@ -281,48 +606,46 @@ class PartialNavigation {
                   hideAll(document.querySelectorAll('div.pastebin'));
             }
         } else {
-            if (jqXHR.status === 0) {
-                if (jqXHR.statusText !== "abort") {
-                    $('#modal-server-error .modal-body').html($('#template-error').html());
-                    $('#modal-server-error').modal('show')
-                }
+            if ([403, 404, 500].indexOf(jqXHR.status) !== -1) {
+                app.ajaxContentSet(jqXHR.responseText);
             } else {
-                if ([403, 404, 500].indexOf(jqXHR.status !== -1)) {
-                    app.ajaxContentSet(jqXHR.responseText);
-                } else {
-                    app.ajaxContentSet(jqXHR.statusText);
-                }
+                app.ajaxContentSet(app.getErrorContent(jqXHR.status));
             }
         }
     }
 
-    setLocation (newLocation, pushState) {
-        /*
-         * Method to update the browsers history and trigger a page update.
-         */
+    getLocationURL (newLocation) {
+         
+        const urlNew = new URL(window.location);
 
-        // Validate the new location first.
+        urlNew.hash = newLocation;
+
+        return urlNew;
+    }
+
+    setLocation (newLocation, pushState, requestOptions) {
+         
+
+        
         newLocation = this.filterLocation(newLocation);
 
         if (typeof pushState === 'undefined') {
-            // Check if we should just load the content or load the content
-            // and update the history.
+            
+            
             pushState = true;
         }
 
-        const urlNew = new URL(window.location);
-        urlNew.hash = newLocation;
+        const urlNew = this.getLocationURL(newLocation);
 
         if (pushState) {
+            this.locationURLPrevious = window.location.href;
             history.pushState({}, '', urlNew);
         }
-        this.loadAjaxContent(newLocation);
+        this.loadAjaxContent(newLocation, requestOptions);
     }
 
     async setupAjaxAnchors () {
-        /*
-         * Setup the new click event handler.
-         */
+         
         const app = this;
         $('body').on('click', 'a', function (event) {
             app.onAnchorClick($(this), event);
@@ -330,9 +653,7 @@ class PartialNavigation {
     }
 
     async setupAjaxForm () {
-        /*
-         * Method to setup the handling of form in an AJAX way.
-         */
+         
         const app = this;
         let lastAjaxFormData = {};
 
@@ -347,17 +668,23 @@ class PartialNavigation {
                 options.url = stringFormAction;
 
                 const urlSearchParamForm = new URLSearchParams(
-                    decodeURIComponent($form.serialize())
+                    $form.serialize()
                 );
                 const urlFormAction = new URL(stringFormAction, window.location);
+
+                if (options.type.toUpperCase() === 'GET') {
+                     
+                    urlFormAction.search = '';
+                    options.url = urlFormAction.toString();
+                }
 
                 urlFormAction.search = urlSearchParamForm.toString();
                 lastAjaxFormData.url = urlFormAction;
 
                 if ($form.attr('target') == '_blank') {
-                    // If the form has a target attribute we emulate it by
-                    // opening a new window and passing the form serialized
-                    // data as the query.
+                    
+                    
+                    
                     window.open(urlFormAction.toString());
 
                     return false;
@@ -368,20 +695,17 @@ class PartialNavigation {
             error: function(jqXHR, textStatus, errorThrown){
                 app.processAjaxRequestError(jqXHR);
             },
-            // ! Need set mimeType only when run from local file.
+            
             mimeType: 'text/html; charset=utf-8',
             success: function(data, textStatus, request) {
-                if (request.status == app.redirectionCode) {
-                    // Handle redirects after submitting the form.
-                    const newLocation = request.getResponseHeader('Location');
+                const newLocation = app.doResponseRedirect(request);
 
-                    app.setLocation(newLocation);
-                } else {
-                    const urlCurrent = new URL(window.location.origin);
-                    urlCurrent.hash = `${lastAjaxFormData.url.pathname}${lastAjaxFormData.url.search}`;
+                if (!newLocation) {
+                    const stringLocation = `${lastAjaxFormData.url.pathname}${lastAjaxFormData.url.search}`;
+                    const urlCurrent = app.getLocationURL(stringLocation);
+
                     history.pushState({}, '', urlCurrent);
                     app.ajaxContentSet(data);
-
                 }
             }
         });
@@ -402,38 +726,74 @@ class PartialNavigation {
 
                 clearTimeout(app.ajaxRefreshButtonTimer);
                 app.setLocation(window.location.hash.substring(1));
-                $this.addClass('fa-spin');
-                $this.css(
+
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                
+                const $icon = $this.find('.mayan-icon');
+
+                $icon.addClass('fa-spin');
+                $icon.css(
                     'animation-duration',
                     `${app.ajaxRefreshButtonAnimationSpeed}ms`
                 );
 
                 app.ajaxRefreshButtonTimer = setTimeout(function () {
-                    $this.removeClass('fa-spin');
+                    $icon.removeClass('fa-spin');
                     app.ajaxRefreshButtonEnabled = true;
                 }, app.ajaxRefreshButtonAnimationSpeed);
             }
         });
     }
 
-    async setupAjaxNavigation () {
-        /*
-         * Setup the navigation method using the hash of the location.
-         * Also handles the back button event and loads via AJAX any
-         * URL in the location when the app first launches. Registers
-         * a callback to send an emulated `HTTP_REFERER` so that the backends
-         * code will still work without change.
-         */
+    async setupCommunicationErrorRetry () {
         const app = this;
 
-        // Load AJAX content when the hash changes.
+        $('body').on('click', 'a.appearance-communication-error-retry', function (event) {
+            const $this = $(this);
+
+            $this.blur();
+
+            event.preventDefault();
+
+            
+            
+            
+            $this.find('i').addClass('fa-spin');
+
+            
+            
+            
+            const target = window.location.hash.substring(1);
+            if (target) {
+                app.setLocation(target, false);
+            } else {
+                window.location.reload();
+            }
+        });
+    }
+
+    async setupAjaxNavigation () {
+         
+        const app = this;
+
+        
         if (window.history && window.history.pushState) {
             $(window).on('popstate', function() {
                 app.setLocation(window.location.hash.substring(1), false);
             });
         }
 
-        // Load any initial address in the URL of the browser.
+        
         if (window.location.hash) {
             this.setLocation(window.location.hash.substring(1));
         } else {
@@ -442,8 +802,12 @@ class PartialNavigation {
 
         $.ajaxSetup({
             beforeSend: function (jqXHR, settings) {
-                // Emulate the `HTTP_REFERER`.
-                jqXHR.setRequestHeader('X-Alt-Referer', app.lastLocation);
+                 
+                if (app.lastLocation) {
+                    jqXHR.setRequestHeader(
+                        app.headerNames.alternateReferer, app.lastLocation
+                    );
+                }
             },
         });
     }

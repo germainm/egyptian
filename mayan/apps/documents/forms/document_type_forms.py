@@ -26,9 +26,6 @@ class DocumentTypeFilenameGeneratorForm(forms.ModelForm):
 
 
 class DocumentTypeFilenameForm_create(forms.ModelForm):
-    """
-    Model class form to create a new document type filename
-    """
     class Meta:
         fields = ('filename',)
         model = DocumentTypeFilename

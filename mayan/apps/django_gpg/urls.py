@@ -39,8 +39,6 @@ urlpatterns = [
         route=r'^keys/query/results/$', name='key_query_results',
         view=KeyQueryResultView.as_view()
     ),
-    # Key ID for this view is not the key's DB ID by the embedded
-    # alphanumeric ID.
     re_path(
         route=r'^keys/receive/(?P<key_id>.+)/$', name='key_receive',
         view=KeyReceive.as_view()

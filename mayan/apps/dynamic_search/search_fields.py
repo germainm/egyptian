@@ -11,7 +11,6 @@ from django.utils.translation import gettext_lazy as _
 
 from .exceptions import DynamicSearchException, DynamicSearchModelException
 from .literals import QUERY_PARAMETER_ANY_FIELD
-from .value_transformations import ValueTransformation
 
 
 class SearchField:
@@ -19,20 +18,9 @@ class SearchField:
     _registry_by_class = {}
 
     class_label = None
-    # Collection is a field that return multiple related fields as a
-    # queryset.
     collection = None
-    # Concrete is true if the search fields maps 1 to 1 with a real model
-    # field.
     concrete = None
-    # Priority ensures concrete and collection fields are processed before
-    # virtual fields.
     priority = None
-
-    @staticmethod
-    class ValueTransformationNull(ValueTransformation):
-        def _execute(self):
-            return self.value
 
     @classmethod
     def all(cls):
@@ -135,9 +123,10 @@ class SearchField:
             search_backend=search_backend
         )
 
-        transformation_class_list = transformations.get(
-            key, (SearchField.ValueTransformationNull,)
-        )
+        transformation_class_list = transformations.get(key)
+
+        if not transformation_class_list:
+            return value
 
         for transformation_class in transformation_class_list:
             value = transformation_class(value=value).execute()
@@ -150,6 +139,14 @@ class SearchField:
             search_backend=search_backend
         ).get(
             'query_type_list', []
+        )
+
+    @functools.cache
+    def get_backend_field_query_type_set(self, search_backend):
+        return frozenset(
+            self.get_backend_field_query_type_list(
+                search_backend=search_backend
+            )
         )
 
     @functools.cache
@@ -237,10 +234,6 @@ class SearchFieldConcrete(SearchField):
 
 
 class SearchFieldDirect(SearchFieldConcrete):
-    """
-    Search for terms in fields that directly belong to the parent
-    SearchModel.
-    """
 
     class_label = _(message='Direct')
     collection = False
@@ -272,6 +265,23 @@ class SearchFieldRelated(SearchFieldConcrete):
     def check(cls, *args, **kwargs):
         return LOOKUP_SEP in kwargs['field'] and not kwargs['field'] == QUERY_PARAMETER_ANY_FIELD
 
+    def do_value_index_transform_list(self, search_backend, value_list):
+        transformation_class_list = self.get_backend_field_transformations(
+            search_backend=search_backend
+        ).get('index')
+
+        if not transformation_class_list:
+            return list(value_list)
+
+        result = []
+        for value in value_list:
+            for transformation_class in transformation_class_list:
+                transformation_instance = transformation_class(value=value)
+                value = transformation_instance.execute()
+            result.append(value)
+
+        return result
+
     def get_instance_value(
         self, instance, search_backend, exclude_kwargs=None,
         exclude_model=None, instance_field_data=None
@@ -295,32 +305,20 @@ class SearchFieldRelated(SearchFieldConcrete):
         if exclude_model and self.related_model == exclude_model:
             sub_queryset = sub_queryset.exclude(**exclude_kwargs)
 
-        result = []
-
         sub_queryset = sub_queryset.distinct()
 
-        for item in sub_queryset:
-            item_value = self.do_value_index_transform(
-                search_backend=search_backend, value=item
+        result = [
+            item_value
+            for item_value in self.do_value_index_transform_list(
+                search_backend=search_backend, value_list=sub_queryset
             )
-            if item_value:
-                result.append(item_value)
+            if item_value
+        ]
 
         return search_backend.do_native_type_conversion(value=result)
 
 
 class SearchFieldVirtual(SearchField):
-    """
-    Base class for all virtual search field that are not populated by
-    directly reading model instance attributes but a calculation.
-
-    Also cover search fields that might not translate to a single model
-    field.
-
-    Virtual search fields need to be registered after the other search
-    field in order to have access to their instance data when doing
-    model instance indexing.
-    """
 
     class_label = _(message='Virtual')
     collection = False

@@ -16,7 +16,11 @@ class IndexInstanceManager(models.Manager):
             index.document_add(document=document)
 
     def document_remove(self, document):
-        for index_instance in self.filter(index_template_nodes__index_instance_nodes__documents=document):
+        queryset = self.filter(
+            index_template_nodes__index_instance_nodes__documents=document
+        ).distinct()
+
+        for index_instance in queryset:
             index_instance.document_remove(document=document)
 
 

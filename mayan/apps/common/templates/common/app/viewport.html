@@ -1,8 +1,9 @@
 {% load i18n %}
 
+{% load appearance_tags %}
 {% load common_tags %}
 
-{# appearance_app_template_nocache #}
+{% appearance_app_template_cache_disable %}
 
 {% common_get_missing_items as missing_items %}
 
@@ -12,7 +13,7 @@
             <p><strong>{{ item.label }}</strong> </p>
             <p>
                 {{ item.description }}
-                {% if item.view %}<a class="btn btn-primary btn-xs" href="{% url item.view %}">{% trans 'Click here to fix this.' %}</a>{% endif %}
+                {% if item.view %}<a class="btn btn-primary btn-sm py-0 small" href="{% url item.view %}">{% trans 'Click here to fix this.' %}</a>{% endif %}
             </p>
     {% endfor %}
     </div>

@@ -107,11 +107,9 @@ def download_file_upload_to(instance, filename):
 
 
 def fs_cleanup(filename, suppress_exceptions=True):
-    """
-    Tries to remove the given filename. Ignores non-existent files.
-    """
     try:
-        os.remove(filename)
+        path = Path(filename)
+        path.unlink()
     except OSError:
         try:
             shutil.rmtree(path=filename)
@@ -123,11 +121,6 @@ def fs_cleanup(filename, suppress_exceptions=True):
 
 
 def get_storage_subclass(dotted_path):
-    """
-    Import a storage class and return a subclass that will always return `eq
-    True` to avoid creating a new migration when for runtime storage class
-    changes. Used now only by historic migrations.
-    """
     imported_storage_class = import_string(dotted_path=dotted_path)
 
     class StorageSubclass(imported_storage_class):
@@ -146,12 +139,6 @@ def get_storage_subclass(dotted_path):
 
 
 def mkdtemp(*args, **kwargs):
-    """
-    Creates a temporary directory in the most secure manner possible.
-    There are no race conditions in the directory's creation.
-    The directory is readable, writable, and searchable only by the creating
-    user ID.
-    """
     path = Path(setting_temporary_directory.value)
 
     if 'dir' in kwargs:
@@ -164,22 +151,6 @@ def mkdtemp(*args, **kwargs):
 
 
 def patch_files(path=None, replace_list=None):
-    """
-    Search and replace content from a list of file based on a pattern
-    replace_list[
-        {
-            'filename_pattern': '*.css',
-            'content_patterns': [
-                {
-                    'search': '',
-                    'replace': '',
-                }
-            ]
-        }
-    ]
-    """
-    file_open_mode = 'r+'
-
     path_object = Path(path)
     for replace_entry in replace_list or []:
         path_entries = path_object.glob(
@@ -189,55 +160,13 @@ def patch_files(path=None, replace_list=None):
         )
         for path_entry in path_entries:
             if path_entry.is_file():
+                file_bytes = path_entry.read_bytes()
                 for pattern in replace_entry['content_patterns']:
-                    with path_entry.open(mode=file_open_mode) as source_file_object:
-                        with tempfile.TemporaryFile(mode=file_open_mode) as temporary_file_object:
-                            source_position = 0
-                            destination_position = 0
-
-                            while (True):
-                                source_file_object.seek(source_position)
-                                letter = source_file_object.read(1)
-
-                                if len(letter) == 0:
-                                    break
-                                else:
-                                    if letter == pattern['search'][0]:
-                                        text = '{}{}'.format(
-                                            letter, source_file_object.read(
-                                                len(
-                                                    pattern['search']
-                                                ) - 1
-                                            )
-                                        )
-
-                                        temporary_file_object.seek(destination_position)
-                                        if text == pattern['search']:
-                                            text = pattern['replace']
-                                            source_position += len(
-                                                pattern['search']
-                                            )
-                                            destination_position += len(
-                                                pattern['replace']
-                                            )
-                                            temporary_file_object.write(text)
-
-                                        else:
-                                            source_position += 1
-                                            destination_position += 1
-                                            temporary_file_object.write(letter)
-                                    else:
-                                        source_position += 1
-                                        destination_position += 1
-                                        temporary_file_object.write(letter)
-
-                            source_file_object.seek(0)
-                            source_file_object.truncate()
-                            temporary_file_object.seek(0)
-                            shutil.copyfileobj(
-                                fsrc=temporary_file_object,
-                                fdst=source_file_object
-                            )
+                    file_bytes = file_bytes.replace(
+                        pattern['search'].encode('utf-8'),
+                        pattern['replace'].encode('utf-8')
+                    )
+                path_entry.write_bytes(file_bytes)
 
 
 def shared_uploaded_file_upload_to(instance, filename):

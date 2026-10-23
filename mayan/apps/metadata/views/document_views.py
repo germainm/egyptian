@@ -54,6 +54,7 @@ class DocumentMetadataAddView(
         queryset = self.object_list
 
         result = {
+            'submit_label': _(message='Add'),
             'title': ngettext(
                 singular='Add metadata types to document',
                 plural='Add metadata types to documents',
@@ -232,6 +233,7 @@ class DocumentMetadataEditView(
                 'type and assign them corresponding values.'
             ),
             'no_results_title': _(message='There is no metadata to edit'),
+            'submit_label': _(message='Save'),
             'title': ngettext(
                 singular='Edit document metadata',
                 plural='Edit documents metadata',
@@ -405,6 +407,7 @@ class DocumentMetadataRemoveView(
 
         result = {
             'form_display_mode_table': True,
+            'submit_label': _(message='Remove'),
             'title': ngettext(
                 singular='Remove metadata types from the document',
                 plural='Remove metadata types from the documents',
@@ -436,8 +439,6 @@ class DocumentMetadataRemoveView(
             )
 
             for document_metadata in queryset_document_metadata:
-                # Metadata value cannot be None here, fallback to an empty
-                # string.
                 value = document_metadata.value or ''
                 if document_metadata.metadata_type in metadata:
                     if value not in metadata[document_metadata.metadata_type]:

@@ -5,15 +5,13 @@
     {% navigation_resolve_menus sort_results=True names='object' source=object as object_menus_link_results %}
 
     {% if facet_menus_link_results or object_menus_link_results %}
-        <div class="panel-footer">
-            <div class="text-center">
+        <div class="card-footer">
+            <div class="d-flex justify-content-center align-items-center gap-3">
                 {% if facet_menus_link_results %}
                     {% include 'appearance/partials/list/column_object_facet_links.html' %}
                 {% endif %}
 
-                {% if facet_menus_link_results and object_menus_link_results %}
-                    <span class="appearance-panel-footer-spacer"></span>
-
+                {% if object_menus_link_results %}
                     {% include 'appearance/partials/list/column_object_links.html' %}
                 {% endif %}
             </div>

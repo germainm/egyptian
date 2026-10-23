@@ -14,7 +14,7 @@ from mayan.apps.converter.transformations import (
 )
 from mayan.apps.databases.classes import ModelQueryFields
 from mayan.apps.views.generics import SimpleView, SingleObjectListView
-from mayan.apps.views.utils import resolve
+from mayan.apps.views.utils import get_request_referer, resolve
 from mayan.apps.views.view_mixins import ExternalObjectViewMixin
 
 from ..forms.document_file_page_forms import DocumentFilePageForm
@@ -53,7 +53,7 @@ class DocumentFilePageListView(
                 message='This could mean that the document file is of a '
                 'format that is not supported, that it is corrupted, or that '
                 'the upload process was interrupted. Use the document file '
-                'introspection link to attempt detection the page count '
+                'introspection link to attempt to detect the page count '
                 'again.'
             ),
             'no_results_title': _(message='No document file pages available'),
@@ -79,11 +79,7 @@ class DocumentFilePageNavigationBase(ExternalObjectViewMixin, RedirectView):
     external_object_queryset = DocumentFilePage.valid.all()
 
     def get_redirect_url(self, *args, **kwargs):
-        """
-        Attempt to jump to the same kind of view but resolved to a new
-        object of the same kind.
-        """
-        previous_url = self.request.META.get('HTTP_REFERER', None)
+        previous_url = get_request_referer(request=self.request)
 
         if not previous_url:
             try:
@@ -93,8 +89,6 @@ class DocumentFilePageNavigationBase(ExternalObjectViewMixin, RedirectView):
 
         parsed_url = furl(url=previous_url)
 
-        # Obtain the view name to be able to resolve it back with new keyword
-        # arguments.
         resolver_match = resolve(
             path=str(parsed_url.path)
         )
@@ -102,16 +96,12 @@ class DocumentFilePageNavigationBase(ExternalObjectViewMixin, RedirectView):
         new_kwargs = self.get_new_kwargs()
 
         if set(new_kwargs) == set(resolver_match.kwargs):
-            # It is the same type of object, reuse the URL to stay in the
-            # same kind of view but pointing to a new object.
             url = reverse(
                 kwargs=new_kwargs, viewname=resolver_match.view_name
             )
         else:
             url = parsed_url.path
 
-        # Update just the path to retain the querystring in case there is
-        # transformation data.
         parsed_url.path = url
 
         return parsed_url.tostr()
@@ -168,7 +158,7 @@ class DocumentFilePageView(ExternalObjectViewMixin, SimpleView):
     external_object_permission = permission_document_file_view
     external_object_pk_url_kwarg = 'document_file_page_id'
     external_object_queryset = DocumentFilePage.valid.all()
-    template_name = 'appearance/form_container.html'
+    template_name = 'appearance/viewport_fill.html'
     view_icon = icon_document_file_page_detail
 
     def get_extra_context(self):
@@ -242,7 +232,6 @@ class DocumentFilePageInteractiveTransformation(
         )
 
         self.transformation_function(query_dict=query_dict)
-        # Refresh query_dict to args reference.
         url.args = query_dict
 
         return url.tostr()

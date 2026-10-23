@@ -19,7 +19,7 @@ PythonDependency(
 )
 PythonDependency(
     environments=(environment_production,), module=__name__,
-    name='google-cloud-storage', version_string='==3.9.0'
+    name='google-cloud-storage', version_string='==3.10.1'
 )
 PythonDependency(
     environments=(environment_testing,), module=__name__, name='psutil',

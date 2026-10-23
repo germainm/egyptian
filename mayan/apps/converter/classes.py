@@ -1,7 +1,8 @@
 import copy
 from io import BytesIO
 import logging
-import os
+from pathlib import Path
+import shlex
 import shutil
 
 import PIL
@@ -17,6 +18,8 @@ from django.utils.functional import cached_property
 from django.utils.module_loading import import_string
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.file_caching.exceptions import FileCachingException
+from mayan.apps.lock_manager.backends.base import LockingBackend
 from mayan.apps.mime_types.classes import MIMETypeBackend
 from mayan.apps.navigation.links import Link
 from mayan.apps.storage.compressed_files import MsgArchive
@@ -30,12 +33,16 @@ from .exceptions import (
     AppImageError, InvalidOfficeFormat, LayerError, OfficeConversionError
 )
 from .literals import (
-    CONVERTER_OFFICE_FILE_MIMETYPES, DEFAULT_LIBREOFFICE_PATH,
-    DEFAULT_PAGE_NUMBER, DEFAULT_PILLOW_FORMAT, MAP_PILLOW_FORMAT_TO_MIME_TYPE
+    CONVERTER_OFFICE_FILE_MIMETYPES, DEFAULT_LIBREOFFICE_ARGUMENTS,
+    DEFAULT_LIBREOFFICE_ENVIRONMENT, DEFAULT_LIBREOFFICE_PATH,
+    DEFAULT_PAGE_NUMBER, DEFAULT_PILLOW_FORMAT,
+    INTERMEDIATE_FILE_GENERATION_MAXIMUM_ATTEMPTS,
+    MAP_PILLOW_FORMAT_TO_MIME_TYPE
 )
 from .literals import IMAGE_ERROR_BROKEN_FILE
 from .settings import (
-    setting_graphics_backend, setting_graphics_backend_arguments,
+    get_command_timeout, setting_graphics_backend,
+    setting_graphics_backend_arguments, setting_image_generation_timeout,
     setting_load_truncated_images
 )
 
@@ -46,10 +53,28 @@ libreoffice_path = setting_graphics_backend_arguments.value.get(
     'libreoffice_path', DEFAULT_LIBREOFFICE_PATH
 )
 
-logger = logging.getLogger(name=__name__)
+
+def get_command_libreoffice():
+    libreoffice_arguments = setting_graphics_backend_arguments.value.get(
+        'libreoffice_arguments', DEFAULT_LIBREOFFICE_ARGUMENTS
+    )
+    if isinstance(libreoffice_arguments, str):
+        libreoffice_arguments = shlex.split(libreoffice_arguments)
+
+    try:
+        return sh.Command(path=libreoffice_path).bake(
+            '--headless', '--convert-to', 'pdf:writer_pdf_Export',
+            *libreoffice_arguments
+        )
+    except sh.CommandNotFound:
+        return None
+
+
+command_libreoffice = get_command_libreoffice()
 
 
 class AppImageErrorImage:
+    _catch_all = None
     _registry = {}
 
     @classmethod
@@ -60,18 +85,35 @@ class AppImageErrorImage:
     def get(cls, name):
         return cls._registry[name]
 
-    def __init__(self, name, image_path=None, template_name=None):
+    @classmethod
+    def get_catch_all(cls):
+        return cls._catch_all
+
+    def __init__(
+        self, name, catch_all=False, image_path=None, template_name=None
+    ):
         if name in self.__class__._registry:
             raise ImproperlyConfigured(
                 '{} already has a entry named `{}`'.format(__class__, name)
             )
 
+        if catch_all and self.__class__._catch_all is not None:
+            raise ImproperlyConfigured(
+                '{} already has a catch all entry named `{}`'.format(
+                    __class__, self.__class__._catch_all.name
+                )
+            )
+
         self.name = name
+        self.catch_all = catch_all
         self.image_path = image_path
         self.template_name = template_name
         self.template = loader.get_template(template_name=self.template_name)
 
         self.__class__._registry[name] = self
+
+        if catch_all:
+            self.__class__._catch_all = self
 
     def open(self):
         return staticfiles_storage.open(name=self.image_path, mode='rb')
@@ -93,33 +135,109 @@ class ConverterBase:
 
         return MAP_PILLOW_FORMAT_TO_MIME_TYPE.get(output_format)
 
+    @staticmethod
+    def is_office_format(mime_type):
+        is_office_mime_type = mime_type in CONVERTER_OFFICE_FILE_MIMETYPES
+        is_msg_mime_type = mime_type in MSG_MIME_TYPES
+
+        return is_office_mime_type or is_msg_mime_type
+
+    @classmethod
+    def get_intermediate_file(
+        cls, cache_partition, mime_type, source_file_object_opener,
+        filename='intermediate_file'
+    ):
+        if not cls.is_office_format(mime_type=mime_type):
+            return source_file_object_opener()
+
+        CachePartitionFile = apps.get_model(
+            app_label='file_caching', model_name='CachePartitionFile'
+        )
+
+        try:
+            cache_file = cache_partition.get_file(filename=filename)
+            return cache_file.open()
+        except CachePartitionFile.DoesNotExist:
+            logger.debug('Intermediate file "%s" not found.', filename)
+
+        lock_name = '{}_generate'.format(
+            cache_partition.get_file_lock_name(filename=filename)
+        )
+        lock_backend = LockingBackend.get_backend()
+        lock = lock_backend.acquire_lock(
+            name=lock_name, timeout=setting_image_generation_timeout.value
+        )
+
+        try:
+            for attempt_number in range(INTERMEDIATE_FILE_GENERATION_MAXIMUM_ATTEMPTS):
+                try:
+                    cache_file = cache_partition.get_file(filename=filename)
+                    return cache_file.open()
+                except CachePartitionFile.DoesNotExist:
+                    logger.debug('Intermediate file "%s" not found.', filename)
+
+                try:
+                    with source_file_object_opener() as file_object:
+                        converter_class = cls.get_converter_class()
+                        converter = converter_class(file_object=file_object)
+                        with converter.to_pdf() as pdf_file_object:
+                            with cache_partition.create_file(filename=filename) as cache_file_object:
+                                shutil.copyfileobj(
+                                    fsrc=pdf_file_object, fdst=cache_file_object
+                                )
+                except InvalidOfficeFormat:
+                    return source_file_object_opener()
+                except Exception as exception:
+                    logger.error(
+                        'Error creating intermediate file "%s"; %s.',
+                        filename, exception, exc_info=True
+                    )
+                    try:
+                        cache_file = cache_partition.get_file(filename=filename)
+                    except CachePartitionFile.DoesNotExist:
+                        """Non fatal, ignore."""
+                    else:
+                        cache_file.delete()
+
+                    raise
+
+            raise FileCachingException(
+                'Intermediate file "{}" was evicted immediately after each '
+                'of {} generation attempts; the cache maximum size may be '
+                'too small.'.format(
+                    filename, INTERMEDIATE_FILE_GENERATION_MAXIMUM_ATTEMPTS
+                )
+            )
+        finally:
+            lock.release()
+
     def __init__(self, file_object, mime_type=None):
         ImageFile.LOAD_TRUNCATED_IMAGES = setting_load_truncated_images.value
 
         self.file_object = file_object
         self.image = None
 
-        self.mime_type = mime_type or MIMETypeBackend.get_backend_instance().get_mime_type(
-            file_object=file_object, mime_type_only=False
-        )[0]
+        if mime_type:
+            self.mime_type = mime_type
+        else:
+            mime_type_backend = MIMETypeBackend.get_backend_instance()
+            mime_type_result = mime_type_backend.get_mime_type(
+                file_object=file_object, mime_type_only=False
+            )
+            self.mime_type = mime_type_result[0]
         self.soffice_file = None
         Image.init()
-        try:
-            self.command_libreoffice = sh.Command(
-                path=libreoffice_path
-            ).bake(
-                '--headless', '--convert-to', 'pdf:writer_pdf_Export'
-            )
-        except sh.CommandNotFound:
-            self.command_libreoffice = None
+        self.command_libreoffice = command_libreoffice
 
     def convert(self, page_number=DEFAULT_PAGE_NUMBER):
         self.page_number = page_number
 
     def get_page(self, output_format=None):
-        output_format = output_format or setting_graphics_backend_arguments.value.get(
-            'pillow_format', DEFAULT_PILLOW_FORMAT
-        )
+        if not output_format:
+            backend_arguments = setting_graphics_backend_arguments.value
+            output_format = backend_arguments.get(
+                'pillow_format', DEFAULT_PILLOW_FORMAT
+            )
 
         if not self.image:
             self.seek_page(page_number=0)
@@ -128,13 +246,14 @@ class ConverterBase:
         new_mode = self.image.mode
 
         if output_format.upper() == 'JPEG':
-            # JPEG doesn't support transparency channel, convert the image to
-            # RGB. Removes modes: P and RGBA.
             new_mode = 'RGB'
 
-        self.image.convert(
-            mode=new_mode
-        ).save(fp=image_buffer, format=output_format)
+        if self.image.mode != new_mode:
+            image = self.image.convert(mode=new_mode)
+        else:
+            image = self.image
+
+        image.save(fp=image_buffer, format=output_format)
 
         image_buffer.seek(0)
 
@@ -147,24 +266,31 @@ class ConverterBase:
             logger.debug('Is not an office format document; %s', exception)
 
     def seek_page(self, page_number):
-        """
-        Seek the specified page number from the source file object.
-        If the file is a paged image get the page if not convert it to a
-        paged image format and return the specified page as an image.
-        """
-        # Starting with #0.
         self.file_object.seek(0)
 
         try:
             self.image = Image.open(fp=self.file_object)
         except IOError:
-            # Cannot identify image file.
             self.image = self.convert(page_number=page_number)
+
+            if not self.image:
+                error_message = (
+                    'Unable to produce an image for the document page. The '
+                    'file format is not supported or a required backend '
+                    'tool (e.g. pdftoppm from poppler-utils) is not '
+                    'available.'
+                )
+                logger.error(error_message)
+                raise AppImageError(
+                    details=error_message, error_name=IMAGE_ERROR_BROKEN_FILE
+                )
         except PIL.Image.DecompressionBombError as exception:
-            error_message = 'Unable to seek document page. Increase the '
-            'value of the argument "pillow_maximum_image_pixels" in the '
-            'CONVERTER_GRAPHICS_BACKEND_ARGUMENTS setting; {}'.format(
-                exception
+            error_message = (
+                'Unable to seek document page. Increase the '
+                'value of the argument "pillow_maximum_image_pixels" in '
+                'the CONVERTER_GRAPHICS_BACKEND_ARGUMENTS setting; {}'.format(
+                    exception
+                )
             )
             logger.error(error_message)
             raise AppImageError(
@@ -193,18 +319,12 @@ class ConverterBase:
                     )
 
     def soffice(self):
-        """
-        Executes LibreOffice as a sub process.
-        """
         if not self.command_libreoffice:
             raise OfficeConversionError(
                 _(message='LibreOffice not installed or not found.')
             )
 
         with NamedTemporaryFile() as temporary_file_object:
-            # Copy the source file object of the converter instance to a
-            # named temporary file to be able to pass it to the LibreOffice
-            # execution.
             self.file_object.seek(0)
             shutil.copyfileobj(
                 fsrc=self.file_object, fdst=temporary_file_object
@@ -213,18 +333,25 @@ class ConverterBase:
             temporary_file_object.seek(0)
 
             with TemporaryDirectory() as libreoffice_home_directory:
+                path_installation = Path(
+                    libreoffice_home_directory, 'LibreOffice_Conversion'
+                )
                 args = (
-                    temporary_file_object.name, '--outdir', setting_temporary_directory.value,
-                    '-env:UserInstallation=file://{}'.format(
-                        os.path.join(
-                            libreoffice_home_directory,
-                            'LibreOffice_Conversion'
-                        )
-                    ),
+                    temporary_file_object.name, '--outdir',
+                    setting_temporary_directory.value,
+                    '-env:UserInstallation=file://{}'.format(path_installation)
+                )
+
+                environment = {'HOME': libreoffice_home_directory}
+                environment.update(
+                    setting_graphics_backend_arguments.value.get(
+                        'libreoffice_environment',
+                        DEFAULT_LIBREOFFICE_ENVIRONMENT
+                    )
                 )
 
                 kwargs = {
-                    '_env': {'HOME': libreoffice_home_directory}
+                    '_env': environment, '_timeout': get_command_timeout()
                 }
 
                 if self.mime_type == 'text/plain':
@@ -237,6 +364,13 @@ class ConverterBase:
                 except sh.ErrorReturnCode as exception:
                     temporary_file_object.close()
                     raise OfficeConversionError(exception)
+                except sh.TimeoutException as exception:
+                    temporary_file_object.close()
+                    logger.error(
+                        'LibreOffice did not finish before the command '
+                        'timeout and was terminated; %s', exception
+                    )
+                    raise OfficeConversionError(exception)
                 except Exception as exception:
                     temporary_file_object.close()
                     logger.error(
@@ -245,44 +379,39 @@ class ConverterBase:
                     )
                     raise
 
-            # LibreOffice return a PDF file with the same name as the input
-            # provided but with the .pdf extension.
 
-            # Get the converted output file path out of the temporary file
-            # name plus the temporary directory.
 
-            filename, extension = os.path.splitext(
-                os.path.basename(temporary_file_object.name)
-            )
+            path_temporary_file = Path(temporary_file_object.name)
+
+            filename = path_temporary_file.stem
+            extension = path_temporary_file.suffix
 
             logger.debug('filename: %s', filename)
             logger.debug('extension: %s', extension)
 
-            converted_file_path = os.path.join(
-                setting_temporary_directory.value, os.path.extsep.join(
-                    (filename, 'pdf')
-                )
-            )
+            converted_file_path = Path(
+                setting_temporary_directory.value, path_temporary_file.name
+            ).with_suffix('.pdf')
             logger.debug('converted_file_path: %s', converted_file_path)
 
-        # Don't use context manager with the NamedTemporaryFile on purpose
-        # so that it is deleted when the caller closes the file and not
-        # before.
         temporary_converted_file_object = NamedTemporaryFile()
 
-        # Copy the LibreOffice output file to a new named temporary file
-        # and delete the converted file.
-        with open(file=converted_file_path, mode='rb') as converted_file_object:
-            shutil.copyfileobj(
-                fsrc=converted_file_object,
-                fdst=temporary_converted_file_object
-            )
-        fs_cleanup(filename=converted_file_path)
+        try:
+            with open(file=converted_file_path, mode='rb') as converted_file_object:
+                shutil.copyfileobj(
+                    fsrc=converted_file_object,
+                    fdst=temporary_converted_file_object
+                )
+        except Exception:
+            temporary_converted_file_object.close()
+            raise
+        finally:
+            fs_cleanup(filename=converted_file_path)
+
         temporary_converted_file_object.seek(0)
         return temporary_converted_file_object
 
     def to_pdf(self):
-        # Handle .msg files
         if self.mime_type in MSG_MIME_TYPES:
             archive = MsgArchive.open(file_object=self.file_object)
             members = archive.members()
@@ -296,9 +425,11 @@ class ConverterBase:
                         filename=members[0]
                     )
 
-                self.mime_type = MIMETypeBackend.get_backend_instance().get_mime_type(
+                mime_type_backend = MIMETypeBackend.get_backend_instance()
+                mime_type_result = mime_type_backend.get_mime_type(
                     file_object=self.file_object, mime_type_only=True
-                )[0]
+                )
+                self.mime_type = mime_type_result[0]
 
         if self.mime_type in CONVERTER_OFFICE_FILE_MIMETYPES:
             return self.soffice()
@@ -360,7 +491,6 @@ class Layer:
         self.permission_map = permission_map
         self.icon = icon
 
-        # Check order
         layer = self.__class__.get_by_value(key='order', value=self.order)
 
         if layer:
@@ -371,7 +501,6 @@ class Layer:
                 )
             )
 
-        # Check default
         if default:
             layer = self.__class__.get_by_value(key='default', value=True)
             if layer:
@@ -410,9 +539,6 @@ class Layer:
             )
 
     def copy_transformations(self, source, targets, delete_existing=False):
-        """
-        Copy transformation from source to all targets.
-        """
         ContentType = apps.get_model(
             app_label='contenttypes', model_name='ContentType'
         )
@@ -426,7 +552,8 @@ class Layer:
                     content_type=content_type, object_id=target.pk
                 )
                 if delete_existing:
-                    object_layer.transformations.all().delete()
+                    queryset = object_layer.transformations.all()
+                    queryset.delete()
 
                 for transformation in transformations:
                     object_layer.transformations.create(
@@ -459,10 +586,6 @@ class Layer:
         return self.permission_map.get(action, None)
 
     def get_transformations_for(self, obj, as_classes=False):
-        """
-        as_classes == True returns the transformation classes from .classes
-        ready to be feed to the converter class.
-        """
         LayerTransformation = apps.get_model(
             app_label='converter', model_name='LayerTransformation'
         )
@@ -514,7 +637,7 @@ class LayerLink(Link):
             content_object_variable = 'resolved_object'
 
         content_type = ContentType.objects.get_for_model(
-            context[content_object_variable]
+            model=context[content_object_variable]
         )
         layer = self.get_layer(context=context)
 

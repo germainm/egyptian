@@ -17,7 +17,8 @@ from mayan.apps.events.event_managers import EventManagerMethodAfter
 from mayan.apps.templating.template_backends import Template
 
 from ..events import (
-    event_document_version_page_created, event_document_version_edited
+    event_document_version_created, event_document_version_edited,
+    event_document_version_page_created
 )
 from ..literals import (
     DOCUMENT_VERSION_PAGE_CREATE_BATCH_SIZE,
@@ -36,22 +37,22 @@ class DocumentVersionBusinessLogicMixin:
         content_object_list, start_page_number=None
     ):
         def content_object_to_dictionary(entry):
-            # Argument order based on the return value of enumerate.
             return {
-                'content_object': entry[1],
-                'page_number': entry[0]
+                'content_object': entry[1], 'page_number': entry[0]
             }
 
-        return map(
-            content_object_to_dictionary, enumerate(
-                iterable=content_object_list or (),
-                start=start_page_number or 1
-            )
-        )
+        iterable = content_object_list or ()
+        start = start_page_number or 1
+        enumerated_iterable = enumerate(iterable=iterable, start=start)
+
+        result = map(content_object_to_dictionary, enumerated_iterable)
+
+        return result
 
     def active_set(self, save=True):
         with transaction.atomic():
-            self.document.versions.exclude(pk=self.pk).update(active=False)
+            queryset = self.document.versions.exclude(pk=self.pk)
+            queryset.update(active=False)
 
             self.active = True
 
@@ -66,6 +67,24 @@ class DocumentVersionBusinessLogicMixin:
                 update_fields=('version_active',)
             )
 
+    def active_unset(self, save=True):
+        with transaction.atomic():
+            self.active = False
+
+            if save:
+                self.save(
+                    update_fields=('active',)
+                )
+
+            document = self.document
+
+            if document.version_active_id == self.pk:
+                document.version_active = None
+                document._event_ignore = True
+                document.save(
+                    update_fields=('version_active',)
+                )
+
     @cached_property
     def cache(self):
         Cache = apps.get_model(app_label='file_caching', model_name='Cache')
@@ -77,9 +96,19 @@ class DocumentVersionBusinessLogicMixin:
     @cached_property
     def cache_partition(self):
         partition, created = self.cache.partitions.get_or_create(
-            name='version-{}'.format(self.uuid)
+            name=self.cache_partition_name
         )
         return partition
+
+    @property
+    def cache_partition_name(self):
+        return 'version-{}'.format(self.uuid)
+
+    def cache_partition_delete(self):
+        for partition in self.cache.partitions.filter(
+            name=self.cache_partition_name
+        ):
+            partition.delete()
 
     def get_absolute_api_url(self):
         return reverse(
@@ -190,9 +219,6 @@ class DocumentVersionBusinessLogicMixin:
         )
 
     def pages_append_all(self, user=None):
-        """
-        Append the pages of all document files.
-        """
         DocumentFilePage = apps.get_model(
             app_label='documents', model_name='DocumentFilePage'
         )
@@ -232,38 +258,51 @@ class DocumentVersionBusinessLogicMixin:
 
         self._event_actor = user
 
-        for page in self.pages.all():
-            page._event_actor = user
-            page.delete()
+        document_version_is_new = not self.pk
 
-        if not annotated_content_object_list:
-            annotated_content_object_list = ()
+        with transaction.atomic():
+            if document_version_is_new:
+                self._event_ignore = True
+                self.save()
 
-        document_version_pages = (
-            DocumentVersionPage(
-                document_version=self,
-                content_object=content_object_entry['content_object'],
-                page_number=content_object_entry['page_number']
-            ) for content_object_entry in annotated_content_object_list
-        )
+            for page in self.pages.all():
+                page._event_actor = user
+                page.delete()
 
-        while True:
-            batch = list(
-                islice(
-                    document_version_pages,
-                    DOCUMENT_VERSION_PAGE_CREATE_BATCH_SIZE
+            if not annotated_content_object_list:
+                annotated_content_object_list = ()
+
+            generator_document_version_page_list = (
+                DocumentVersionPage(
+                    document_version=self,
+                    content_object=content_object_entry['content_object'],
+                    page_number=content_object_entry['page_number']
+                ) for content_object_entry in annotated_content_object_list
+            )
+
+            while True:
+                batch = list(
+                    islice(
+                        generator_document_version_page_list,
+                        DOCUMENT_VERSION_PAGE_CREATE_BATCH_SIZE
+                    )
                 )
+
+                if not batch:
+                    break
+
+                DocumentVersionPage.objects.bulk_create(
+                    batch_size=DOCUMENT_VERSION_PAGE_CREATE_BATCH_SIZE,
+                    objs=batch
+                )
+
+        if document_version_is_new:
+            event_document_version_created.commit(
+                action_object=self.document, actor=user, target=self
             )
 
-            if not batch:
-                break
-
-            DocumentVersionPage.objects.bulk_create(
-                batch_size=DOCUMENT_VERSION_PAGE_CREATE_BATCH_SIZE,
-                objs=batch
-            )
-
-        for page in self.pages.all().only('pk'):
+        queryset_document_version_pages = self.pages.all()
+        for page in queryset_document_version_pages.only('pk'):
             event_document_version_page_created.commit(
                 action_object=self, actor=user, target=page
             )
@@ -273,10 +312,6 @@ class DocumentVersionBusinessLogicMixin:
         )
 
     def pages_reset(self, document_file=None, user=None):
-        """
-        Remove all page mappings and recreate them to be a 1 to 1 match
-        to the latest document file or the document file supplied.
-        """
         DocumentVersion = apps.get_model(
             app_label='documents', model_name='DocumentVersion'
         )
@@ -300,5 +335,4 @@ class DocumentVersionBusinessLogicMixin:
 
     @property
     def uuid(self):
-        # Make cache UUID a mix of document UUID, file ID.
         return '{}-{}'.format(self.document.uuid, self.pk)

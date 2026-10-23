@@ -3,18 +3,16 @@
 {% load navigation_tags %}
 
 {% if not hide_object %}
-    <th>{% trans 'Identifier' %}</th>
+    <th class="pb-2 pt-0">{% trans 'Identifier' %}</th>
 {% else %}
     {% if source_columns_identifier %}
-        <th>
+        <th class="pb-2 pt-0">
             <span style="white-space: nowrap">
                 {% if source_columns_identifier.0.is_sortable %}
                     <a href="{% navigation_get_sort_field_querystring column=source_columns_identifier.0 %}">{{ source_columns_identifier.0.label }}</a>
                         {% navigation_source_column_get_sort_icon column=source_columns_identifier.0 as icon_sort %}
                         {% if icon_sort %}
-                            <span class="appearance-list-column-sort-icon">
-                                {{ icon_sort.render }}
-                            </span>
+                            {{ icon_sort.render }}
                         {% endif %}
                 {% else %}
                     <span class="appearance-list-column-label">{{ source_columns_identifier.0.label }}</span>

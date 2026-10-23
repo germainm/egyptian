@@ -7,6 +7,7 @@ from PIL import Image
 import pypdf
 import sh
 
+from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.storage.utils import NamedTemporaryFile
@@ -24,7 +25,9 @@ from ..literals import (
     DEFAULT_PDFTOPPM_FORMAT, DEFAULT_PDFTOPPM_PATH, DEFAULT_PDFINFO_PATH,
     DEFAULT_PILLOW_MAXIMUM_IMAGE_PIXELS
 )
-from ..settings import setting_graphics_backend_arguments
+from ..settings import (
+    get_command_timeout, setting_graphics_backend_arguments
+)
 
 logger = logging.getLogger(name=__name__)
 pdftoppm_path = setting_graphics_backend_arguments.value.get(
@@ -147,7 +150,8 @@ class Python(ConverterBase):
                 image_buffer = io.BytesIO()
                 command_pdftoppm(
                     new_file_object.name, f=self.page_number + 1,
-                    l=self.page_number + 1, _out=image_buffer
+                    l=self.page_number + 1, _out=image_buffer,
+                    _timeout=get_command_timeout()
                 )
                 image_buffer.seek(0)
                 return Image.open(fp=image_buffer)
@@ -164,41 +168,46 @@ class Python(ConverterBase):
 
         super().get_page_count()
 
-        if self.mime_type == CONVERTER_SVG_MIME_TYPE:
-            return 1
+        try:
+            if self.mime_type == CONVERTER_SVG_MIME_TYPE:
+                return 1
 
-        if self.mime_type in CONVERTER_VIDEO_MIME_TYPES:
-            return 1
+            if self.mime_type in CONVERTER_VIDEO_MIME_TYPES:
+                return 1
 
-        if self.mime_type in CONVERTER_RAW_PHOTO_MIME_TYPES:
-            return 1
+            if self.mime_type in CONVERTER_RAW_PHOTO_MIME_TYPES:
+                return 1
 
-        if self.mime_type in CONVERTER_DJVU_MIME_TYPES:
-            return self._get_djvu_page_count()
+            if self.mime_type in CONVERTER_DJVU_MIME_TYPES:
+                return self._get_djvu_page_count()
 
-        if self.mime_type == CONVERTER_EPUB_MIME_TYPE or self._is_epub_zip():
-            return self._get_epub_page_count()
+            if self.mime_type == CONVERTER_EPUB_MIME_TYPE or self._is_epub_zip():
+                return self._get_epub_page_count()
 
-        if self.mime_type in CONVERTER_MARKDOWN_MIME_TYPES:
-            return self._get_markdown_page_count()
+            if self.mime_type in CONVERTER_MARKDOWN_MIME_TYPES:
+                return self._get_markdown_page_count()
 
-        if self.mime_type in (
-            CONVERTER_EML_MIME_TYPE,
-            *CONVERTER_DXF_MIME_TYPES,
-            *CONVERTER_STL_MIME_TYPES,
-            *CONVERTER_DICOM_MIME_TYPES,
-        ) or self._is_dxf_text() or self._is_stl_file():
-            return 1
+            if self.mime_type in (
+                CONVERTER_EML_MIME_TYPE,
+                *CONVERTER_DXF_MIME_TYPES,
+                *CONVERTER_STL_MIME_TYPES,
+                *CONVERTER_DICOM_MIME_TYPES,
+            ) or self._is_dxf_text() or self._is_stl_file():
+                return 1
 
-        if self.mime_type == 'application/pdf' or self.soffice_file:
-            if self.soffice_file:
-                file_object = self.soffice_file
+            if self.mime_type == 'application/pdf' or self.soffice_file:
+                if self.soffice_file:
+                    file_object = self.soffice_file
+                else:
+                    file_object = self.file_object
+
+                return self.get_pypdf_page_count(file_object=file_object)
             else:
-                file_object = self.file_object
-
-            return self.get_pypdf_page_count(file_object=file_object)
-        else:
-            return self.get_pillow_page_count()
+                return self.get_pillow_page_count()
+        finally:
+            if self.soffice_file:
+                self.soffice_file.close()
+                self.soffice_file = None
 
     def get_pillow_page_count(self):
         page_count = 1
@@ -214,9 +223,6 @@ class Python(ConverterBase):
         finally:
             self.file_object.seek(0)
 
-        # Get total page count by attempting to seek to an increasing
-        # page count number until an EOFError or struct.error exception
-        # are raised.
         while True:
             try:
                 image.seek(
@@ -237,9 +243,6 @@ class Python(ConverterBase):
                 break
             else:
                 try:
-                    # Even if the image reports multiple frames,
-                    # test it to make sure it is valid and supported
-                    # before counting it as a valid page.
                     image.getim()
                 except OSError as exception:
                     logger.error(
@@ -254,29 +257,56 @@ class Python(ConverterBase):
         return page_count
 
     def get_pdfinfo_page_count(self, file_object):
-        process = command_pdfinfo('-', _in=file_object)
+        if command_pdfinfo is None:
+            file_object.seek(0)
+            error_message = _(
+                message='Exception determining PDF page count; pdfinfo '
+                '(poppler-utils) is not installed.'
+            )
+            logger.error(error_message)
+            raise PageCountError(error_message)
 
-        for line in str(process.stdout).split('\n'):
+        try:
+            process = command_pdfinfo(
+                '-', _in=file_object, _timeout=get_command_timeout()
+            )
+        except sh.TimeoutException:
+            file_object.seek(0)
+            error_message = _(
+                message='Exception determining PDF page count; pdfinfo did '
+                'not finish before the command timeout and was terminated.'
+            )
+            logger.error(error_message)
+            raise PageCountError(error_message)
+
+        page_count = None
+        for line in force_str(s=process.stdout).split('\n'):
             if line.startswith('Pages:'):
                 line = line.replace('Pages:', '')
                 page_count = int(line)
                 break
 
         file_object.seek(0)
+
+        if page_count is None:
+            error_message = _(
+                message='Exception determining PDF page count; pdfinfo did '
+                'not report a page count.'
+            )
+            logger.error(error_message)
+            raise PageCountError(error_message)
+
         logger.debug('Document contains %d pages', page_count)
         return page_count
 
     def get_pypdf_page_count(self, file_object):
         try:
-            # Try PyPDF to determine the page count.
             pdf_reader = pypdf.PdfReader(
                 stream=file_object, strict=False
             )
             page_count = len(pdf_reader.pages)
         except Exception as exception:
             if str(exception) == 'File has not been decrypted':
-                # File is encrypted, try to decrypt using a blank
-                # password.
                 file_object.seek(0)
                 pdf_reader = pypdf.PdfReader(
                     stream=file_object, strict=False
@@ -287,8 +317,6 @@ class Python(ConverterBase):
                 except Exception as exception:
                     file_object.seek(0)
                     if str(exception) == 'only algorithm code 1 and 2 are supported':
-                        # PDF uses an unsupported encryption.
-                        # Try poppler-util's pdfinfo.
                         page_count = self.get_pdfinfo_page_count(
                             file_object=file_object
                         )
@@ -300,8 +328,6 @@ class Python(ConverterBase):
                         logger.error(error_message, exc_info=True)
                         raise PageCountError(error_message)
             elif str(exception) == 'EOF marker not found':
-                # PyPDF2 issue: https://github.com/mstamy2/PyPDF2/issues/177
-                # Try poppler-util's pdfinfo.
                 logger.debug(
                     msg='PyPDF2 GitHub issue #177 : EOF marker not found'
                 )

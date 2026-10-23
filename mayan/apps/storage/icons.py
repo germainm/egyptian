@@ -1,7 +1,7 @@
 from mayan.apps.icons.icons import Icon
 
 icon_download_file_delete = Icon(
-    driver_name='fontawesome', symbol='times'
+    driver_name='fontawesome', symbol='trash-can'
 )
 icon_download_file_download = Icon(
     driver_name='fontawesome', symbol='download'

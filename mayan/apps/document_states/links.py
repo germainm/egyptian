@@ -44,7 +44,6 @@ from .permissions import (
     permission_workflow_tools
 )
 
-# Workflow template
 
 link_document_type_workflow_template_list = Link(
     args='resolved_object.pk',
@@ -108,7 +107,6 @@ link_workflow_template_preview = Link(
     text=_(message='Preview'), view='document_states:workflow_template_preview'
 )
 
-# Workflow template state action
 
 link_workflow_template_state_action_delete = Link(
     args='resolved_object.pk',
@@ -139,7 +137,6 @@ link_workflow_template_state_action_selection = Link(
     view='document_states:workflow_template_state_action_selection'
 )
 
-# Workflow template state escalation
 
 link_workflow_template_state_escalation_create = Link(
     args='resolved_object.pk',
@@ -170,7 +167,6 @@ link_workflow_template_state_escalation_list = Link(
     view='document_states:workflow_template_state_escalation_list'
 )
 
-# Workflow template state
 
 link_workflow_template_state_create = Link(
     args='workflow.pk',
@@ -198,7 +194,6 @@ link_workflow_template_state_list = Link(
     view='document_states:workflow_template_state_list'
 )
 
-# Workflow template transition
 
 link_workflow_template_transition_create = Link(
     args='workflow.pk',
@@ -234,7 +229,6 @@ link_workflow_template_transition_list = Link(
     view='document_states:workflow_template_transition_list'
 )
 
-# Workflow transition field
 
 link_document_workflow_templates_launch_multiple = Link(
     icon=icon_document_workflow_templates_launch_multiple,
@@ -275,7 +269,6 @@ link_workflow_template_transition_field_list = Link(
     view='document_states:workflow_template_transition_field_list'
 )
 
-# Document workflow instance
 
 link_workflow_instance_delete_single = Link(
     args='resolved_object.pk', icon=icon_workflow_instance_delete,
@@ -301,7 +294,6 @@ link_workflow_instance_transition = Link(
     view='document_states:workflow_instance_transition_selection'
 )
 
-# Runtime proxy
 
 link_workflow_runtime_proxy_document_list = Link(
     args='resolved_object.pk',
@@ -331,7 +323,6 @@ link_workflow_runtime_proxy_state_list = Link(
     view='document_states:workflow_runtime_proxy_state_list'
 )
 
-# Tools
 
 link_tool_launch_workflows = Link(
     icon=icon_tool_launch_workflows,

@@ -1,6 +1,7 @@
 import email
 from io import BytesIO
 import logging
+import shutil
 import tarfile
 import zipfile
 
@@ -8,14 +9,14 @@ import extract_msg
 from pypdf import PdfReader
 
 try:
-    import zlib  # NOQA
+    import zlib
     COMPRESSION = zipfile.ZIP_DEFLATED
 except ImportError:
     COMPRESSION = zipfile.ZIP_STORED
 
 from django.core.files import File
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.utils.encoding import force_bytes, force_str
+from django.utils.encoding import force_bytes
 
 from mayan.apps.mime_types.classes import MIMETypeBackend
 
@@ -24,6 +25,11 @@ from .exceptions import (
     ArchiveMemberSizeExceeded, NoMIMETypeMatch
 )
 from .literals import MIME_TYPE_EML, MSG_MIME_TYPES
+from .settings import (
+    setting_compressed_file_compression_ratio_maximum,
+    setting_compressed_file_input_size_maximum,
+    setting_compressed_file_member_size_maximum
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -33,13 +39,6 @@ class Archive:
 
     @staticmethod
     def _get_seekable_size(file_object):
-        """
-        Return the size in bytes of a seekable file-like object by seeking
-        to end and back to the original position. Returns ``None`` if the
-        object is not seekable (no ``seek``/``tell``), in which case the
-        size check is skipped, the caller is responsible for any further
-        bounded reads.
-        """
         try:
             original_position = file_object.tell()
             file_object.seek(0, 2)
@@ -75,19 +74,6 @@ class Archive:
                 return instance
 
     def _check_compression_ratio(self, uncompressed_size, compressed_size):
-        """
-        Refuse a member whose declared-to-compressed size ratio exceeds
-        the configured maximum. ``compressed_size`` of zero (e.g.
-        directory entries, zero-byte files) is treated as a 1:1 ratio
-        to avoid division by zero and false positives on legitimately
-        empty members.
-        """
-        # Local import to avoid a circular import at module load time:
-        # settings.py imports from literals.py which is in this app.
-        from .settings import (
-            setting_compressed_file_compression_ratio_maximum
-        )
-
         ratio_maximum = (
             setting_compressed_file_compression_ratio_maximum.value
         )
@@ -101,21 +87,16 @@ class Archive:
         if ratio > ratio_maximum:
             raise ArchiveCompressionRatioExceeded(
                 'Archive member compression ratio {ratio:.0f} exceeds '
-                'maximum {maximum}.'.format(
-                    maximum=ratio_maximum, ratio=ratio
+                'maximum {maximum}. This is the `{setting_name}` safety '
+                'limit, not a defect in the archive. Raise that setting if '
+                'this content is trusted and legitimately this '
+                'compressible.'.format(
+                    maximum=ratio_maximum, ratio=ratio,
+                    setting_name=setting_compressed_file_compression_ratio_maximum.global_name
                 )
             )
 
     def _check_input_size(self, file_object):
-        """
-        Refuse to parse an input archive whose size exceeds the
-        configured maximum. Called from each subclass's ``_open``. A
-        non-seekable input is allowed through (size unknown), the
-        per-member checks and upstream-library memory limits provide
-        the next line of defense.
-        """
-        from .settings import setting_compressed_file_input_size_maximum
-
         size_maximum = setting_compressed_file_input_size_maximum.value
         if not size_maximum:
             return
@@ -133,12 +114,6 @@ class Archive:
             )
 
     def _check_member_size(self, member_size, filename=None):
-        """
-        Refuse a member whose declared (uncompressed) size exceeds the
-        configured maximum.
-        """
-        from .settings import setting_compressed_file_member_size_maximum
-
         size_maximum = setting_compressed_file_member_size_maximum.value
         if not size_maximum:
             return
@@ -156,18 +131,12 @@ class Archive:
         raise NotImplementedError
 
     def add_file(self, file_object, filename):
-        """
-        Add a file as a member of an archive
-        """
         raise NotImplementedError
 
     def close(self):
         self._archive.close()
 
     def create(self):
-        """
-        Create an empty archive
-        """
         raise NotImplementedError
 
     def get_members(self):
@@ -179,21 +148,12 @@ class Archive:
         )
 
     def member_contents(self, filename):
-        """
-        Return the content of a member
-        """
         raise NotImplementedError
 
     def members(self):
-        """
-        Return a list of all the elements inside the archive
-        """
         raise NotImplementedError
 
     def open_member(self, filename):
-        """
-        Return a file-like object to a member of the archive
-        """
         raise NotImplementedError
 
 
@@ -217,18 +177,12 @@ class EMLArchive(Archive):
 
                     yield {'label': label, 'message': message}
             else:
-                # If it is not an attachment then it should be a body message
-                # part.
                 yield {'label': 'body', 'message': message}
 
     def _get_part_content(self, part, filename):
-        """
-        Return a part's content as bytes, after enforcing the
-        per-member size cap. The EML parser has already materialized
-        the part into memory by the time we get here; the cap defends
-        downstream consumers, not this layer.
-        """
-        content = force_bytes(s=part['message'].get_content())
+        content = force_bytes(
+            s=part['message'].get_content()
+        )
         self._check_member_size(
             filename=filename, member_size=len(content)
         )
@@ -365,14 +319,57 @@ class PDFArchive(Archive):
 class TarArchive(Archive):
     def _open(self, file_object):
         self._check_input_size(file_object=file_object)
+
+        input_size = Archive._get_seekable_size(file_object=file_object)
+
         self._archive = tarfile.open(fileobj=file_object)
 
+        self._check_aggregate_compression_ratio(input_size=input_size)
+
+    def _check_aggregate_compression_ratio(self, input_size):
+        ratio_maximum = (
+            setting_compressed_file_compression_ratio_maximum.value
+        )
+
+        if not ratio_maximum or not input_size:
+            return
+
+        size_budget = input_size * ratio_maximum
+        cumulative_size = 0
+
+        for tarinfo in self._archive:
+            if not tarinfo.isfile():
+                continue
+
+            cumulative_size += tarinfo.size
+
+            if cumulative_size > size_budget:
+                raise ArchiveCompressionRatioExceeded(
+                    'Archive compression ratio exceeds maximum {maximum}. '
+                    'Aborted after {size} bytes of declared member content '
+                    'from an input of {input_size} bytes, a ratio of at '
+                    'least {ratio:.0f}. This is the `{setting_name}` safety '
+                    'limit, not a defect in the archive. Raise that setting '
+                    'if this content is trusted and legitimately this '
+                    'compressible.'.format(
+                        input_size=input_size, maximum=ratio_maximum,
+                        ratio=cumulative_size / input_size,
+                        size=cumulative_size,
+                        setting_name=setting_compressed_file_compression_ratio_maximum.global_name
+                    )
+                )
+
     def _get_tarinfo(self, filename):
-        """
-        Resolve a member name to its ``TarInfo`` so callers can read
-        the declared size before any decompression.
-        """
-        return self._archive.getmember(name=filename)
+        tarinfo = self._archive.getmember(name=filename)
+
+        if not tarinfo.isfile():
+            raise KeyError(
+                'Member "{filename}" is not a regular file.'.format(
+                    filename=filename
+                )
+            )
+
+        return tarinfo
 
     def add_file(self, file_object, filename):
         self._archive.addfile(
@@ -383,7 +380,6 @@ class TarArchive(Archive):
 
     def create(self):
         self.string_buffer = BytesIO()
-        # Mode cannot be a binary mode.
         self._archive = tarfile.TarFile(fileobj=self.string_buffer, mode='w')
 
     def member_contents(self, filename):
@@ -391,17 +387,29 @@ class TarArchive(Archive):
         self._check_member_size(
             filename=filename, member_size=tarinfo.size
         )
-        return self._archive.extractfile(filename).read()
+        return self._archive.extractfile(tarinfo).read()
 
     def members(self):
-        return self._archive.getnames()
+        results = []
+
+        for tarinfo in self._archive.getmembers():
+            if tarinfo.isfile():
+                results.append(tarinfo.name)
+            else:
+                logger.warning(
+                    'Skipping non regular file member "%s" of tar '
+                    'archive; member type: %s.', tarinfo.name,
+                    tarinfo.type
+                )
+
+        return results
 
     def open_member(self, filename):
         tarinfo = self._get_tarinfo(filename=filename)
         self._check_member_size(
             filename=filename, member_size=tarinfo.size
         )
-        return self._archive.extractfile(filename)
+        return self._archive.extractfile(tarinfo)
 
 
 class ZipArchive(Archive):
@@ -410,22 +418,19 @@ class ZipArchive(Archive):
         self._archive = zipfile.ZipFile(file=file_object)
 
     def _get_zipinfo(self, filename):
-        """
-        Resolve a member name to its ``ZipInfo`` so callers can read
-        the declared size and compressed size before any decompression.
-        """
         return self._archive.getinfo(name=filename)
 
     def add_file(self, file_object, filename):
-        self._archive.writestr(
-            zinfo_or_arcname=filename, data=file_object.read(),
-            compress_type=COMPRESSION
-        )
+        with self._archive.open(name=filename, mode='w') as archive_member_file_object:
+            shutil.copyfileobj(
+                fsrc=file_object, fdst=archive_member_file_object
+            )
 
     def create(self):
         self.string_buffer = BytesIO()
-        # Mode cannot be a binary mode.
-        self._archive = zipfile.ZipFile(file=self.string_buffer, mode='w')
+        self._archive = zipfile.ZipFile(
+            file=self.string_buffer, mode='w', compression=COMPRESSION
+        )
 
     def member_contents(self, filename):
         zipinfo = self._get_zipinfo(filename=filename)
@@ -439,34 +444,10 @@ class ZipArchive(Archive):
         return self._archive.read(name=filename)
 
     def members(self):
-        results = []
-
-        for filename in self._archive.namelist():
-            # Zip files only support UTF-8 and CP437 encodings.
-            # Attempt to decode CP437 to be able to check if it ends
-            # with a slash.
-            # Future improvement that violates the Zip format:
-            # Add chardet.detect to detect the most likely encoding
-            # if other than CP437.
-            try:
-                filename = filename.decode('CP437')
-                is_unicode = False
-            except AttributeError:
-                filename = force_str(s=filename)
-                is_unicode = True
-            except UnicodeEncodeError:
-                is_unicode = True
-
-            if not filename.endswith('/'):
-                # Re encode in the original encoding
-                if not is_unicode:
-                    filename = filename.encode(
-                        encoding='CP437', errors='strict'
-                    )
-
-                results.append(filename)
-
-        return results
+        return [
+            zipinfo.filename for zipinfo in self._archive.infolist()
+            if not zipinfo.is_dir()
+        ]
 
     def open_member(self, filename):
         zipinfo = self._get_zipinfo(filename=filename)
@@ -480,7 +461,6 @@ class ZipArchive(Archive):
         return self._archive.open(name=filename)
 
     def write(self, filename=None):
-        # fix for Linux zip files read in Windows
         for entry in self._archive.filelist:
             entry.create_system = 0
 

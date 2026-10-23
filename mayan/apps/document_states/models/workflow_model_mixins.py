@@ -74,14 +74,19 @@ class WorkflowBusinessLogicMixin:
                 document__document_type_id=model_instance.pk
             ).delete()
 
+    def get_image_cache_filename(
+        self, maximum_layer_order=None, transformation_instance_list=None,
+        user=None
+    ):
+        return '{}'.format(
+            self.get_hash()
+        )
+
     def generate_image(
         self, maximum_layer_order=None, transformation_instance_list=None,
         user=None
     ):
-        # `user` argument added for compatibility.
-        cache_filename = '{}'.format(
-            self.get_hash()
-        )
+        cache_filename = self.get_image_cache_filename()
 
         try:
             self.cache_partition.get_file(filename=cache_filename)
@@ -157,6 +162,10 @@ class WorkflowBusinessLogicMixin:
             app_label='document_states',
             model_name='WorkflowInstance'
         )
+        WorkflowInstanceLogEntry = apps.get_model(
+            app_label='document_states',
+            model_name='WorkflowInstanceLogEntry'
+        )
 
         initial_state = self.get_state_initial()
 
@@ -173,12 +182,12 @@ class WorkflowBusinessLogicMixin:
                     workflow_instance._event_actor = user
                     workflow_instance.save()
 
-                    initial_state.do_active_set(
+                    initial_log_entry = WorkflowInstanceLogEntry(
+                        transition=None, user=user,
                         workflow_instance=workflow_instance
                     )
-                    # TODO: Update once initial entry log patch is merged.
-                    # Break pattern by passing `workflow_instance`
-                    # until initial entry logs patch is merged.
+                    initial_log_entry._event_actor = user
+                    initial_log_entry.save()
                 except IntegrityError:
                     logger.debug(
                         'Workflow %s already launched for document %s',
@@ -208,10 +217,6 @@ class WorkflowBusinessLogicMixin:
 
 class WorkflowRuntimeProxyBusinessLogicMixin:
     def get_documents(self, permission=None, user=None):
-        """
-        Provide a queryset of the documents. The queryset is optionally
-        filtered by access.
-        """
         queryset = Document.valid.filter(workflows__workflow=self)
 
         if self.ignore_completed:
@@ -226,10 +231,6 @@ class WorkflowRuntimeProxyBusinessLogicMixin:
         return queryset
 
     def get_document_count(self, user):
-        """
-        Return the numeric count of documents executing this workflow.
-        The count is filtered by access.
-        """
         return self.get_documents(
             permission=permission_document_view, user=user
         ).count()

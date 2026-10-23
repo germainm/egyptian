@@ -19,7 +19,6 @@ from .permissions import (
     permission_document_version_ocr_content_view
 )
 
-# Document type
 
 link_document_type_ocr_settings = Link(
     args='resolved_object.id', icon=icon_document_type_ocr_settings,
@@ -32,7 +31,6 @@ link_document_type_submit = Link(
     text=_(message='OCR documents per type'), view='ocr:document_type_submit'
 )
 
-# Document version
 
 link_document_version_ocr_content_delete_multiple = Link(
     icon=icon_document_version_ocr_content_delete_multiple,
@@ -70,7 +68,6 @@ link_document_version_ocr_submit_single = Link(
     view='ocr:document_version_ocr_single_submit'
 )
 
-# Document version page
 
 link_document_version_page_ocr_content_detail_view = Link(
     args='resolved_object.id',

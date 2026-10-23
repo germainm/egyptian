@@ -1,7 +1,8 @@
+from io import UnsupportedOperation
 import zipfile
 
 try:
-    import zlib  # NOQA
+    import zlib
     COMPRESSION = zipfile.ZIP_DEFLATED
 except ImportError:
     COMPRESSION = zipfile.ZIP_STORED
@@ -21,16 +22,14 @@ class BufferedZipFile(BufferedFile):
         self.binary_mode = 'b' in self.mode
 
         if 'r' in self.mode:
-            zip_mode = 'r'
+            self.zip_mode = 'r'
         else:
-            zip_mode = 'w'
+            self.zip_mode = 'w'
 
         self.zip_container_file_object = zipfile.ZipFile(
-            file=self.file_object, mode=zip_mode
+            file=self.file_object, mode=self.zip_mode
         )
-        self.zip_file_object = self.zip_container_file_object.open(
-            name=self.member_name, mode=zip_mode
-        )
+        self.zip_file_object = self._get_zip_file_object()
 
     def _get_file_object_chunk(self):
         chunk = self.zip_file_object.read(n=ZIP_CHUNK_SIZE)
@@ -41,16 +40,30 @@ class BufferedZipFile(BufferedFile):
             else:
                 return force_str(s=chunk)
 
+    def _get_zip_file_object(self):
+        return self.zip_container_file_object.open(
+            name=self.member_name, mode=self.zip_mode
+        )
+
+    def _source_reset(self):
+        if self.zip_mode == 'w':
+            raise UnsupportedOperation(
+                'Zip compressed files opened for writing cannot be '
+                'rewound.'
+            )
+
+        self.zip_file_object.close()
+        self.zip_file_object = self._get_zip_file_object()
+
     def close(self):
         self.zip_file_object.close()
         self.zip_container_file_object.close()
-        self.file_object.close()
-
-    def tell(self):
-        return self.zip_file_object.tell()
+        super().close()
 
     def write(self, data):
-        return self.zip_file_object.write(data=data)
+        count = self.zip_file_object.write(data=data)
+        self.position = self.position + count
+        return count
 
 
 class ZipCompressedPassthroughStorage(PassthroughStorage):
@@ -69,7 +82,6 @@ class ZipCompressedPassthroughStorage(PassthroughStorage):
                 method_name='open', kwargs=next_kwargs
             )
         else:
-            # Next storage mode is always 'rb+' when reading the zip file.
             next_kwargs['mode'] = 'rb+'
 
             storage_file = self._call_backend_method(
@@ -109,7 +121,6 @@ class ZipCompressedPassthroughStorage(PassthroughStorage):
                     'name': name, 'mode': 'wb'
                 }
             ) as file_object:
-                # From Python: ZipFile requires mode 'r', 'w', 'x', or 'a'.
                 with zipfile.ZipFile(file=file_object, mode='w', compression=COMPRESSION) as zip_file_object:
                     zip_file_object.writestr(
                         zinfo_or_arcname=ZIP_MEMBER_FILENAME,

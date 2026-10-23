@@ -45,6 +45,12 @@ class DependencyGroupEntryListView(SingleObjectListView):
         return {
             'hide_link': True,
             'hide_object': True,
+            'no_results_icon': icon_dependency_group_entry_list,
+            'no_results_text': _(
+                message='Entries partition a dependency group into the '
+                'individual sets of components it tracks.'
+            ),
+            'no_results_title': _(message='No entries available'),
             'object': self.get_object(),
             'subtitle': self.get_object().help_text,
             'title': _(
@@ -76,6 +82,12 @@ class DependencyGroupListView(SingleObjectListView):
         return {
             'hide_link': True,
             'hide_object': True,
+            'no_results_icon': icon_dependency_group_list,
+            'no_results_text': _(
+                message='Dependency groups organize the external components '
+                'required by the system.'
+            ),
+            'no_results_title': _(message='No dependency groups available'),
             'title': _(message='Dependency groups')
         }
 
@@ -97,6 +109,13 @@ class DependencyGroupEntryDetailView(SingleObjectListView):
             'hide_link': True,
             'hide_object': True,
             'navigation_object_list': ('group', 'entry'),
+            'no_results_icon': icon_dependency_group_entry_detail,
+            'no_results_text': _(
+                message='Dependencies are the individual external components, '
+                'such as Python or JavaScript libraries, required by the '
+                'system.'
+            ),
+            'no_results_title': _(message='No dependencies available'),
             'title': _(
                 message='Dependency group and entry: %(group)s, %(entry)s'
             ) % {
@@ -137,8 +156,6 @@ class DependencyLicensesView(SimpleView):
     view_icon = icon_dependency_licenses
 
     def get_extra_context(self):
-        # Use a function so that DependenciesLicensesForm get initialized
-        # at every request.
         return {
             'form': DependenciesLicensesForm(),
             'read_only': True,

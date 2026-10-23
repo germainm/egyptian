@@ -1,9 +1,21 @@
 {% load navigation_tags %}
 
-<div class="panel-body">
+<div class="card-body">
     {% if not hide_columns %}
         {% for column in source_columns_non_identifier %}
-            <div class="text-center" style="">{% navigation_source_column_resolve column=column as column_value %}{% if column_value != '' %}{% if column.include_label %}<span class="source-column-label">{{ column.label }}</span>: {% endif %}{{ column_value }}{% endif %}</div>
+            {% navigation_source_column_resolve column=column as column_value %}
+            {% if column_value != '' %}
+                
+                
+                
+                
+                
+                
+                
+                <div class="text-center">
+                    {% if column.include_label %}<bdi class="fw-bold">{{ column.label }}</bdi>: {% endif %}<bdi>{{ column_value }}</bdi>
+                </div>
+            {% endif %}
         {% endfor %}
     {% endif %}
 </div>

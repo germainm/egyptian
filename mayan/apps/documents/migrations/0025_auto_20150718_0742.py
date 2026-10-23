@@ -6,25 +6,26 @@ from django.db import migrations
 def code_change_bibliographic_to_terminology(apps, schema_editor):
     Document = apps.get_model(app_label='documents', model_name='Document')
 
-    queryset = Document.objects.using(
-        alias=schema_editor.connection.alias
-    ).all()
+    alias = schema_editor.connection.alias
+
+    queryset = Document.objects.using(alias=alias).all()
 
     for document in queryset:
         try:
             language = pycountry.languages.get(
                 bibliographic=document.language
             )
-        except KeyError:
-            # The pycountry version used doesn't support the 'bibliographic'
-            # key. Reset the document's language to English.
-            # GitHub issue #250
-            # https://github.com/mayan-edms/mayan-edms/issues/250
+        except (KeyError, TypeError):
+            language = None
+
+        if language is None:
             document.language = 'eng'
-            document.save()
         else:
-            document.language = language.terminology
-            document.save()
+            document.language = getattr(
+                language, 'terminology', None
+            ) or language.alpha_3
+
+        document.save(using=alias)
 
 
 class Migration(migrations.Migration):
@@ -33,5 +34,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(code=code_change_bibliographic_to_terminology)
+        migrations.RunPython(
+            code=code_change_bibliographic_to_terminology,
+            reverse_code=migrations.RunPython.noop, elidable=True
+        )
     ]

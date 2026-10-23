@@ -158,7 +158,6 @@ class FileMetadataApp(MayanAppConfig):
             name='file_metadata_value_of.< underscore separated driver name and property name >'
         )
 
-        # FileMetadataEntry
 
         SourceColumn(
             attribute='internal_name', is_identifier=True, is_sortable=True,
@@ -175,7 +174,6 @@ class FileMetadataApp(MayanAppConfig):
             source=FileMetadataEntry
         )
 
-        # FileMetadataDriver
 
         SourceColumn(
             attribute='label', include_label=True, label=_(message='Label'),
@@ -208,7 +206,6 @@ class FileMetadataApp(MayanAppConfig):
             source=FileMetadataDriver, widget=column_widgets.TwoStateWidget
         )
 
-        # DocumentFileDriverEntry
 
         SourceColumn(
             attribute='driver', is_identifier=True,
@@ -223,7 +220,6 @@ class FileMetadataApp(MayanAppConfig):
             source=DocumentFileDriverEntry
         )
 
-        # DocumentTypeDriverConfiguration
 
         SourceColumn(
             attribute='stored_driver', is_identifier=True,
@@ -246,7 +242,6 @@ class FileMetadataApp(MayanAppConfig):
             )
         )
 
-        # Document file
 
         menu_list_facet.bind_links(
             links=(link_document_file_metadata_driver_list,),
@@ -265,7 +260,6 @@ class FileMetadataApp(MayanAppConfig):
             )
         )
 
-        # Document file driver
 
         menu_object.bind_links(
             links=(link_document_file_metadata_driver_attribute_list,),
@@ -278,7 +272,6 @@ class FileMetadataApp(MayanAppConfig):
             ), sources=(DocumentTypeDriverConfiguration,)
         )
 
-        # Document type
 
         menu_list_facet.bind_links(
             links=(

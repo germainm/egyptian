@@ -16,10 +16,7 @@ from .settings import (
 
 
 class SavedResultsetEntryManager(ManagerMinixCreateBulk, models.Manager):
-    """
-    Nothing additional required, this is just to add the create bulk mixing
-    to the manager.
-    """
+    pass
 
 
 class SavedResultsetManager(models.Manager):

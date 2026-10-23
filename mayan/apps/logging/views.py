@@ -47,8 +47,8 @@ class ObjectErrorLogEntryListClearView(
         return {
             'object': self.external_object,
             'title': _(
-                message='Clear error log entries for: %s' % self.external_object
-            )
+                message='Clear error log entries for: %s'
+            ) % self.external_object
         }
 
     def view_action(self):
@@ -104,8 +104,8 @@ class ObjectErrorLogEntryListView(
                 'type: %s'
             ) % self.external_object.error_log_instance.limit,
             'title': _(
-                message='Error log entries for: %s' % self.external_object
-            )
+                message='Error log entries for: %s'
+            ) % self.external_object
         }
 
     def get_source_queryset(self):

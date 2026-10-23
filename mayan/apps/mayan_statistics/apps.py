@@ -40,8 +40,6 @@ class StatisticsApp(MayanAppConfig):
 
         SourceColumn(
             attribute='schedule',
-            # Translators: Schedule here is a noun, the 'schedule' at
-            # which the statistic will be updated
             include_label=True, label=_(message='Schedule'),
             source=StatisticType
         )
@@ -51,7 +49,6 @@ class StatisticsApp(MayanAppConfig):
             label=_(message='Last update'), source=StatisticType
         )
 
-        # StatisticNamespace
 
         menu_list_facet.bind_links(
             links=(link_statistic_namespace_detail,),
@@ -65,7 +62,6 @@ class StatisticsApp(MayanAppConfig):
             )
         )
 
-        # StatisticType
 
         menu_list_facet.bind_links(
             links=(link_statistic_type_detail,), sources=(StatisticType,)

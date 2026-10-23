@@ -2,15 +2,6 @@ from django.core.exceptions import ImproperlyConfigured
 
 
 class DynamicFormBackendMixin:
-    """
-    The form_fields attribute is a list of dictionaries with the format:
-    {
-        'name': ''  # Field internal name
-        'label': ''  # Label to show to users
-        'initial': ''  # Field initial value
-        'default': ''  # Default value.
-    }
-    """
     form_field_widgets = {}
     form_fields = {}
     form_fieldset_exclude_list = ('backend_data',)

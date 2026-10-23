@@ -1,5 +1,0 @@
-- AI integration with Ollama
-
-  - Seamlessly connect Mayan EDMS with local or remote Ollama models for advanced AI capabilities.
-  - Use natural language to search, summarize, and extract data from documents.
-  - Power the workflow engine with the output of a model for true agentic document management.

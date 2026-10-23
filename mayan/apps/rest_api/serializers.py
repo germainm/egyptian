@@ -1,7 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers as rest_framework_serializers
-from rest_framework.fields import (  # NOQA
+from rest_framework.fields import (
     BooleanField, CharField, ChoiceField, DateField, DateTimeField,
     DecimalField, DictField, DurationField, EmailField, Field, FileField,
     FilePathField, FloatField, HiddenField, HStoreField, ImageField,
@@ -9,7 +9,7 @@ from rest_framework.fields import (  # NOQA
     MultipleChoiceField, ReadOnlyField, RegexField, SerializerMethodField,
     SlugField, TimeField, URLField, UUIDField
 )
-from rest_framework.relations import (  # NOQA
+from rest_framework.relations import (
     HyperlinkedIdentityField, HyperlinkedRelatedField, ManyRelatedField,
     PrimaryKeyRelatedField, RelatedField, SlugRelatedField, StringRelatedField
 )
@@ -28,7 +28,7 @@ from .serializer_mixins import (
 class Serializer(
     DynamicFieldListSerializerMixin, rest_framework_serializers.Serializer
 ):
-    """Serializer subclass to add Mayan specific mixins."""
+    pass
 
 
 class BatchAPIRequestResponseSerializer(Serializer):
@@ -66,7 +66,7 @@ class BatchAPIRequestResponseSerializer(Serializer):
 
 
 class BlankSerializer(Serializer):
-    """Serializer for the object action API view."""
+    pass
 
 
 class EndpointSerializer(Serializer):
@@ -90,14 +90,14 @@ class HyperlinkedModelSerializer(
     CreateOnlyFieldSerializerMixin, DynamicFieldListSerializerMixin,
     RESTFrameworkHyperlinkedModelSerializer
 ):
-    """HyperlinkedModelSerializer subclass to add Mayan specific mixins."""
+    pass
 
 
 class ModelSerializer(
     CreateOnlyFieldSerializerMixin, DynamicFieldListSerializerMixin,
     RESTFrameworkModelSerializer
 ):
-    """ModelSerializer subclass to add Mayan specific mixins."""
+    pass
 
 
 class ProjectInformationSerializer(Serializer):
@@ -109,6 +109,9 @@ class ProjectInformationSerializer(Serializer):
     )
     __build__ = CharField(
         label=_(message='Build'), read_only=True
+    )
+    __build_revision__ = CharField(
+        label=_(message='Build revision'), read_only=True
     )
     __build_string__ = CharField(
         label=_(message='Build string'), read_only=True

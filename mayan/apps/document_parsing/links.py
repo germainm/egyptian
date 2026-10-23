@@ -18,7 +18,6 @@ from .permissions import (
     permission_document_type_parsing_setup,
 )
 
-# Document file
 
 link_document_file_content_detail = Link(
     args='resolved_object.id', icon=icon_document_file_content_detail,
@@ -56,7 +55,6 @@ link_document_file_parsing_submit_single = Link(
     view='document_parsing:document_file_parsing_single_submit'
 )
 
-# Document file page
 
 link_document_file_page_content_detail = Link(
     args='resolved_object.id',
@@ -66,7 +64,6 @@ link_document_file_page_content_detail = Link(
     view='document_parsing:document_file_page_content_view'
 )
 
-# Document type
 
 link_document_type_parsing_settings = Link(
     args='resolved_object.id',

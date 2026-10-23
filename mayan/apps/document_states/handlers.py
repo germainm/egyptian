@@ -20,15 +20,33 @@ def handler_create_workflow_image_cache(sender, **kwargs):
 
 def handler_launch_workflow_on_create(sender, instance, created, **kwargs):
     if created:
-        task_launch_all_workflow_for.apply_async(
-            kwargs={'document_id': instance.pk}
+        Workflow = apps.get_model(
+            app_label='document_states', model_name='Workflow'
         )
+
+        queryset_workflow_templates = Workflow.objects.get_queryset_auto_launch(
+            document_type=instance.document_type
+        )
+
+        if queryset_workflow_templates.exists():
+            task_launch_all_workflow_for.apply_async(
+                kwargs={'document_id': instance.pk}
+            )
 
 
 def handler_launch_workflow_on_type_change(sender, instance, **kwargs):
-    task_launch_all_workflow_for.apply_async(
-        kwargs={'document_id': instance.pk}
+    Workflow = apps.get_model(
+        app_label='document_states', model_name='Workflow'
     )
+
+    queryset_workflow_templates = Workflow.objects.get_queryset_auto_launch(
+        document_type=instance.document_type
+    )
+
+    if queryset_workflow_templates.exists():
+        task_launch_all_workflow_for.apply_async(
+            kwargs={'document_id': instance.pk}
+        )
 
 
 def handler_transition_trigger(sender, **kwargs):
@@ -43,7 +61,6 @@ def handler_transition_trigger(sender, **kwargs):
     WorkflowTransitionTriggerEvent.objects.check_triggers(action=action)
 
 
-# Indexing, workflow template
 
 
 def handler_workflow_template_post_edit(sender, **kwargs):
@@ -54,7 +71,6 @@ def handler_workflow_template_post_edit(sender, **kwargs):
             )
 
 
-# Indexing, workflow state
 
 
 def handler_workflow_template_state_post_edit(sender, **kwargs):
@@ -67,16 +83,12 @@ def handler_workflow_template_state_post_edit(sender, **kwargs):
 
 def handler_workflow_template_state_pre_delete(sender, **kwargs):
     for workflow_instance in kwargs['instance'].workflow.instances.all():
-        # Remove each of the documents.
-        # Trigger the remove event for each document so they can be
-        # reindexed.
         workflow_instance.delete()
         task_index_instance_document_add.apply_async(
             kwargs={'document_id': workflow_instance.document.pk}
         )
 
 
-# Indexing, workflow template
 
 
 def handler_workflow_template_transition_post_edit(sender, **kwargs):
@@ -89,9 +101,6 @@ def handler_workflow_template_transition_post_edit(sender, **kwargs):
 
 def handler_workflow_template_transition_pre_delete(sender, **kwargs):
     for workflow_instance in kwargs['instance'].workflow.instances.all():
-        # Remove each of the documents.
-        # Trigger the remove event for each document so they can be
-        # reindexed.
         workflow_instance.delete()
         task_index_instance_document_add.apply_async(
             kwargs={'document_id': workflow_instance.document.pk}

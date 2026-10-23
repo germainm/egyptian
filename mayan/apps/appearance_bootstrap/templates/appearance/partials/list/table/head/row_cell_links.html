@@ -5,12 +5,12 @@
 {% if not hide_links %}
     {% navigation_resolve_menu name='list facet' sort_results=True source=object_list.0 as facet_menus_results %}
     {% if facet_menus_results %}
-        <th class="text-center">{% trans 'Views' %}</th>
+        <th class="pb-2 pt-0 text-center text-nowrap">{% trans 'Views' %}</th>
     {% endif %}
 
 
     {% navigation_resolve_menu name='object' source=object_list.0 sort_results=True as object_menus_results %}
     {% if object_menus_results %}
-        <th class="text-center">{% trans 'Actions' %}</th>
+        <th class="pb-2 pt-0 text-center text-nowrap">{% trans 'Actions' %}</th>
     {% endif %}
 {% endif %}

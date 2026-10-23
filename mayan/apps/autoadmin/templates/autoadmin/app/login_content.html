@@ -1,4 +1,6 @@
+{% load appearance_tags %}
 {% load autoadmin_tags %}
 
-{# appearance_app_template_nocache #}
+{% appearance_app_template_cache_disable %}
+
 {% autoadmin_partial %}

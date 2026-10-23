@@ -30,11 +30,16 @@ class FontAwesomeDriver(IconDriver):
     name = 'fontawesome'
     template_name = 'icons/font_awesome/symbol.html'
 
-    def __init__(self, symbol):
+    def __init__(self, symbol, css_classes=None, style=None):
+        self.css_classes = css_classes or ''
+        self.style = style or 'fa-solid'
         self.symbol = symbol
 
     def get_context(self):
-        return {'symbol': self.symbol}
+        return {
+            'css_classes': self.css_classes, 'style': self.style,
+            'symbol': self.symbol
+        }
 
 
 class FontAwesomeDualDriver(IconDriver):
@@ -47,45 +52,23 @@ class FontAwesomeDualDriver(IconDriver):
 
     def get_context(self):
         return {
-            'css_classes': 'mayan-icon-fa-dual-symbol',
+            'wrapper_css_classes': 'mayan-icon-dual',
             'data': (
                 {
-                    'class': 'fas fa-circle',
+                    'class': 'fa-solid fa-circle',
                     'transform': 'shrink-2 down-4 right-6',
-                    'mask': 'fas fa-{}'.format(self.primary_symbol)
+                    'mask': 'fa-solid fa-{}'.format(self.primary_symbol)
                 },
                 {
-                    'class': 'far fa-circle',
+                    'class': 'fa-regular fa-circle',
                     'transform': 'shrink-2 down-4 right-6'
                 },
                 {
-                    'class': 'fas fa-{}'.format(self.secondary_symbol),
+                    'class': 'fa-solid fa-{}'.format(self.secondary_symbol),
                     'transform': 'shrink-8 down-4 right-6'
                 }
             )
         }
-
-
-class FontAwesomeCSSDriver(IconDriver):
-    name = 'fontawesome-css'
-    template_name = 'icons/font_awesome/css.html'
-
-    def __init__(self, css_classes):
-        self.css_classes = css_classes
-
-    def get_context(self):
-        return {'css_classes': self.css_classes}
-
-
-class FontAwesomeMasksDriver(IconDriver):
-    name = 'fontawesome-masks'
-    template_name = 'icons/font_awesome/masks.html'
-
-    def __init__(self, data):
-        self.data = data
-
-    def get_context(self):
-        return {'data': self.data}
 
 
 class FontAwesomeLayersDriver(IconDriver):
@@ -96,7 +79,7 @@ class FontAwesomeLayersDriver(IconDriver):
         self.data = data
 
     def get_context(self):
-        return {'css_classes': 'mayan-icon-fa-layers', 'data': self.data}
+        return {'data': self.data}
 
 
 class Icon:
@@ -108,8 +91,6 @@ class Icon:
         return self.driver.render(**kwargs)
 
 
-IconDriver.register(driver_class=FontAwesomeCSSDriver)
 IconDriver.register(driver_class=FontAwesomeDriver)
 IconDriver.register(driver_class=FontAwesomeDualDriver)
 IconDriver.register(driver_class=FontAwesomeLayersDriver)
-IconDriver.register(driver_class=FontAwesomeMasksDriver)

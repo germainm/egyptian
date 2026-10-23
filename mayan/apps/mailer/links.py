@@ -25,7 +25,6 @@ from .permissions import (
     permission_send_document_version_link
 )
 
-# Document
 
 link_document_link_send_multiple = Link(
     icon=icon_document_link_send_multiple,
@@ -39,7 +38,6 @@ link_document_link_send_single = Link(
     view='mailer:send_document_link_single'
 )
 
-# Document file
 
 link_document_file_attachment_send_multiple = Link(
     icon=icon_document_file_attachment_send_multiple,
@@ -65,7 +63,6 @@ link_document_file_link_send_single = Link(
     view='mailer:send_document_file_link_single'
 )
 
-# Document version
 
 link_document_version_attachment_send_single = Link(
     args='resolved_object.pk',
@@ -91,7 +88,6 @@ link_document_version_link_send_multiple = Link(
     view='mailer:send_document_version_link_multiple'
 )
 
-# Mailing profile
 
 link_mailing_profile_create = Link(
     icon=icon_mailing_profile_create,

@@ -1,9 +1,9 @@
-from rest_framework import status
-from rest_framework.response import Response
-
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.functional import classproperty
 from django.utils.translation import gettext_lazy as _
+
+from rest_framework import status
+from rest_framework.response import Response
 
 from ..exceptions import SourceActionExceptionInterfaceArgumentMissing
 
@@ -72,14 +72,6 @@ class SourceBackendActionInterface(
         return str(cls.__name__)
 
     def __init__(self, action):
-        """
-        Load:     Data arrives in the context, is processed by the interface,
-                  and stored in the action_kwargs.
-
-        Retrieve: Action data is stored in action_data, context is used as
-                  persistent storage for the MRO and the final return value
-                  is set in interface_result.
-        """
         self.action = action
         self.action_data = None
         self.action_kwargs = {}
@@ -147,9 +139,7 @@ class SourceBackendActionInterfaceRequestRESTAPI(
 class SourceBackendActionInterfaceRequestView(
     SourceBackendActionInterfaceRequest
 ):
-    """
-    Interface for HTML views.
-    """
+    pass
 
 
 class SourceBackendActionInterfaceRequestViewForm(
@@ -165,7 +155,4 @@ class SourceBackendActionInterfaceRequestViewForm(
 
 
 class SourceBackendActionInterfaceTask(SourceBackendActionInterface):
-    """
-    Interface that every action needs to received the background task
-    arguments.
-    """
+    pass

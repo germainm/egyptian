@@ -6,10 +6,10 @@
 {% load smart_settings_tags %}
 
 <div class="row">
-    <div class="col-xs-12">
+    <div class="col-12">
         {% include 'appearance/partials/list/header.html' %}
         {% if not object_list %}
-            <div class="well">
+            <div class="card card-body bg-body-tertiary border-0">
                 {% include 'appearance/partials/list/no_results.html' %}
             </div>
         {% else %}
@@ -18,10 +18,12 @@
             {% navigation_get_source_columns source=object_list only_identifier=True as source_columns_identifier %}
             {% navigation_get_source_columns source=object_list exclude_identifier=True as source_columns_non_identifier %}
 
-            <div class="well center-block">
-                <div class="row row-items">
+            <div class="card card-body bg-body-secondary border-0">
+                <div class="row row-items g-3">
+                    
+                    
                     {% for object in object_list %}
-                        {% include 'appearance/partials/list/panel/single.html' %}
+                        {% include panel_item_template|default:'appearance/partials/list/panel/single.html' %}
                     {% endfor %}
                 </div>
             </div>
@@ -29,12 +31,3 @@
     </div>
 </div>
 
-<script>
-    'use strict';
-
-    $(function() {
-        $('.row-items > [class*="col"] .panel-item .panel-heading').matchHeight();
-        $('.row-items > [class*="col"] .panel-item .panel-body').matchHeight();
-        $('.row-items > [class*="col"] .panel-item').matchHeight();
-    });
-</script>

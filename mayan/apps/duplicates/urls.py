@@ -3,28 +3,53 @@ from django.urls import re_path
 from .api_views import (
     APIDocumentDuplicateListView, APIDuplicatedDocumentListView
 )
-from .views import (
-    DocumentDuplicatesListView, DuplicatedDocumentListView,
-    ScanDuplicatedDocuments
+from .views.document_views import (
+    DocumentDuplicateBackendListView,
+    DocumentDuplicateBackendDocumentListView
 )
+from .views.main_views import (
+    DuplicateBackendDocumentListView, DuplicatesBackendListView
+)
+from .views.tool_views import ScanDuplicatedDocuments
 
-urlpatterns = [
+urlpatterns_documents = [
     re_path(
-        route=r'^documents/duplicated/$',
-        name='duplicated_document_list',
-        view=DuplicatedDocumentListView.as_view()
+        route=r'^documents/(?P<document_id>\d+)/backends/$',
+        name='document_duplicate_backend_list',
+        view=DocumentDuplicateBackendListView.as_view()
     ),
     re_path(
-        route=r'^documents/(?P<document_id>\d+)/duplicates/$',
-        name='document_duplicates_list',
-        view=DocumentDuplicatesListView.as_view()
+        route=r'^documents/(?P<document_id>\d+)/backends/(?P<backend_entry_id>\d+)/$',
+        name='document_duplicate_backend_document_list',
+        view=DocumentDuplicateBackendDocumentListView.as_view()
+    )
+]
+
+urlpatterns_main = [
+    re_path(
+        route=r'^documents/duplicate_backends/$',
+        name='duplicate_backend_list',
+        view=DuplicatesBackendListView.as_view()
     ),
+    re_path(
+        route=r'^documents/duplicate_backends/(?P<stored_duplicated_backend_id>\d+)/documents/$',
+        name='duplicate_backend_document_list',
+        view=DuplicateBackendDocumentListView.as_view()
+    )
+]
+
+urlpatterns_tools = [
     re_path(
         route=r'^documents/duplicated/scan/$',
         name='duplicated_document_scan',
         view=ScanDuplicatedDocuments.as_view()
     )
 ]
+
+urlpatterns = []
+urlpatterns.extend(urlpatterns_documents)
+urlpatterns.extend(urlpatterns_main)
+urlpatterns.extend(urlpatterns_tools)
 
 api_urls = [
     re_path(

@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.documents.utils import get_language_choices
 from mayan.apps.source_compressed.source_backends.literals import (
-    SOURCE_UNCOMPRESS_NON_INTERACTIVE_CHOICES
+    SOURCE_UNCOMPRESS_CHOICE_NEVER, SOURCE_UNCOMPRESS_NON_INTERACTIVE_CHOICES
 )
 from mayan.apps.source_compressed.source_backends.mixins import (
     SourceBackendMixinCompressed
@@ -123,7 +123,6 @@ class SourceBackendMixinPeriodic:
             app_label='django_celery_beat', model_name='PeriodicTask'
         )
 
-        # Create a new interval or use an existing one.
         interval_instance, created = IntervalSchedule.objects.get_or_create(
             every=self.kwargs['interval'], period='seconds'
         )
@@ -155,7 +154,6 @@ class SourceBackendMixinPeriodic:
             interval_instance = periodic_task.interval
 
             if tuple(interval_instance.periodictask_set.values_list('id', flat=True)) == (periodic_task.pk,):
-                # Only delete the interval if nobody else is using it.
                 interval_instance.delete()
             else:
                 periodic_task.delete()
@@ -195,3 +193,4 @@ class SourceBackendMixinPeriodicCompressed(
     SourceBackendMixinCompressed, SourceBackendMixinPeriodic
 ):
     uncompress_choices = SOURCE_UNCOMPRESS_NON_INTERACTIVE_CHOICES
+    uncompress_default = SOURCE_UNCOMPRESS_CHOICE_NEVER

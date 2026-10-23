@@ -1,8 +1,11 @@
-from django.utils.html import format_html
+from django.template.loader import render_to_string
 
 
 def setting_widget(instance):
-    return format_html(
-        '<strong>{}</strong><p class="small">{}</p>', instance,
-        instance.help_text or ''
+    help_text = instance.help_text or ''
+    context = {'help_text': help_text, 'setting': instance}
+
+    return render_to_string(
+        context=context,
+        template_name='smart_settings/widgets/setting_name.html'
     )

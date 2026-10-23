@@ -1,6 +1,6 @@
 from django.core.exceptions import FieldDoesNotExist
 from django.db import migrations, models
-from django.db.utils import IntegrityError, OperationalError
+from django.db.utils import DatabaseError
 
 
 def code_do_unique_on_columns_drop(apps, schema_editor):
@@ -10,7 +10,7 @@ def code_do_unique_on_columns_drop(apps, schema_editor):
 
     connection = schema_editor.connection
     database_columns = ('document_file_id', 'key')
-    field_names = ('document_file', 'key'),
+    field_names = ('document_file', 'key')
     table_name = Model._meta.db_table
     target = set(database_columns)
 
@@ -25,7 +25,6 @@ def code_do_unique_on_columns_drop(apps, schema_editor):
             )
 
             if constraint_data.get('unique') and constraint_columns == target:
-                # Try dropping as a constraint first.
                 try:
                     schema_editor.remove_constraint(
                         model=Model,
@@ -33,9 +32,7 @@ def code_do_unique_on_columns_drop(apps, schema_editor):
                             fields=field_names, name=constraint_name
                         )
                     )
-                except IntegrityError:
-                    # The uniqueness is not coded as a constraint.
-                    # Fall back to dropping as an index.
+                except DatabaseError:
                     try:
                         schema_editor.remove_index(
                             model=Model,
@@ -43,7 +40,7 @@ def code_do_unique_on_columns_drop(apps, schema_editor):
                                 fields=field_names, name=constraint_name
                             )
                         )
-                    except OperationalError:
+                    except DatabaseError:
                         """It's neither or deleted already."""
                 else:
                     continue
@@ -69,18 +66,15 @@ def do_source_column_remove_if_exists(apps, schema_editor):
         }
 
         if source_column_name not in columns_set:
-            # Field is already gone, exit.
             return
         else:
             try:
                 field = Model._meta.get_field(field_name=source_field_name)
             except FieldDoesNotExist:
-                # Add a fake field.
                 field = models.IntegerField(null=True)
                 field.set_attributes_from_name(name=source_field_name)
                 field.db_column = source_column_name
 
-            # Use backend DDL to DROP COLUMN safely across vendors.
             schema_editor.remove_field(model=Model, field=field)
 
 

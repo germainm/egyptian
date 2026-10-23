@@ -35,7 +35,6 @@ class ImpersonateMiddleware(MiddlewareMixin):
 
         if not impersonate_permanent_session:
             if USER_IMPERSONATE_VARIABLE_DISABLE in request.POST or USER_IMPERSONATE_VARIABLE_DISABLE in request.GET:
-                # End the impersonation
                 if USER_IMPERSONATE_VARIABLE_ID in request.session:
                     user_impersonate_id = request.session[USER_IMPERSONATE_VARIABLE_ID]
 
@@ -53,7 +52,6 @@ class ImpersonateMiddleware(MiddlewareMixin):
                         )
                         return
             else:
-                # Start the impersonation
                 user_impersonate_id = request.GET.get(
                     USER_IMPERSONATE_VARIABLE_ID, request.POST.get(
                         USER_IMPERSONATE_VARIABLE_ID
@@ -90,7 +88,6 @@ class ImpersonateMiddleware(MiddlewareMixin):
 
                             return
 
-        # Set the request user to the previously impersonated user.
         if USER_IMPERSONATE_VARIABLE_ID in request.session:
             user_impersonate_id = request.session[USER_IMPERSONATE_VARIABLE_ID]
             try:

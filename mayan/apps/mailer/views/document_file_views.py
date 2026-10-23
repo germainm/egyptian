@@ -19,9 +19,9 @@ class MailDocumentFileAttachmentView(MailingObjectAttachmentSendView):
     success_message_plural = _(
         message='%(count)d document files queued for email delivery'
     )
-    title = 'Email document file'
-    title_document = 'Email document file: %s'
-    title_plural = 'Email document files'
+    title = _(message='Email document file')
+    title_document = _(message='Email document file: %s')
+    title_plural = _(message='Email document files')
     view_icon = icon_document_file_attachment_send_single
 
 
@@ -34,7 +34,7 @@ class MailDocumentFileLinkView(MailingObjectLinkSendView):
     success_message_plural = _(
         message='%(count)d document file links queued for email delivery'
     )
-    title = 'Email document file link'
-    title_document = 'Email link for document file: %s'
-    title_plural = 'Email document file links'
+    title = _(message='Email document file link')
+    title_document = _(message='Email link for document file: %s')
+    title_plural = _(message='Email document file links')
     view_icon = icon_document_file_link_send_single

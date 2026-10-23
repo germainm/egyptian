@@ -13,7 +13,7 @@ from .permissions import (
     permission_redaction_edit, permission_redaction_exclude,
     permission_redaction_view
 )
-from .transformations import *  # NOQA
+from .transformations import *
 
 logger = logging.getLogger(name=__name__)
 

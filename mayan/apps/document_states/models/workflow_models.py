@@ -23,10 +23,6 @@ __all__ = ('Workflow', 'WorkflowRuntimeProxy')
 class Workflow(
     ExtraDataModelMixin, WorkflowBusinessLogicMixin, models.Model
 ):
-    """
-    Fields:
-    * label - Identifier. A name/label to call the workflow
-    """
     _ordering_fields = (
         'internal_name', 'label', 'auto_launch', 'ignore_completed'
     )

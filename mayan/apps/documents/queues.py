@@ -124,7 +124,7 @@ queue_documents_version.add_task_type(
 )
 queue_documents_version.add_task_type(
     dotted_path='mayan.apps.documents.tasks.document_version_tasks.task_document_version_export',
-    label=_(message='Export a document version')
+    label=_(message='Export a document version to a download file')
 )
 queue_documents_version.add_task_type(
     dotted_path='mayan.apps.documents.tasks.document_version_tasks.task_document_version_delete',

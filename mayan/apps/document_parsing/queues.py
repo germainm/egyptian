@@ -1,10 +1,10 @@
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.task_manager.classes import CeleryQueue
-from mayan.apps.task_manager.workers import worker_b
+from mayan.apps.task_manager.workers import worker_c
 
 queue_parsing = CeleryQueue(
-    name='parsing', label=_(message='Parsing'), worker=worker_b
+    name='parsing', label=_(message='Parsing'), worker=worker_c
 )
 
 queue_parsing.add_task_type(

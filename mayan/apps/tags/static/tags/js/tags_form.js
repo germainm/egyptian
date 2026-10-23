@@ -3,12 +3,11 @@
 jQuery(document).ready(function() {
     const tagsTagTemplate = function (object) {
         return $(
-            '<span class="label label-tag" style="background: ' + object.element.dataset.color + ';"> ' + appearanceSanitizeHTML(object.text) + '</span>'
+            '<span class="badge label-tag" style="background: ' + object.element.dataset.color + '; color: ' + object.element.dataset.colorContrast + ';"> ' + appearanceSanitizeHTML(object.text) + '</span>'
         );
     }
 
-    const tagSelectionTemplate = function (object, container) {
-        container[0].style.background = object.element.dataset.color;
+    const tagSelectionTemplate = function (object) {
         return tagsTagTemplate(object);
     }
 
