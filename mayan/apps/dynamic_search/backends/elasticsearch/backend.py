@@ -380,7 +380,13 @@ class ElasticsearchSearchBackend(SearchBackend):
     def deindex_instance(self, instance):
         search_model = SearchModel.get_for_model(instance=instance)
         index_name = self._get_index_name(search_model=search_model)
-        self._client.delete(id=instance.pk, index=index_name)
+        try:
+            self._client.delete(id=instance.pk, index=index_name)
+        except elasticsearch.exceptions.NotFoundError:
+            """
+            The document is not present in the index. This happens when the
+            instance was never indexed or was already deindexed.
+            """
 
     def index_instance(
         self, instance, exclude_model=None, exclude_kwargs=None
