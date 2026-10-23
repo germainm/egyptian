@@ -1,3 +1,7 @@
+from functools import partial
+
+from django.db import transaction
+
 from mayan.apps.common.compatibility import Iterable
 from mayan.apps.common.utils import (
     ResolverPipelineModelAttribute, flatten_list
@@ -13,12 +17,17 @@ from .tasks import (
 def handler_deindex_instance(sender, **kwargs):
     instance = kwargs['instance']
 
-    task_deindex_instance.apply_async(
-        kwargs={
-            'app_label': instance._meta.app_label,
-            'model_name': instance._meta.model_name,
-            'object_id': instance.pk
-        }
+    # Queue the task only once the deletion is committed. Queued earlier,
+    # it could run first and an index task that still sees the instance
+    # would add it back to the index.
+    transaction.on_commit(
+        func=partial(
+            task_deindex_instance.apply_async, kwargs={
+                'app_label': instance._meta.app_label,
+                'model_name': instance._meta.model_name,
+                'object_id': instance.pk
+            }
+        ), using=kwargs.get('using')
     )
 
 
@@ -33,15 +42,20 @@ def handler_factory_index_related_instance_delete(reverse_field_path):
         entries = flatten_list(value=result)
 
         def call_task(instance):
-            task_index_instance.apply_async(
-                kwargs={
-                    'app_label': instance._meta.app_label,
-                    'exclude_app_label': related_instance._meta.app_label,
-                    'exclude_kwargs': {'id': related_instance.pk},
-                    'exclude_model_name': related_instance._meta.model_name,
-                    'model_name': instance._meta.model_name,
-                    'object_id': instance.pk
-                }
+            # Same as handler_deindex_instance: wait for the deletion to be
+            # committed so an instance deleted along with the related one is
+            # not indexed again.
+            transaction.on_commit(
+                func=partial(
+                    task_index_instance.apply_async, kwargs={
+                        'app_label': instance._meta.app_label,
+                        'exclude_app_label': related_instance._meta.app_label,
+                        'exclude_kwargs': {'id': related_instance.pk},
+                        'exclude_model_name': related_instance._meta.model_name,
+                        'model_name': instance._meta.model_name,
+                        'object_id': instance.pk
+                    }
+                ), using=kwargs.get('using')
             )
 
         if isinstance(entries, Iterable):
