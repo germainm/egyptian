@@ -35,7 +35,7 @@
         return src.replace(/search_help[^/]*\.js(\?.*)?$/, '');
       }
     }
-    return '/static/search_patches/js/';
+    return '/static/dynamic_search/js/';
   }
 
   function loadI18n(lang, callback) {

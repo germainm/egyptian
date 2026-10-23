@@ -1,0 +1,7 @@
+{% load static %}
+{% load smart_settings_tags %}
+
+{% smart_setting global_name="SEARCH_BACKEND" as search_backend %}
+
+<script>window.MAYAN_SEARCH_BACKEND = '{% if "elasticsearch" in search_backend|lower %}elasticsearch{% elif "whoosh" in search_backend|lower %}whoosh{% else %}django{% endif %}';</script>
+<script src="{% static 'dynamic_search/js/search_help.js' %}"></script>
