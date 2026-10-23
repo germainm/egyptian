@@ -101,7 +101,7 @@
     return window.MAYAN_SEARCH_BACKEND || 'elasticsearch';
   }
 
-  // ── 4. CSS BOOTSTRAP 3 CLAIR ─────────────────────────────────────────────────
+  // ── 4. CSS BOOTSTRAP 5 (couleurs du thème, mode sombre compris) ─────────────────────────────────────────────────
 
   var CSS = [
     '.sh-tooltip-btn{display:inline-flex;align-items:center;justify-content:center;',
@@ -109,31 +109,31 @@
     'color:#fff;font-size:10px;font-weight:700;cursor:pointer;margin-left:5px;',
     'vertical-align:middle;flex-shrink:0;line-height:1;font-family:monospace;}',
     '.sh-tooltip-btn:hover{background:#2e6da4;}',
-    '.sh-panel{display:none;position:absolute;z-index:9999;background:#fff;',
-    'border:1px solid #ddd;border-radius:4px;min-width:360px;max-width:480px;',
+    '.sh-panel{display:none;position:absolute;z-index:9999;background:var(--bs-body-bg);',
+    'border:1px solid var(--bs-border-color);border-radius:4px;min-width:360px;max-width:480px;',
     'box-shadow:0 6px 18px rgba(0,0,0,.15);',
-    'font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:13px;color:#333;}',
+    'font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;font-size:13px;color:var(--bs-body-color);}',
     '.sh-panel.sh-visible{display:block;}',
-    '.sh-panel-header{background:#f5f5f5;border-bottom:1px solid #ddd;padding:8px 12px;',
+    '.sh-panel-header{background:var(--bs-tertiary-bg);border-bottom:1px solid var(--bs-border-color);padding:8px 12px;',
     'border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:space-between;}',
-    '.sh-panel-title{font-size:12px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.04em;}',
-    '.sh-panel-close{cursor:pointer;color:#999;font-size:16px;line-height:1;}',
-    '.sh-panel-close:hover{color:#333;}',
+    '.sh-panel-title{font-size:12px;font-weight:700;color:var(--bs-body-color);text-transform:uppercase;letter-spacing:.04em;}',
+    '.sh-panel-close{cursor:pointer;color:var(--bs-secondary-color);font-size:16px;line-height:1;}',
+    '.sh-panel-close:hover{color:var(--bs-body-color);}',
     '.sh-panel-body{padding:10px 12px;}',
     '.sh-field-type{font-size:11px;background:#e8f4f8;border:1px solid #b8dce8;border-radius:3px;',
     'padding:1px 6px;color:#31708f;font-family:monospace;margin-bottom:8px;display:inline-block;}',
-    '.sh-note{font-size:11px;color:#666;margin-bottom:8px;line-height:1.5;}',
+    '.sh-note{font-size:11px;color:var(--bs-secondary-color);margin-bottom:8px;line-height:1.5;}',
     '.sh-note.sh-warn{color:#8a6d3b;background:#fcf8e3;border:1px solid #faebcc;border-radius:3px;padding:4px 8px;}',
-    '.sh-ops-title{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}',
-    '.sh-op-row{display:flex;align-items:flex-start;gap:6px;padding:3px 0;border-bottom:1px solid #f0f0f0;font-size:12px;}',
+    '.sh-ops-title{font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}',
+    '.sh-op-row{display:flex;align-items:flex-start;gap:6px;padding:3px 0;border-bottom:1px solid var(--bs-border-color-translucent);font-size:12px;}',
     '.sh-op-row:last-child{border-bottom:none;}',
     '.sh-op-alias{font-family:monospace;color:#c7254e;background:#f9f2f4;padding:0 3px;border-radius:2px;min-width:52px;font-weight:700;flex-shrink:0;}',
-    '.sh-op-label{color:#333;flex:1;}',
+    '.sh-op-label{color:var(--bs-body-color);flex:1;}',
     '.sh-op-example{font-family:monospace;font-size:10px;color:#3c763d;background:#dff0d8;padding:1px 4px;border-radius:3px;border:1px solid #d6e9c6;}',
-    '.sh-examples-title{font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px;}',
+    '.sh-examples-title{font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px;}',
     '.sh-example-row{display:flex;gap:8px;padding:2px 0;font-size:11px;align-items:flex-start;}',
     '.sh-example-q{font-family:monospace;color:#8b008b;min-width:160px;flex-shrink:0;background:#f9f2f4;padding:0 3px;border-radius:2px;}',
-    '.sh-example-desc{color:#666;}',
+    '.sh-example-desc{color:var(--bs-secondary-color);}',
     '.sh-backend-badge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;font-family:monospace;margin-left:4px;}',
     '.sh-be-es{background:#d9edf7;color:#31708f;border:1px solid #bce8f1;}',
     '.sh-be-orm{background:#dff0d8;color:#3c763d;border:1px solid #d6e9c6;}',
@@ -207,30 +207,30 @@
     var bc = bcolors[backend] || '#31708f';
     var bb = bbg[backend]     || '#d9edf7';
 
-    var ss = 'font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;';
+    var ss = 'font-size:10px;font-weight:700;color:var(--bs-secondary-color);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;';
     var cs = 'color:#c7254e;background:#f9f2f4;padding:1px 4px;border-radius:2px;display:inline-block;';
 
-    var html = '<div class="panel panel-default" style="margin-top:16px;">'
-      + '<div class="panel-heading" style="display:flex;align-items:center;justify-content:space-between;">'
+    var html = '<div class="card" style="margin-top:16px;">'
+      + '<div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">'
       + '<strong>' + i18n.ui.globalTitle + '</strong>'
       + '<span style="font-size:11px;padding:2px 8px;border-radius:3px;background:' + bb + ';color:' + bc + ';border:1px solid ' + bc + ';">'
       + i18n.ui.backendLabel + '<strong>' + bl + '</strong></span>'
-      + '</div><div class="panel-body">';
+      + '</div><div class="card-body">';
 
     html += '<p style="' + ss + '">' + i18n.ui.prefixesTitle + '</p>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px;margin-bottom:14px;">';
     ['exact','phrase','fuzzy','regex','gt','gte','lt','lte','range','range_excl'].forEach(function(k) {
       var op = i18n.operators[k];
       if (!op) return;
-      html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;background:#f9f9f9;border:1px solid #eee;border-radius:3px;">'
+      html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;background:var(--bs-tertiary-bg);border:1px solid var(--bs-border-color);border-radius:3px;">'
         + '<code style="' + cs + 'min-width:36px;text-align:center;font-size:11px;">' + op.alias + '</code>'
-        + '<span style="font-size:11px;color:#555;">' + op.label + '</span>'
+        + '<span style="font-size:11px;color:var(--bs-secondary-color);">' + op.label + '</span>'
         + '</div>';
     });
     html += '</div>';
 
     html += '<p style="' + ss + '">' + i18n.ui.regexTitle + '</p>'
-      + '<div class="well well-sm" style="margin-bottom:10px;">'
+      + '<div class="bg-body-tertiary border rounded p-2 mb-2">'
       + '<div class="alert alert-warning" style="padding:4px 8px;margin-bottom:6px;font-size:11px;">' + i18n.ui.regexWarning + '</div>';
     (i18n.regexExamples || []).forEach(function(ex) {
       html += '<div style="display:flex;gap:10px;padding:2px 0;font-size:12px;">'
@@ -240,7 +240,7 @@
     html += '</div>';
 
     html += '<p style="' + ss + '">' + i18n.ui.wildcardsTitle + '</p>'
-      + '<div class="well well-sm" style="margin-bottom:10px;">'
+      + '<div class="bg-body-tertiary border rounded p-2 mb-2">'
       + '<p class="text-muted" style="font-size:11px;margin-bottom:4px;">' + i18n.ui.wildcardsNote + '</p>';
     (i18n.wildcardExamples || []).forEach(function(ex) {
       html += '<div style="display:flex;gap:10px;padding:2px 0;font-size:12px;">'
@@ -250,7 +250,7 @@
     html += '</div>';
 
     html += '<p style="' + ss + '">' + i18n.ui.datesTitle + '</p>'
-      + '<div class="well well-sm">';
+      + '<div class="bg-body-tertiary border rounded p-2">';
     (i18n.dateExamples || []).forEach(function(ex) {
       html += '<div style="display:flex;gap:10px;padding:2px 0;font-size:12px;">'
         + '<code style="' + cs + 'min-width:200px;flex-shrink:0;">' + ex.q + '</code>'
@@ -298,7 +298,7 @@
       var fn = input.name;
       if (!fn || fn.charAt(0) === '_') return;
 
-      var fg = input.closest('.form-group');
+      var fg = input.closest('.mb-3');
       if (!fg) return;
       var lbl = fg.querySelector('label');
 
@@ -343,7 +343,7 @@
 
     var tb = document.createElement('button');
     tb.type = 'button';
-    tb.className = 'sh-toggle-btn btn btn-default btn-sm';
+    tb.className = 'sh-toggle-btn btn btn-secondary btn-sm';
     tb.textContent = i18n.ui.toggleShow;
     tb.style.marginTop = '12px';
 
