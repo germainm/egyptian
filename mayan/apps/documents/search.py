@@ -25,6 +25,9 @@ search_model_document.add_proxy_model(
 search_model_document.add_proxy_model(
     app_label='documents', model_name='RecentlyCreatedDocument'
 )
+search_model_document.add_proxy_model(
+    app_label='documents', model_name='TrashedDocument'
+)
 
 search_model_document.add_model_field(
     field='document_type__id',
