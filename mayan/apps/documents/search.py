@@ -11,7 +11,7 @@ from .permissions import (
 # Document
 
 search_model_document = SearchModel(
-    app_label='documents',  label=_(message='Document'),
+    app_label='documents', default=True, label=_(message='Document'),
     list_mode=LIST_MODE_CHOICE_ITEM, manager_name='valid',
     model_name='DocumentSearchResult', permission=permission_document_view,
     serializer_path='mayan.apps.documents.serializers.document_serializers.DocumentSerializer'
@@ -92,7 +92,7 @@ search_model_document_file.add_model_field(field='size')
 # Document file page
 
 search_model_document_file_page = SearchModel(
-    app_label='documents', default=True, label=_(message='Document file page'),
+    app_label='documents', label=_(message='Document file page'),
     list_mode=LIST_MODE_CHOICE_ITEM, manager_name='valid',
     model_name='DocumentFilePageSearchResult',
     permission=permission_document_file_view,
