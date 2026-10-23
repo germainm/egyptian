@@ -1,3 +1,4 @@
+claude_context/
 *.orig
 *.pyc
 *.pyo
@@ -46,3 +47,4 @@ MANIFEST.in
 forge/.env-local
 __pycache__/
 .config.env.mk
+mayan/tmp/
