@@ -6,6 +6,8 @@
 #   bash install-custom-apps.sh /path/to/app-directory
 #
 # The app directory must contain apps.py with a MayanAppConfig subclass.
+# The Python packages listed in its requirements.txt, if any, are installed in
+# every Mayan container (MAYAN_PIP_INSTALLS).
 set -e
 
 APP_DIR="${1:-}"
@@ -36,6 +38,46 @@ fi
 THIS_APP="${APP_MODULE}.apps.${APP_CLASS}"
 APP_SLUG=$(echo "$APP_MODULE" | awk -F. '{print $NF}')
 INSTALL_DIR="/opt/mayan-${APP_SLUG}"
+
+# Python packages needed by the registered apps (requirements.txt of each
+# app). They go into MAYAN_PIP_INSTALLS: the Mayan image installs them with
+# pip at every start of every container, before Mayan itself, so they survive
+# the re-creation of the containers and reach the workers too. Mayan 4.10
+# runs that pip command through a shell: a line must not contain quotes,
+# < > or other shell characters, nor spaces except after a pip option.
+PIP_INSTALLS=""
+
+pip_installs_add() {
+    case " ${PIP_INSTALLS} " in
+        *" $1 "*) ;;
+        *) PIP_INSTALLS="${PIP_INSTALLS:+${PIP_INSTALLS} }$1" ;;
+    esac
+}
+
+requirements_add() {
+    local line
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%$'\r'}"
+        line="${line%%[[:space:]]#*}"
+        line="$(printf '%s' "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        case "$line" in
+            ''|'#'*) continue ;;
+            *[\'\"\<\>\|\&\;\$\`\(\)\{\}\*\?\[\]\\]* | -*[[:space:]]*[[:space:]]* | [!-]*[[:space:]]*)
+                echo "Error: unsupported line in $1:" >&2
+                echo "  $line" >&2
+                echo "One requirement per line, without quotes, spaces or < > (use == or ~=)." >&2
+                exit 1
+                ;;
+        esac
+        pip_installs_add "$line"
+    done < "$1"
+}
+
+# Check the requirements of this app before changing anything.
+if [ -f "$APP_DIR/requirements.txt" ]; then
+    requirements_add "$APP_DIR/requirements.txt"
+fi
+
 
 echo "=== Mayan EDMS — Installing ${APP_MODULE} ==="
 echo ""
@@ -89,9 +131,10 @@ echo ""
 
 MOUNT_TARGET="${SITE}/mayan/apps/${APP_SLUG}"
 
-# Find the mayan-edms command inside the container
+# Find the mayan-edms command inside the container (in a bin directory: the
+# 4.12 image also has static files named mayan-edms.*.ttf.gz).
 MAYAN_CMD=$(docker exec "$CONTAINER" \
-    find /opt /usr/local -name "mayan-edms*" -not -name "*.pyc" -type f 2>/dev/null \
+    find /opt /usr/local -path "*/bin/mayan-edms*" -not -name "*.pyc" -type f 2>/dev/null \
     | head -1 | tr -d '\r')
 if [ -z "$MAYAN_CMD" ]; then
     echo "Error: could not find mayan-edms executable in container." >&2
@@ -121,6 +164,40 @@ echo "${THIS_APP}|${INSTALL_DIR}|${MOUNT_TARGET}" >> "$REGISTRY"
 
 # Build merged app list from the full registry
 FINAL_APPS=$(cut -d'|' -f1 "$REGISTRY" | sort | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+
+# Keep the packages already set by the docker-compose.yml/.env of the user.
+USER_PIP_INSTALLS=$($DC -f docker-compose.yml config 2>/dev/null \
+    | sed -n 's/^[[:space:]]*MAYAN_PIP_INSTALLS:[[:space:]]*//p' | head -1)
+USER_PIP_INSTALLS="${USER_PIP_INSTALLS#[\"\']}"
+USER_PIP_INSTALLS="${USER_PIP_INSTALLS%[\"\']}"
+PIP_INSTALLS="$USER_PIP_INSTALLS"
+
+while IFS='|' read -r cls dir mnt; do
+    if [ -f "${dir}/requirements.txt" ]; then
+        requirements_add "${dir}/requirements.txt"
+    fi
+done < "$REGISTRY"
+
+# Waits until the Mayan entrypoint of the app container has done its setup,
+# pip installs included (the first start after adding packages can take
+# several minutes). Mayan 4.11+ then prints "Executing final target"; 4.10
+# runs "fc-cache -v" right after pip.
+wait_for_app_setup() {
+    local container started
+    echo "Waiting for the app container to finish its setup (Python packages included)..."
+    for i in $(seq 1 360); do
+        container=$($DC ps -q app 2>/dev/null | head -1)
+        if [ -n "$container" ]; then
+            started=$(docker inspect --format '{{.State.StartedAt}}' "$container" 2>/dev/null || true)
+            if [ -n "$started" ] && docker logs --since "$started" "$container" 2>&1 \
+                | grep -qE 'Executing final target|fc-cache: succeeded'; then
+                return 0
+            fi
+        fi
+        sleep 5
+    done
+    echo "Warning: the app container did not finish its setup in 30 minutes; see: $DC logs app" >&2
+}
 
 # Back up any existing override
 if [ -f "docker-compose.override.yml" ]; then
@@ -166,9 +243,16 @@ for SERVICE in $ALL_SERVICES; do
     done < "$REGISTRY"
     printf "    environment:\n      MAYAN_COMMON_EXTRA_APPS: \"[%s]\"\n" \
         "$FINAL_APPS" >> docker-compose.override.yml
+    if [ -n "$PIP_INSTALLS" ]; then
+        # YAML double quotes; $$ keeps a literal $ from compose interpolation.
+        printf "      MAYAN_PIP_INSTALLS: \"%s\"\n" \
+            "$(printf '%s' "$PIP_INSTALLS" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/$$/g')" \
+            >> docker-compose.override.yml
+    fi
 done
 
 echo "  Apps registered: $FINAL_APPS"
+echo "  Python packages (MAYAN_PIP_INSTALLS): ${PIP_INSTALLS:-none}"
 echo "  Services in override: $ALL_SERVICES"
 echo "  Services restarted:   $RUNNING_SERVICES"
 echo ""
@@ -177,14 +261,8 @@ echo ""
 echo "Applying new configuration (recreating containers)..."
 $DC up -d
 
-# Wait for the app container to accept exec commands before continuing
-echo "Waiting for app container to be ready..."
-for i in $(seq 1 30); do
-    if $DC exec -T app true 2>/dev/null; then
-        break
-    fi
-    sleep 3
-done
+# Migrations and collectstatic import every app: wait for the Python packages.
+wait_for_app_setup
 
 echo "Delete bootswatch docs directory to mitigate the collectstatic problem"
 $DC exec -T app rm -rf "${SITE}/mayan/apps/appearance_bootstrap/static/appearance_bootstrap/node_modules/bootswatch/docs/"
@@ -205,14 +283,9 @@ echo "Restarting app to reload static files manifest..."
 $DC stop
 $DC start
 
-# Wait for app to be ready before regenerating supervisor config
-echo "Waiting for app container to be ready (supervisor update)..."
-for i in $(seq 1 30); do
-    if $DC exec -T app true 2>/dev/null; then
-        break
-    fi
-    sleep 3
-done
+# Wait for app to be ready before regenerating supervisor config (the
+# entrypoint runs pip again at every start).
+wait_for_app_setup
 
 # Regenerate supervisord configuration so new Celery queues from custom apps
 # are registered with their workers. platforms_template docker_supervisord
@@ -228,16 +301,30 @@ done
 # programs may still be starting (exit 3) or the socket path may vary.
 SUPERVISORD_CONF="/etc/supervisor/conf.d/mayan-edms.conf"
 if $DC exec -T app test -f "$SUPERVISORD_CONF" 2>/dev/null; then
-    echo "Regenerating supervisord configuration to register new Celery queues..."
-    # -u root: writing /etc/supervisor/conf.d/ requires root; docker compose
-    # exec runs as the container user (mayan) by default.
-    $DC exec -T -u root app sh -c \
-        "'$MAYAN_CMD' platforms_template docker_supervisord \
-         > '$SUPERVISORD_CONF' \
-         && supervisorctl reread \
-         && supervisorctl update" \
-        || echo "Warning: supervisord config update failed — restart the stack manually to apply new queues."
-    echo "Supervisord updated."
+    # Mayan 4.12+ images have no docker_supervisord template: their workers
+    # compute their queues when they start (run_worker.sh), and the restart
+    # above already did that.
+    if $DC exec -T app "$MAYAN_CMD" platforms_template --list 2>/dev/null \
+        | grep -q "docker_supervisord"; then
+        echo "Regenerating supervisord configuration to register new Celery queues..."
+        # -u root: writing /etc/supervisor/conf.d/ requires root; docker compose
+        # exec runs as the container user (mayan) by default. Written to a
+        # temporary file first: a failure must not leave an empty configuration,
+        # Mayan would not start at the next restart of the container.
+        if $DC exec -T -u root app sh -c \
+            "'$MAYAN_CMD' platforms_template docker_supervisord \
+             > /tmp/mayan-edms.conf.new \
+             && test -s /tmp/mayan-edms.conf.new \
+             && mv /tmp/mayan-edms.conf.new '$SUPERVISORD_CONF' \
+             && supervisorctl reread \
+             && supervisorctl update"; then
+            echo "Supervisord updated."
+        else
+            echo "Warning: supervisord config update failed — restart the stack manually to apply new queues."
+        fi
+    else
+        echo "The workers of this Mayan image find the queues of the new apps when they start."
+    fi
 else
     echo "Multi-container mode detected — worker containers restarted with new queue list."
 fi
