@@ -1,45 +1,45 @@
 [submodule "mayan/apps/workflow_ui"]
 	path = mayan/apps/workflow_ui
-	url = git@github.com:germainm/egyptian-workflow-ui.git
+	url = git@github.com:egyptian-apps/egyptian-workflow-ui.git
 [submodule "mayan/apps/approvals"]
 	path = mayan/apps/approvals
-	url = git@github.com:germainm/egyptian-approvals.git
+	url = git@github.com:egyptian-apps/egyptian-approvals.git
 [submodule "mayan/apps/document_embedding"]
 	path = mayan/apps/document_embedding
-	url = git@github.com:germainm/egyptian-document_embedding.git
+	url = git@github.com:egyptian-apps/egyptian-document_embedding.git
 [submodule "mayan/apps/document_autotag"]
 	path = mayan/apps/document_autotag
-	url = git@github.com:germainm/egyptian-document_autotag.git
+	url = git@github.com:egyptian-apps/egyptian-document_autotag.git
 [submodule "mayan/apps/document_ner"]
 	path = mayan/apps/document_ner
-	url = git@github.com:germainm/egyptian-document_ner.git
+	url = git@github.com:egyptian-apps/egyptian-document_ner.git
 [submodule "mayan/apps/document_qa"]
 	path = mayan/apps/document_qa
-	url = git@github.com:germainm/egyptian-document_qa.git
+	url = git@github.com:egyptian-apps/egyptian-document_qa.git
 [submodule "mayan/apps/image_barcode_extract"]
 	path = mayan/apps/image_barcode_extract
-	url = git@github.com:germainm/egyptian-image_barcode_extract.git
+	url = git@github.com:egyptian-apps/egyptian-image_barcode_extract.git
 [submodule "mayan/apps/itineraires"]
 	path = mayan/apps/itineraires
 	url = git@github.com:germainm/egyptian-itineraires.git
 [submodule "mayan/apps/ocr_viewer"]
 	path = mayan/apps/ocr_viewer
-	url = git@github.com:germainm/egyptian-ocr_viewer.git
+	url = git@github.com:egyptian-apps/egyptian-ocr_viewer.git
 [submodule "mayan/apps/document_health"]
 	path = mayan/apps/document_health
-	url = git@github.com:germainm/egyptian-document_health.git
+	url = git@github.com:egyptian-apps/egyptian-document_health.git
 [submodule "mayan/apps/activity_report"]
 	path = mayan/apps/activity_report
-	url = git@github.com:germainm/egyptian-activity_report.git
+	url = git@github.com:egyptian-apps/egyptian-activity_report.git
 [submodule "mayan/apps/document_version_diff"]
 	path = mayan/apps/document_version_diff
-	url = git@github.com:germainm/egyptian-document_version_diff.git
+	url = git@github.com:egyptian-apps/egyptian-document_version_diff.git
 [submodule "mayan/apps/recherche_similaire"]
 	path = mayan/apps/recherche_similaire
 	url = git@github.com:germainm/egyptian-recherche_similaire.git
 [submodule "mayan/apps/acl_explorer"]
 	path = mayan/apps/acl_explorer
-	url = git@github.com:germainm/egyptian-acl_explorer.git
+	url = git@github.com:egyptian-apps/egyptian-acl_explorer.git
 [submodule "mayan/apps/finance"]
 	path = mayan/apps/finance
 	url = git@github.com:germainm/egyptian-finance.git
