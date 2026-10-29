@@ -55,6 +55,8 @@ jobs:
         env:
           MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
           MAYAN_DOCKER_IMAGE_TAG: test
+          # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
+          MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
           docker compose up --detach
           for i in $(seq 90); do
@@ -71,6 +73,8 @@ jobs:
         env:
           MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
           MAYAN_DOCKER_IMAGE_TAG: test
+          # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
+          MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
           set -x
           test -s /tmp/login.html
@@ -90,6 +94,8 @@ jobs:
         env:
           MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
           MAYAN_DOCKER_IMAGE_TAG: test
+          # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
+          MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
           docker compose logs app | tail -120
           docker compose down --volumes
