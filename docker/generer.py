@@ -65,6 +65,7 @@ def main():
     from mayan.apps.platforms.platform_templates import (
         PlatformTemplate, PlatformTemplateSupervisord, Variable
     )
+    from mayan.apps.logging.literals import DEFAULT_LOGGING_LEVEL
     from mayan.apps.platforms.utils import load_env_file
     from mayan.apps.task_manager.classes import Worker
     from mayan import literals
@@ -81,6 +82,7 @@ def main():
             context = load_env_file(skip_local_config=True)
             context.update(
                 {
+                    'DEFAULT_LOGGING_LEVEL': DEFAULT_LOGGING_LEVEL,
                     'MAYAN_BUILD_STRING': mayan.__build_string__,
                     'MAYAN_COPYRIGHT': mayan.__copyright__,
                     'MAYAN_FORK_COPYRIGHT': mayan.__fork_copyright__,
