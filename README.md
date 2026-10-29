@@ -1,7 +1,7 @@
-# Egyptian — Mayan EDMS 4.x Fork
+# Egyptian — a fork based on Mayan EDMS® 4.x
 
 **Egyptian** is a production fork of [Mayan EDMS](https://gitlab.com/mayan-edms/mayan-edms) 4.x,
-maintained by [mypalace.ca](https://mayan.mypalace.ca).
+maintained by [mypalace.ca](https://egyptian-apps.mypalace.ca).
 It ships bug fixes that have not yet been merged upstream, and serves as the base for a set of
 commercial extensions built and used in production.
 
@@ -49,27 +49,30 @@ All fixes below are available to anyone who runs this fork, at no cost.
 
 ---
 
-## Paid extensions
+## Extensions
 
 The following applications extend Mayan EDMS with AI, workflow, and productivity features.
-Access is granted per GitHub account via private repository.
+Access is granted per GitHub account via private repository; the free ones need an account
+on the site.
 All prices are in USD.
 
 | Application | What it does | Price |
 |---|---|---|
-| [Approvals](https://mayan.mypalace.ca/apps/approvals/) | Document approval workflows with SLA tracking and notifications | from $999 / yr |
-| [Workflow UI](https://mayan.mypalace.ca/apps/workflow-ui/) | Visual drag-and-drop workflow editor — no code required | $499 one-time |
-| [Document Q&A](https://mayan.mypalace.ca/apps/document-qa/) | Ask your documents in natural language — answers with citations | $299 one-time |
-| [Document Embedding](https://mayan.mypalace.ca/apps/document-embedding/) | Semantic search — find documents even when you don't know the exact words | $299 one-time |
-| [Document NER](https://mayan.mypalace.ca/apps/document-ner/) | Automatically extract persons, organizations, and dates from your documents | $249 one-time |
-| [Autotag](https://mayan.mypalace.ca/apps/autotag/) | Zero-shot automatic tagging using your existing Mayan tags | $199 one-time |
-| [Activity Report](https://mayan.mypalace.ca/apps/activity-report/) | Exportable audit reports — who did what, when, on which document | $149 one-time |
-| [Barcode Extract](https://mayan.mypalace.ca/apps/barcode-extract/) | Automatically detect and index all barcodes found in your documents | $149 one-time |
-| [Document Health](https://mayan.mypalace.ca/apps/document-health/) | Quality dashboard — identify and fix problematic documents | $149 one-time |
-| [Version Diff](https://mayan.mypalace.ca/apps/version-diff/) | Compare two document versions with highlighted differences in one click | $149 one-time |
-| [OCR Viewer](https://mayan.mypalace.ca/apps/ocr-viewer/) | Select and copy text directly from scanned document pages | $99 one-time |
+| [Approvals](https://egyptian-apps.mypalace.ca/apps/approvals/) | Document approval workflows with SLA and notifications | from $999 / yr |
+| [ACL Explorer](https://egyptian-apps.mypalace.ca/apps/acl-explorer/) | Audit tool — see exactly what any user can access and why | $99 one-time |
+| [Workflow UI](https://egyptian-apps.mypalace.ca/apps/workflow-ui/) | Visual drag-and-drop workflow editor | $499 one-time |
+| [Document Q&A](https://egyptian-apps.mypalace.ca/apps/document-qa/) | Ask your documents in natural language — answers based on their text | $299 one-time |
+| [Document Embedding](https://egyptian-apps.mypalace.ca/apps/document-embedding/) | Semantic search — find what you don't know how to search for | free with an account |
+| [Document NER](https://egyptian-apps.mypalace.ca/apps/document-ner/) | Automatically extract persons, organizations, places and more from your documents | free with an account |
+| [Autotag](https://egyptian-apps.mypalace.ca/apps/document-autotag/) | Zero-shot automatic tagging — your existing tags applied intelligently | free with an account |
+| [Activity Report](https://egyptian-apps.mypalace.ca/apps/activity-report/) | Exportable audit reports: who did what, when, on which document | $149 one-time |
+| [Barcode Extract](https://egyptian-apps.mypalace.ca/apps/image-barcode-extract/) | Automatically detect and index all barcodes in your documents | $149 one-time |
+| [Document Health](https://egyptian-apps.mypalace.ca/apps/document-health/) | Quality dashboard — spot the documents that need attention | $149 one-time |
+| [Version Diff](https://egyptian-apps.mypalace.ca/apps/document-version-diff/) | Compare two versions of a document — highlighted differences in one click | $149 one-time |
+| [OCR Viewer](https://egyptian-apps.mypalace.ca/apps/ocr-viewer/) | Read, search and copy the OCR text of your scanned documents | $99 one-time |
+| [Themes](https://egyptian-apps.mypalace.ca/apps/themes/) | 13 themes for Mayan EDMS 4.12, with the menus in the colors of the theme | $4.99 one-time |
 
-Browse all apps and purchase access: **[mayan.mypalace.ca](https://mayan.mypalace.ca)**
+Browse all apps and purchase access: **[egyptian-apps.mypalace.ca](https://egyptian-apps.mypalace.ca)**
 
 ---
 
@@ -77,7 +80,7 @@ Browse all apps and purchase access: **[mayan.mypalace.ca](https://mayan.mypalac
 
 Questions, feedback, and discussion about Egyptian and its extensions:
 
-**[mayan.mypalace.ca/forum/](https://mayan.mypalace.ca/forum/)**
+**[egyptian-apps.mypalace.ca/forum/](https://egyptian-apps.mypalace.ca/forum/)**
 
 ---
 
@@ -89,7 +92,10 @@ and is designed for self-hosted enterprise deployments.
 
 - **Source code**: [gitlab.com/mayan-edms/mayan-edms](https://gitlab.com/mayan-edms/mayan-edms)
 - **Documentation**: [docs.mayan-edms.com](https://docs.mayan-edms.com)
-- **License**: Apache 2.0
+- **License**: GNU General Public License, version 2.0 (GPL-2.0-only)
 
 Egyptian tracks the Mayan EDMS 4.x branch. Changes in this fork that are generic enough
 are submitted upstream when possible.
+
+"Mayan EDMS" is a registered trademark of Roberto Rosario. Egyptian and its extensions are
+not affiliated with, or endorsed by, the Mayan EDMS project or its trademark holder.
