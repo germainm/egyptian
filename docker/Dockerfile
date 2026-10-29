@@ -176,6 +176,9 @@ COPY docker/rootfs /
 
 VOLUME ["/var/lib/mayan"]
 
+# Supervisor starts the processes as the mayan user without changing HOME.
+ENV HOME=/home/mayan
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 EXPOSE 8000
@@ -200,5 +203,8 @@ RUN set -a \
 && find /var/log -type f | while read f; do echo -ne '' > $f; done \
 # Delete Debian package proxy used for the base image.
 && rm --force /etc/apt/apt.conf.d/01proxy \
-# Remove the mayan user home directory
-&& rm --force --recursive /home/mayan
+# Empty home directory of the mayan user, for the configuration and the caches
+# of the converter libraries (ezdxf, matplotlib, Calibre, fontconfig).
+&& rm --force --recursive /home/mayan \
+&& mkdir --parents /home/mayan/.cache/fontconfig /home/mayan/.config \
+&& chown --recursive mayan:mayan /home/mayan

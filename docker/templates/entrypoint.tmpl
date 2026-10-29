@@ -103,7 +103,7 @@ update_uid_gid() {
 
         if [ "${MAYAN_USER_UID}" -ne {{ DOCKER_USER_UID }} ] || [ "${MAYAN_USER_GID}" -ne {{ DOCKER_USER_GID }} ]; then
             echo "Updating file ownership. This might take a while if there are many documents."
-            chown --recursive {{ DOCKER_USER_USERNAME }}:{{ DOCKER_USER_USERNAME }} "${MAYAN_INSTALL_DIR}" "${MAYAN_STATIC_ROOT}"
+            chown --recursive {{ DOCKER_USER_USERNAME }}:{{ DOCKER_USER_USERNAME }} "${MAYAN_INSTALL_DIR}" "${MAYAN_STATIC_ROOT}" /home/{{ DOCKER_USER_USERNAME }}
             if [ "${MAYAN_SKIP_CHOWN_ON_STARTUP}" = "true" ]; then
                 echo "Skipping \`chown\` command on startup as instructed."
             else

@@ -103,7 +103,7 @@ update_uid_gid() {
 
         if [ "${MAYAN_USER_UID}" -ne 1000 ] || [ "${MAYAN_USER_GID}" -ne 1000 ]; then
             echo "Updating file ownership. This might take a while if there are many documents."
-            chown --recursive mayan:mayan "${MAYAN_INSTALL_DIR}" "${MAYAN_STATIC_ROOT}"
+            chown --recursive mayan:mayan "${MAYAN_INSTALL_DIR}" "${MAYAN_STATIC_ROOT}" /home/mayan
             if [ "${MAYAN_SKIP_CHOWN_ON_STARTUP}" = "true" ]; then
                 echo "Skipping \`chown\` command on startup as instructed."
             else
