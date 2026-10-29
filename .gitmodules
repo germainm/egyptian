@@ -52,3 +52,6 @@
 [submodule "mayan/apps/hr"]
 	path = mayan/apps/hr
 	url = git@github.com:germainm/egyptian-hr.git
+[submodule "mayan/apps/themes"]
+	path = mayan/apps/themes
+	url = git@github.com:egyptian-apps/egyptian-themes.git
