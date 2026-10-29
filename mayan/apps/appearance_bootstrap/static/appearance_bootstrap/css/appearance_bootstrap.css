@@ -23,7 +23,14 @@
 }
 
 .navbar-brand {
-    font-family: "IM Fell English SC", serif;
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
+.egyptian-logo {
+    height: 1.6em;
+    vertical-align: -.4em;
+    width: 1.6em;
 }
 
 

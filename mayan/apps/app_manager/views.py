@@ -20,7 +20,7 @@ class AppListView(SingleObjectListView):
                 'is incomplete.'
             ),
             'no_results_title': _(message='No apps available'),
-            'subtitle': _(message='Detected and active Mayan EDMS apps.'),
+            'subtitle': _(message='Detected and active apps.'),
             'title': _(message='System apps')
         }
 

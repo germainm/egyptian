@@ -16,32 +16,34 @@
     {% common_project_information '__copyright__' as project_copyright %}
     {% common_project_information '__copyright_registration__' as project_copyright_registration %}
     {% common_project_information '__description__' as project_description %}
+    {% common_project_information '__fork_copyright__' as fork_copyright %}
     {% common_project_information '__license__' as license_information %}
     {% common_project_information '__title__' as project_title %}
     {% common_project_information '__trademark_registration_design__' as project_trademark_registration_design %}
     {% common_project_information '__trademark_registration_word__' as project_trademark_registration_word %}
+    {% common_project_information '__upstream_title__' as upstream_title %}
+    {% common_project_information '__upstream_website__' as upstream_website %}
     {% common_project_information '__version__' as project_version %}
     {% common_project_information '__website__' as project_website %}
 
     {% navigation_get_link 'mayan.apps.common.links.link_documentation' as link_documentation %}
-    {% navigation_get_link 'mayan.apps.common.links.link_forum' as link_forum %}
-    {% navigation_get_link 'mayan.apps.common.links.link_knowledge_base' as link_knowledge_base %}
-    {% navigation_get_link 'mayan.apps.common.links.link_mailing_list' as link_mailing_list %}
     {% navigation_get_link 'mayan.apps.common.links.link_release_notes' as link_release_notes %}
     {% navigation_get_link 'mayan.apps.common.links.link_source_code' as link_source_code %}
     {% navigation_get_link 'mayan.apps.common.links.link_support' as link_support %}
+    {% url 'common:license_view' as url_license %}
+    {% url 'common:trademark_policy_view' as url_trademark_policy %}
 
     <div id="row">
         <div class="col-10 offset-1 col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-6 offset-lg-3">
             <div class="card card-body bg-body-secondary border-0">
 
                 <div id="about-image-wrapper">
-                    <img class="mx-auto img-fluid" id="about-image-top" src="{% static 'appearance/images/about-top.jpg' %}" />
+                    <img alt="{{ project_title }}" class="mx-auto img-fluid" id="about-image-top" src="{% static 'appearance/images/egyptian-about.png' %}" />
                 </div>
 
                 <p></p>
 
-                <p class="text-center">{% trans 'Version' %} {{ project_version }}</p>
+                <p class="text-center">{% blocktrans %}Based on {{ upstream_title }}® {{ project_version }}{% endblocktrans %}</p>
                 {% if project_build_number %}
                     <p class='text-center'>{% blocktrans with project_build_number as project_build_number %}Build number: {{ project_build_number }}{% endblocktrans %}</p>
                 {% endif %}
@@ -50,14 +52,16 @@
                 </p>
 
                 <p class="text-center">
-                    {% trans 'Released under the license:' %} {% trans license_information %}
+                    {% blocktrans %}{{ project_title }} is a modified version (fork) of {{ upstream_title }}, maintained by mypalace.ca. It is not affiliated with, or endorsed by, the {{ upstream_title }} project or its trademark holder.{% endblocktrans %}
                 </p>
 
-                
-                
-                
+                <p class="text-center">
+                    {% trans 'Released under the license:' %} <a href="{{ url_license }}">{% trans license_information %}</a>
+                </p>
+
                 <p class="text-center small">
-                    {% blocktrans %}{{ project_title }}&reg; and the {{ project_title }} logo are registered trademarks of {{ project_author }}.{% endblocktrans %}
+                    {% blocktrans with project_title=upstream_title %}{{ project_title }}&reg; and the {{ project_title }} logo are registered trademarks of {{ project_author }}.{% endblocktrans %}
+                    {% blocktrans %}Details on the <a href="{{ url_trademark_policy }}">Trademarks</a> page.{% endblocktrans %}
                 </p>
 
                 <p class="text-center small">
@@ -68,58 +72,14 @@
 
                 {% appearance_app_templates template_name='about' %}
 
+                <h6 class="mt-2">{{ project_title }}</h6>
                 <ul class="list-unstyled mx-1">
-                    <li class="d-flex bg-body p-2 mb-1">
-                        <div class="flex-shrink-0">
-                            {% icons_get_icon 'mayan.apps.common.icons.icon_mailing_list' %}
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_mailing_list.url as link_mailing_list_url %}To get the latest news subscribe to the <a class="new_window" href="{{ link_mailing_list_url }}"> Mailing list</a>.{% endblocktrans %}
-                        </div>
-                    </li>
-
-                    <li class="d-flex bg-body p-2 mb-1">
-                        <div class="flex-shrink-0">
-                            {% icons_get_icon 'mayan.apps.common.icons.icon_knowledge_base' %}
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_knowledge_base.url as link_knowledge_base_url %}For articles, tutorials, troubleshooting, subscribe to the <a class="new_window" href="{{ link_knowledge_base_url }}"> Knowledge base</a>.{% endblocktrans %}
-                        </div>
-                    </li>
-
                     <li class="d-flex bg-body p-2 mb-1">
                         <div class="flex-shrink-0">
                             {% icons_get_icon 'mayan.apps.common.icons.icon_support' %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_support.url as link_support_url%}Need professional help? Check out the <a class="new_window" href="{{ link_support_url }}"> Support</a> offerings.{% endblocktrans %}
-                        </div>
-                    </li>
-
-                    <li class="d-flex bg-body p-2 mb-1">
-                        <div class="flex-shrink-0">
-                            {% icons_get_icon 'mayan.apps.common.icons.icon_forum' %}
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_forum.url as link_forum_url %}For discussions visit the <a class="new_window" href="{{ link_forum_url }}">Community forum</a>.{% endblocktrans %}
-                        </div>
-                    </li>
-
-                    <li class="d-flex bg-body p-2 mb-1">
-                        <div class="flex-shrink-0">
-                            {% icons_get_icon 'mayan.apps.common.icons.icon_release_notes' %}
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_release_notes.url as link_release_notes_url %}The complete list of changes is available via the <a class="new_window" href="{{ link_release_notes_url }}">Release notes</a>.{% endblocktrans %}
-                        </div>
-                    </li>
-
-                    <li class="d-flex bg-body p-2 mb-1">
-                        <div class="flex-shrink-0">
-                            {% icons_get_icon 'mayan.apps.common.icons.icon_documentation' %}
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_documentation.url as link_documentation_url %}For questions check the <a class="new_window" href="{{ link_documentation_url }}">Documentation</a>.{% endblocktrans %}
+                            {% blocktrans with link_support.url as link_support_url %}Questions or problems? Ask on the <a class="new_window" href="{{ link_support_url }}">support forum</a>.{% endblocktrans %}
                         </div>
                     </li>
 
@@ -128,16 +88,28 @@
                             {% icons_get_icon 'mayan.apps.common.icons.icon_website' %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            {% blocktrans %}More more details check the <a class="new_window" href="{{ project_website }}">Website</a>.{% endblocktrans %}
+                            {% blocktrans %}Applications that extend {{ project_title }}: <a class="new_window" href="{{ project_website }}">{{ project_website }}</a>.{% endblocktrans %}
+                        </div>
+                    </li>
+                </ul>
+
+                <h6 class="mt-2">{% blocktrans %}{{ upstream_title }}, the software {{ project_title }} is based on{% endblocktrans %}</h6>
+                <ul class="list-unstyled mx-1">
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
+                            {% icons_get_icon 'mayan.apps.common.icons.icon_documentation' %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            {% blocktrans with link_documentation.url as link_documentation_url %}<a class="new_window" href="{{ link_documentation_url }}">Documentation</a> of {{ upstream_title }}.{% endblocktrans %}
                         </div>
                     </li>
 
                     <li class="d-flex bg-body p-2 mb-1">
                         <div class="flex-shrink-0">
-                            {% icons_get_icon 'mayan.apps.common.icons.icon_trademark_policy' %}
+                            {% icons_get_icon 'mayan.apps.common.icons.icon_release_notes' %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            {% url 'common:trademark_policy_view' as url_trademark_policy %}{% blocktrans with url_trademark_policy=url_trademark_policy %}What the marks above permit is set out in the <a href="{{ url_trademark_policy }}">Trademark policy</a>.{% endblocktrans %}
+                            {% blocktrans with link_release_notes.url as link_release_notes_url %}<a class="new_window" href="{{ link_release_notes_url }}">Release notes</a> of {{ upstream_title }}.{% endblocktrans %}
                         </div>
                     </li>
 
@@ -146,7 +118,7 @@
                             {% icons_get_icon 'mayan.apps.common.icons.icon_source_code' %}
                         </div>
                         <div class="flex-grow-1 ms-3">
-                            {% blocktrans with link_source_code.url as link_source_code_url %}If you found a bug or have a feature idea open a ticket in the <a class="new_window" href="{{ link_source_code_url }}">Source code repository</a>.{% endblocktrans %}
+                            {% blocktrans with link_source_code.url as link_source_code_url %}<a class="new_window" href="{{ link_source_code_url }}">Source code</a> and website (<a class="new_window" href="{{ upstream_website }}">{{ upstream_website }}</a>) of {{ upstream_title }}.{% endblocktrans %}
                         </div>
                     </li>
                 </ul>
@@ -156,11 +128,11 @@
                 </p>
 
                 <p class="text-center small">
-                    {{ project_copyright }}
+                    {% blocktrans %}{{ upstream_title }}: {{ project_copyright }}{% endblocktrans %}<br />
+                    {% blocktrans %}{{ project_title }} modifications: {{ fork_copyright }}{% endblocktrans %}
                 </p>
 
             </div>
         </div>
     </div>
 {% endblock %}
-

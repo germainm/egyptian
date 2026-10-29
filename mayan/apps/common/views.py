@@ -5,6 +5,8 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import RedirectView
 
+import mayan
+
 from mayan.apps.views.generics import ConfirmView, SimpleView
 from mayan.apps.views.view_mixins import (
     ExternalContentTypeObjectViewMixin, ObjectNameViewMixin
@@ -31,10 +33,11 @@ class AboutView(SimpleView):
 
 @method_decorator(login_not_required, name='dispatch')
 class FaviconRedirectView(RedirectView):
-    permanent = True
+    # Not permanent: browsers would keep the target of a former icon.
+    permanent = False
 
     def get_redirect_url(self, *args, **kwargs):
-        return static(path='appearance/images/favicon.ico')
+        return static(path='appearance/images/egyptian-favicon.ico')
 
 
 class HomeView(SimpleView):
@@ -46,23 +49,52 @@ class HomeView(SimpleView):
 
 
 class LicenseView(SimpleView):
-    extra_context = {
-        'form': LicenseForm(),
-        'read_only': True,
-        'title': _(message='License')
-    }
     template_name = 'appearance/form_container.html'
     view_icon = icon_license
 
+    def get_extra_context(self):
+        return {
+            'form': LicenseForm(),
+            'read_only': True,
+            'subtitle': _(
+                message='%(title)s is a modified version of %(upstream)s, '
+                'distributed under the same license, reproduced below. '
+                '%(upstream)s: %(copyright)s. %(title)s modifications: '
+                '%(fork_copyright)s.'
+            ) % {
+                'copyright': mayan.__copyright__,
+                'fork_copyright': mayan.__fork_copyright__,
+                'title': mayan.__title__,
+                'upstream': mayan.__upstream_title__
+            },
+            'title': _(message='License')
+        }
+
 
 class TrademarkPolicyView(SimpleView):
-    extra_context = {
-        'form': TrademarkPolicyForm(),
-        'read_only': True,
-        'title': _(message='Trademark policy')
-    }
     template_name = 'appearance/form_container.html'
     view_icon = icon_trademark_policy
+
+    def get_extra_context(self):
+        return {
+            'form': TrademarkPolicyForm(),
+            'read_only': True,
+            'subtitle': _(
+                message='%(upstream)s® and the %(upstream)s logo are '
+                'registered trademarks of %(owner)s (U.S. Reg. No. %(word)s '
+                'and %(design)s). %(title)s is a fork based on %(upstream)s: '
+                'it is not affiliated with, or endorsed by, the %(upstream)s '
+                'project or its trademark holder, and it does not use the '
+                '%(upstream)s logo. The %(upstream)s trademark policy follows.'
+            ) % {
+                'design': mayan.__trademark_registration_design__,
+                'owner': mayan.__author__,
+                'title': mayan.__title__,
+                'upstream': mayan.__upstream_title__,
+                'word': mayan.__trademark_registration_word__
+            },
+            'title': _(message='Trademarks')
+        }
 
 
 class ObjectCopyView(

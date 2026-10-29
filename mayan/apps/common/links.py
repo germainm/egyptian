@@ -48,13 +48,13 @@ link_forum = Link(
 )
 link_knowledge_base = Link(
     icon=icon_knowledge_base, tags='new_window',
-    text=_(message='Knowledge base'), url=URL_KNOWLEDGE_BASE
+    text=_(message='Mayan EDMS knowledge base'), url=URL_KNOWLEDGE_BASE
 )
 link_license = Link(
     icon=icon_license, text=_(message='License'), view='common:license_view'
 )
 link_trademark_policy = Link(
-    icon=icon_trademark_policy, text=_(message='Trademark policy'),
+    icon=icon_trademark_policy, text=_(message='Trademarks'),
     view='common:trademark_policy_view'
 )
 link_mailing_list = Link(

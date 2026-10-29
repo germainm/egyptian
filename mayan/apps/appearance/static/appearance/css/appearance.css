@@ -1,28 +1,4 @@
 @font-face {
-    font-family: 'mayan-edms';
-    font-style: normal;
-    font-weight: normal;
-    src: url('../fonts/mayan-edms.ttf') format('truetype');
-}
-
-
-.icon-mayan-edms-logo {
-    -moz-osx-font-smoothing: grayscale;
-    -webkit-font-smoothing: antialiased;
-    font-family: 'mayan-edms';
-    font-size: 90%;
-    font-style: normal;
-    font-variant: normal;
-    font-weight: normal;
-    line-height: 1;
-    text-transform: none;
-}
-
-.icon-mayan-edms-logo::before {
-    content: "\e600";
-}
-
-@font-face {
     font-family: 'IM Fell English SC';
     font-style: normal;
     font-weight: normal;

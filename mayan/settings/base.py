@@ -123,7 +123,6 @@ INSTALLED_APPS = (
     'mayan.apps.dynamic_search.apps.DynamicSearchApp',
     'mayan.apps.file_caching.apps.FileCachingAppConfig',
     'mayan.apps.forms.apps.FormsApp',
-    'mayan.apps.fundraisers.apps.FundraisersAppConfig',
     'mayan.apps.icons.apps.IconsApp',
     'mayan.apps.locales.apps.LocalesApp',
     'mayan.apps.lock_manager.apps.LockManagerApp',

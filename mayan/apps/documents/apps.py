@@ -502,7 +502,7 @@ class DocumentsApp(MayanAppConfig):
             label=_(message='Create a document type'),
             description=_(
                 message='Every uploaded document must be assigned a document '
-                'type, it is the basic way Mayan EDMS categorizes documents.'
+                'type, it is the basic way Egyptian categorizes documents.'
             ), condition=lambda: not DocumentType.objects.exists(),
             view='documents:document_type_list'
         )

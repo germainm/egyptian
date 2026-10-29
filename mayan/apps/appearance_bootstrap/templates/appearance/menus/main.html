@@ -63,6 +63,8 @@
             <span class="text-center">
                 {% if common_project_title %}<p>{{ common_project_title }}</p>{% endif %}
                 <p class="m-0"><a class="new_window" href="{% common_project_information '__website__' %}">{% common_project_information '__title__' %}</a></p>
+                {% common_project_information '__upstream_title__' as upstream_title %}
+                <p class="m-0">{% blocktrans %}Based on {{ upstream_title }}®{% endblocktrans %}</p>
                 <p>{% common_project_information '__copyright__' %}</p>
             </span>
         </div>
