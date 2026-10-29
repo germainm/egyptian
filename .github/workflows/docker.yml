@@ -91,25 +91,33 @@ jobs:
       - name: Process a document
         run: |
           base=http://127.0.0.1/api/v4
+          api() {
+            curl --silent --show-error --fail-with-body -H 'Accept: application/json' "$@" > /tmp/api.json \
+              || { echo "API error:"; head -c 600 /tmp/api.json; echo; return 1; }
+            jq -e . /tmp/api.json > /dev/null || { echo "Not JSON:"; head -c 600 /tmp/api.json; echo; return 1; }
+            cat /tmp/api.json
+          }
           # A new installation shows the password of its administrator on the login page.
           password=$(grep -o 'Password: <strong>[^<]*' /tmp/login.html | sed 's/.*<strong>//')
           test -n "${password}"
-          token=$(curl --silent --fail --data-urlencode username=admin --data-urlencode "password=${password}" "${base}/auth/token/obtain/" | jq -r .token)
+          token=$(api --data-urlencode username=admin --data-urlencode "password=${password}" "${base}/auth/token/obtain/" | jq -r .token)
           auth="Authorization: Token ${token}"
-          type_id=$(curl --silent --fail -H "${auth}" "${base}/document_types/" | jq '.results[0].id // empty')
+          type_id=$(api -H "${auth}" "${base}/document_types/" | jq '.results[0].id // empty')
           if [ -z "${type_id}" ]; then
-            type_id=$(curl --silent --fail -H "${auth}" -H 'Content-Type: application/json' -d '{"label": "Test"}' "${base}/document_types/" | jq .id)
+            type_id=$(api -H "${auth}" -H 'Content-Type: application/json' -d '{"label": "Test"}' "${base}/document_types/" | jq .id)
           fi
+          echo "Document type ${type_id}"
           printf 'Egyptian Docker image test\nSecond line\n' > /tmp/egyptian-test.txt
-          document_id=$(curl --silent --fail -H "${auth}" -F "document_type_id=${type_id}" -F file=@/tmp/egyptian-test.txt "${base}/documents/upload/" | jq .id)
+          document_id=$(api -H "${auth}" -F "document_type_id=${type_id}" -F file=@/tmp/egyptian-test.txt "${base}/documents/upload/" | jq .id)
+          echo "Document ${document_id}"
           for i in $(seq 60); do
-            image_url=$(curl --silent --fail -H "${auth}" "${base}/documents/${document_id}/" | jq -r '.file_latest.pages_first.image_url // empty')
+            image_url=$(api -H "${auth}" "${base}/documents/${document_id}/" | jq -r '.file_latest.pages_first.image_url // empty')
             [ -n "${image_url}" ] && break
             sleep 5
           done
           echo "First page after about $((i * 5)) seconds"
           test -n "${image_url}"
-          curl --silent --fail -H "${auth}" --output /tmp/page.bin --write-out '%{content_type} %{size_download}\n' "${image_url}"
+          curl --silent --show-error --fail -H "${auth}" --output /tmp/page.bin --write-out 'Page image: %{content_type}, %{size_download} bytes\n' "${image_url}"
           test -s /tmp/page.bin
 
       - name: Logs
