@@ -1,81 +1,91 @@
-Contributing to Mayan EDMS
-==========================
+Contributing to Egyptian
+========================
+
+Egyptian is a fork based on Mayan EDMS, maintained by mypalace.ca. Its source
+code is at https://github.com/germainm/egyptian and contributions are made
+with **pull requests** on that repository.
+
+Questions and support
+---------------------
+
+- For questions, help with an installation or the extensions of
+  https://egyptian-apps.mypalace.ca, use the forum:
+  https://egyptian-apps.mypalace.ca/forum/
+- The extensions sold or given on that site are not in this repository;
+  report their problems on the forum, not here.
 
 Issues
 ------
 
-- The issue system is for reporting problems with the program code. For
-questions use the forum at: https://forum.mayan-edms.com/
-- Do not open issues asking for **support or consulting**. For paid support
-and consultation visit: https://www.mayan-edms.com/support/
-- The issue must be related to the code only, do not open issues for problems
-with databases, deployments, webservers, cloud providers, etc.
-- Before submitting a new issue, check for **existing issues** first and
-join the discussion.
-- If your issue is not attended in a while, **be patient**, the core team is
-small and the codebase big.
-- Try to reproduce the issue using a **separate, clean installation**,
-sometimes the issue can be caused by an error in a configuration file and
-not with the code itself.
-- **Do not upload** sensitive, private or classified information or files
-with your issue. If the issue is triggered by a user file, create a dummy
-file with the same properties that can trigger the issue and upload that
-file instead.
-- Add steps that trigger the issue in a **repeatable manner**.
-- **Screenshots** go a long way in helping understand problems.
+- Open a GitHub issue for a problem with the code of Egyptian, after checking
+  the existing issues.
+- Reproduce the problem on a separate, clean installation when you can: a
+  configuration error can look like a bug.
+- Give the steps that trigger the problem, the version (shown on the About
+  page) and, when it helps, screenshots.
+- Do not attach private or confidential files. If a file triggers the
+  problem, make a dummy file with the same properties.
+- **Security problems**: do not open a public issue. Write to
+  germain.malenfant@mypalace.ca with the details.
 
-Code
-----
+Pull requests
+-------------
 
-1. Complete and mail, or scan and email the corresponding Contributor Assignment Agreement: [Mayan EDMS Individual Contributor Assignment Agreement](https://gitlab.com/mayan-edms/mayan-edms/-/blob/master/docs/chapters/development/caa_individual.txt) or [Mayan EDMS Entity Contributor Assignment Agreement](https://gitlab.com/mayan-edms/mayan-edms/-/blob/master/docs/chapters/development/caa_entity.txt).
-1. Fork [the repository](http://gitlab.com/mayan-edms/mayan-edms).
-1. Choose the version for which you want to develop. The code is divided in the
-following branches:
+1. Fork https://github.com/germainm/egyptian on GitHub.
+1. Create a branch from `master` for your change, one subject per branch.
+1. Make your change, with a test that shows the bug is fixed or the feature
+   works, when the code can be tested.
+1. Sign off each commit (see below), then open a pull request against
+   `master`. Explain what the change does and why.
+1. Keep the pull request up to date with the review. It is merged when it is
+   approved; a change may also be declined, for example when it belongs in
+   Mayan EDMS itself (see below).
 
-    a. **master:** Current stable version.
-    a. **series/X.Y:** There will be a **series** branch for each major version
-    release (1.0, 2.0). The **master** branch will be in sync with the latest
-    **series** branch.
-    a. **features/X.Y/:** These are branches dealing with a specific bug or feature
-    that is not yet ready to be merged.
-    a. The **master** and **series** branches are stable and not breaking changes
-    must be submitted or merged. The **features** branches are unstable and
-    should not be used in production.
+Copyright and license
+---------------------
 
-1. Start making your changes in your own separate branch.
-1. Write a test which shows that the bug was fixed or that the feature works as
-   expected.
-1. Sign your work. Your signature certifies your submission according to the
-   articles of the [Developer Certificate of Origin](https://gitlab.com/mayan-edms/mayan-edms/blob/master/DCO).
-   The sign-off should be in the form:
+- Egyptian is distributed under the GNU General Public License, version 2.0
+  only (see `LICENSE`). By contributing, you license your contribution under
+  the same terms. **You keep the copyright of your work**: there is no
+  copyright assignment.
+- **Sign off** every commit with your real name and email. The sign-off
+  certifies that you have the right to submit the work under this license,
+  as described in the Developer Certificate of Origin (`DCO`):
 
-    ````
-    Signed-off-by: John Doe <john.doe@example.com>
-    ````
+      Signed-off-by: Jane Doe <jane.doe@example.com>
 
-    You must use your real name and email, pseudonyms or anonymous contributions
-    are not allowed. If you set your user.name and user.email git configs, you can
-    sign your commit automatically with git commit -s.
-1. Submit a merge request for your changes.
+  With `user.name` and `user.email` set in git, `git commit -s` adds it.
+- Only submit work that you wrote, or that you have the right to submit
+  under GPL-2.0-only. Code taken from elsewhere must be compatible with this
+  license; keep its notices and give its origin and license in the pull
+  request.
+- **Do not remove or change** an existing copyright, license or trademark
+  notice. Most of the code is the work of Roberto Rosario and the Mayan EDMS
+  contributors, and their notices stay.
 
-Feature requests
-----------------
-
-- Opening issues to start a discussion around a new feature or idea are welcomed.
-- Be explicit about your idea and provide a simple scenario, others need to really
-understand the concepts behind your idea if it is to be implemented.
-- Be realistic in your expectation and scope of your idea.
-
-Translations
-------------
-- Translations are handled using [Transifex](https://explore.transifex.com/rosarior/mayan-edms/).
-- Join an existing team for the language to which you wish to contribute,
-if there is no team for your language, request for one to be created.
-- Don't request the creation of a new language and expect others to do all the
-work. If you request the creation of a new language try to do some of the
-translation. Language teams that don't see activity for a while are deleted.
-
-Code style
+Trademarks
 ----------
-- Refer to the [Development](https://docs.mayan-edms.com/chapters/development/index.html)
-chapter for information and examples of the code style.
+
+"Mayan EDMS" and the Mayan EDMS logo are registered trademarks of Roberto
+Rosario (see `TRADEMARK_POLICY.md`). Egyptian is not affiliated with, or
+endorsed by, the Mayan EDMS project. Contributions must not present Egyptian
+as Mayan EDMS: do not use that name or logo as the name or logo of the
+software, in the interface, the documentation or the package metadata.
+Factual references, such as "based on Mayan EDMS", are fine.
+
+Changes for Mayan EDMS itself
+-----------------------------
+
+A fix that applies to Mayan EDMS as well is best submitted to Mayan EDMS
+directly, following its own rules (https://gitlab.com/mayan-edms/mayan-edms;
+Mayan EDMS asks its contributors for a copyright assignment agreement).
+Egyptian picks up the Mayan EDMS releases.
+
+Code style and translations
+---------------------------
+
+- Follow the style of the surrounding code, which is the style of Mayan
+  EDMS: https://docs.mayan-edms.com/chapters/development/index.html
+- The translations of the Mayan EDMS texts are made by the Mayan EDMS
+  project on Transifex. For the texts specific to Egyptian, propose
+  corrections or translations in an issue or a pull request.

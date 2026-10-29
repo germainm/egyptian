@@ -9,16 +9,16 @@ commercial extensions built and used in production.
 
 ## Free bug fixes included in this fork
 
-All fixes below are available to anyone who runs this fork, at no cost.
+All fixes below are available to anyone who runs this fork, at no cost. The list only keeps
+what still differs from Mayan EDMS 4.12.2: fixes that Mayan EDMS has made since then are not
+listed.
 
 ### Security and core fixes
 
 #### OIDC
 
-- Fix JavaScript injection in logout view
-- Add cross-origin SSO logout support
+- Add cross-origin SSO logout support (the logout URL is escaped in the page script)
 - Add missing OIDC parameters (token expiry, logout endpoint, id token storage)
-- Add HTTP timeout on OIDC discovery requests
 - Add ModelBackend fallback for OIDC-down scenarios
 
 #### Encrypted storage
@@ -38,14 +38,13 @@ All fixes below are available to anyone who runs this fork, at no cost.
 
 #### Core
 
-- Fix intermediate file cache race condition
-- Fix file cache eviction order (oldest first)
-- Fix Redis lock blocking with timeout (30s)
-- Fix OCR task FileNotFoundError retry
-- Fix GPG signature_id from sig_info fallback
-- Fix default search model to DocumentFilePage
-- Fix setting migrations value preservation
-- Fix appearance checkbox label attribute
+- Retry the OCR task on FileNotFoundError
+
+### More file formats
+
+The converter also renders SVG, RAW photo, DXF, STL and DICOM files and HEIF/HEIC images,
+and, when their tools are installed, videos (first frame, FFmpeg), DjVu (djvulibre), EPUB
+(Calibre), EML and Markdown (WeasyPrint).
 
 ---
 
@@ -90,6 +89,12 @@ docker compose up --detach
 
 `docker/docker-compose.yml` uses `mypalace/egyptian:s4.12` (`MAYAN_DOCKER_IMAGE_NAME`,
 `MAYAN_DOCKER_IMAGE_TAG`). Set your own passwords in `docker/.env` before real use.
+
+The image renders the added formats that only need Python libraries (SVG, RAW photos, DXF,
+STL, DICOM, HEIF/HEIC). Videos, DjVu, EPUB, EML and Markdown need tools that are not in the
+image yet (FFmpeg, djvulibre, Calibre, WeasyPrint); the `MAYAN_APT_INSTALLS` and
+`MAYAN_PIP_INSTALLS` variables of the image install packages at start up.
+
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.
 
