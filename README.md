@@ -76,6 +76,25 @@ Browse all apps and purchase access: **[egyptian-apps.mypalace.ca](https://egypt
 
 ---
 
+## Docker image
+
+A public image of Egyptian, without the extensions, is published on Docker Hub:
+**[mypalace/egyptian](https://hub.docker.com/r/mypalace/egyptian)**. It is built from this
+repository (`docker/`, GitHub Actions) and keeps the paths and the `MAYAN_*` variables of the
+Mayan EDMS image: the Mayan EDMS Docker Compose file and `install-custom-apps.sh` work with it.
+
+```bash
+cd docker
+docker compose up --detach
+```
+
+`docker/docker-compose.yml` uses `mypalace/egyptian:s4.12` (`MAYAN_DOCKER_IMAGE_NAME`,
+`MAYAN_DOCKER_IMAGE_TAG`). Set your own passwords in `docker/.env` before real use.
+To regenerate the files of the image after a change to the workers, the queues or
+`mayan/literals.py`, see `docker/generer.py`.
+
+---
+
 ## Community forum
 
 Questions, feedback, and discussion about Egyptian and its extensions:

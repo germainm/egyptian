@@ -80,7 +80,7 @@ x-mayan-container:
       required: false
   environment:
     <<: [*mayan-environment]
-  image: ${MAYAN_DOCKER_IMAGE_NAME:-mayanedms/mayanedms}:${MAYAN_DOCKER_IMAGE_TAG:-s4.12}
+  image: ${MAYAN_DOCKER_IMAGE_NAME:-mypalace/egyptian}:${MAYAN_DOCKER_IMAGE_TAG:-s4.12}
   networks:
     - mayan
   restart: unless-stopped
