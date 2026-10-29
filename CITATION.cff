@@ -1,6 +1,9 @@
 cff-version: 1.2.0
-title: Mayan EDMS
-message: 'If you use Mayan EDMS in your work, please cite it using the following metadata.'
+title: Egyptian
+message: >-
+  If you use Egyptian in your work, please cite it using the following
+  metadata, and cite Mayan EDMS, the software it is based on (see
+  references).
 type: software
 authors:
   - given-names: Roberto
@@ -8,27 +11,36 @@ authors:
     email: roberto.rosario@mayan-edms.com
     affiliation: Author
     orcid: 'https://orcid.org/0009-0007-3999-2835'
-identifiers:
-  - type: doi
-    value: 10.5281/zenodo.16760961
-repository-code: 'https://gitlab.com/mayan-edms/mayan-edms'
-url: 'https://www.mayan-edms.com'
-repository-artifact: 'https://hub.docker.com/r/mayanedms/mayanedms'
+  - name: mypalace.ca
+    email: germain.malenfant@mypalace.ca
+repository-code: 'https://github.com/germainm/egyptian'
+url: 'https://egyptian-apps.mypalace.ca'
 abstract: >-
-  Mayan EDMS is an open-source electronic document
-  management system (EDMS) designed to manage millions of
-  documents with enterprise-grade features. It provides
-  workflow automation, full-text search, OCR, role-based
-  access control, and seamless integration with external
-  systems. Mayan EDMS is widely used by government,
-  academic, and private sector organizations for secure,
-  scalable, and auditable document processing.
+  Egyptian is a fork based on Mayan EDMS 4.x, an open-source electronic
+  document management system. It adds security and bug fixes that are not
+  yet merged upstream. "Mayan EDMS" is a registered trademark of Roberto
+  Rosario; Egyptian is not affiliated with, or endorsed by, the Mayan EDMS
+  project or its trademark holder.
 keywords:
   - document management
   - EDMS
   - open source
   - Django
-  - enterprise software
 license: GPL-2.0-only
 version: 4.12.2
-date-released: '2026-08-21'
+references:
+  - type: software
+    title: Mayan EDMS
+    authors:
+      - given-names: Roberto
+        family-names: Rosario
+        email: roberto.rosario@mayan-edms.com
+        affiliation: Author
+        orcid: 'https://orcid.org/0009-0007-3999-2835'
+    identifiers:
+      - type: doi
+        value: 10.5281/zenodo.16760961
+    repository-code: 'https://gitlab.com/mayan-edms/mayan-edms'
+    url: 'https://www.mayan-edms.com'
+    license: GPL-2.0-only
+    version: 4.12.2

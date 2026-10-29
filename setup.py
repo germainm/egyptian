@@ -10,7 +10,7 @@ except ImportError:
 
 import mayan
 
-PACKAGE_NAME = 'mayan-edms'
+PACKAGE_NAME = 'egyptian'
 PACKAGE_DIR = 'mayan'
 
 if sys.argv[-1] == 'publish':
@@ -113,10 +113,11 @@ tinycss2==1.5.1
 whitenoise==6.12.0
 """.split()
 
-with open(file='README.rst') as file_object:
+with open(file='README.md') as file_object:
     readme = file_object.read()
 
 setup(
+    # Egyptian is a fork of Mayan EDMS: Roberto Rosario stays the author.
     author='Roberto Rosario',
     author_email='roberto.rosario@mayan-edms.com',
     classifiers=[
@@ -140,17 +141,18 @@ setup(
     install_requires=install_requires,
     license='GPL-2.0-only',
     long_description=readme,
-    long_description_content_type='text/x-rst',
+    long_description_content_type='text/markdown',
+    maintainer='mypalace.ca',
+    maintainer_email='germain.malenfant@mypalace.ca',
     name=PACKAGE_NAME,
     packages=find_packages(PACKAGE_DIR),
     platforms=['any'],
     project_urls={
-        'Documentation': 'https://docs.mayan-edms.com/',
-        'Forum': 'https://forum.mayan-edms.com/',
-        'Changelog': 'https://docs.mayan-edms.com/chapters/releases/index.html',
-        'Bug Tracker': 'https://gitlab.com/mayan-edms/mayan-edms/-/issues',
-        'Source Code': 'https://gitlab.com/mayan-edms/mayan-edms',
-        'Support': 'https://www.mayan-edms.com/support/'
+        'Source Code': 'https://github.com/germainm/egyptian',
+        'Support': 'https://egyptian-apps.mypalace.ca/forum/',
+        'Extensions': 'https://egyptian-apps.mypalace.ca/',
+        'Upstream (Mayan EDMS)': 'https://gitlab.com/mayan-edms/mayan-edms',
+        'Mayan EDMS documentation': 'https://docs.mayan-edms.com/'
     },
     python_requires='>=3.9',
     scripts=['mayan/bin/mayan-edms.py'],
