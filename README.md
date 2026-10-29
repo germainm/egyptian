@@ -90,10 +90,9 @@ docker compose up --detach
 `docker/docker-compose.yml` uses `mypalace/egyptian:s4.12` (`MAYAN_DOCKER_IMAGE_NAME`,
 `MAYAN_DOCKER_IMAGE_TAG`). Set your own passwords in `docker/.env` before real use.
 
-The image renders the added formats that only need Python libraries (SVG, RAW photos, DXF,
-STL, DICOM, HEIF/HEIC). Videos, DjVu, EPUB, EML and Markdown need tools that are not in the
-image yet (FFmpeg, djvulibre, Calibre, WeasyPrint); the `MAYAN_APT_INSTALLS` and
-`MAYAN_PIP_INSTALLS` variables of the image install packages at start up.
+The image has the tools of all the file formats added to the converter: FFmpeg (videos),
+djvulibre (DjVu), Calibre (EPUB), WeasyPrint (EML, Markdown) and the Python libraries of the
+SVG, RAW photo, DXF, STL, DICOM and HEIF/HEIC formats.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.

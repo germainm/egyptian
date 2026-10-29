@@ -70,6 +70,21 @@ set -x \
 # Update ClamAV database.
 && (/usr/bin/freshclam || echo "freshclam failed: no ClamAV database in the image, run freshclam in the container.")
 
+# Tools of the file formats added by Egyptian to the converter: videos (FFmpeg),
+# DjVu (djvulibre), EPUB (Calibre) and, for WeasyPrint (EML, Markdown), Pango and
+# HarfBuzz. Installed after the removals above, which could take them away.
+ENV QT_QPA_PLATFORM=offscreen
+
+RUN --mount=type=cache,target=/var/cache/apt \
+apt-get update \
+&& apt-get install --no-install-recommends --yes \
+    calibre \
+    djvulibre-bin \
+    ffmpeg \
+    libharfbuzz-subset0 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0
+
 ####
 # builder_image - This image builds the Python package and is discarded afterwards
 #                 only the build artifact is carried over to the next image.
