@@ -1,6 +1,8 @@
 import io
 import logging
+import math
 import os
+import re
 import shutil
 import struct
 
@@ -187,14 +189,73 @@ class Python(ConverterBase):
         if os.path.samestat(stat_file_object, stat_path):
             return path
 
-    def _get_pdftoppm_page_image(self, path):
+    def _get_pdftoppm_page_image(self, path, resolution=None):
+        arguments = (path,)
+        if resolution:
+            # Given after the baked arguments, it replaces their resolution.
+            arguments += ('-r', resolution)
+
         image_buffer = io.BytesIO()
         command_pdftoppm(
-            path, f=self.page_number + 1, l=self.page_number + 1,
+            *arguments, f=self.page_number + 1, l=self.page_number + 1,
             _out=image_buffer, _timeout=get_command_timeout()
         )
         image_buffer.seek(0)
-        return Image.open(fp=image_buffer)
+
+        try:
+            return Image.open(fp=image_buffer)
+        except Image.DecompressionBombError:
+            # Oversized pages, such as captures of whole web pages, exceed
+            # the pixel limit of Pillow at the configured resolution (and the
+            # image size that Tesseract reads): render them at a lower one.
+            reduced_resolution = None
+            if not resolution:
+                reduced_resolution = self._get_pdftoppm_reduced_resolution(
+                    path=path
+                )
+
+            if not reduced_resolution:
+                raise
+
+            logger.warning(
+                'Page %d of "%s" rendered at %d dpi instead of %s, its image '
+                'exceeding the maximum number of pixels.',
+                self.page_number + 1, path, reduced_resolution, pdftoppm_dpi
+            )
+            return self._get_pdftoppm_page_image(
+                path=path, resolution=reduced_resolution
+            )
+
+    def _get_pdftoppm_reduced_resolution(self, path):
+        """
+        Resolution at which the page fits within the pixel limit of Pillow,
+        from its size given by pdfinfo; None when it cannot be determined.
+        """
+        if not command_pdfinfo or not Image.MAX_IMAGE_PIXELS:
+            return None
+
+        page_number = self.page_number + 1
+        try:
+            output = command_pdfinfo(
+                path, f=page_number, l=page_number,
+                _timeout=get_command_timeout()
+            )
+        except (sh.ErrorReturnCode, sh.TimeoutException):
+            return None
+
+        match = re.search(
+            pattern=r'size:\s+([\d.]+) x ([\d.]+) pts', string=str(output)
+        )
+        if not match:
+            return None
+
+        width, height = (float(points) / 72 for points in match.groups())
+        resolution = int(
+            math.sqrt(Image.MAX_IMAGE_PIXELS / (width * height))
+        )
+
+        if 0 < resolution < float(pdftoppm_dpi):
+            return resolution
 
     def get_page_count(self):
         # Content-based detections that overlap with CONVERTER_OFFICE_FILE_MIMETYPES

@@ -46,6 +46,8 @@ listed.
 - Remove NUL characters from file metadata, which PostgreSQL rejects
 - Render the pages of PDF files stored as plain files in place, instead of copying the whole
   file to the temporary directory for each page
+- Render oversized PDF pages (captures of whole web pages) at the resolution that fits the
+  pixel limit of Pillow, instead of failing with a decompression bomb error
 
 ### More file formats
 
