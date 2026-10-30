@@ -1,5 +1,6 @@
 import io
 import logging
+import os
 import shutil
 import struct
 
@@ -7,6 +8,7 @@ from PIL import Image
 import pypdf
 import sh
 
+from django.core.files.base import File
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
@@ -139,6 +141,13 @@ class Python(ConverterBase):
             return self._convert_dicom()
 
         if self.mime_type == 'application/pdf' and command_pdftoppm:
+            # A PDF stored as a plain file is read in place: copying the
+            # whole file for each page filled the temporary directory with
+            # large PDFs, several pages being rendered at the same time.
+            path = self._get_file_object_path()
+            if path:
+                return self._get_pdftoppm_page_image(path=path)
+
             with NamedTemporaryFile() as new_file_object:
                 self.file_object.seek(0)
                 shutil.copyfileobj(
@@ -147,14 +156,45 @@ class Python(ConverterBase):
                 self.file_object.seek(0)
                 new_file_object.seek(0)
 
-                image_buffer = io.BytesIO()
-                command_pdftoppm(
-                    new_file_object.name, f=self.page_number + 1,
-                    l=self.page_number + 1, _out=image_buffer,
-                    _timeout=get_command_timeout()
+                return self._get_pdftoppm_page_image(
+                    path=new_file_object.name
                 )
-                image_buffer.seek(0)
-                return Image.open(fp=image_buffer)
+
+    def _get_file_object_path(self):
+        """
+        Path of the file on disk read through the file object, when it is a
+        plain file opened by a file system storage; None for anything else,
+        such as the files of the encrypted or compressed storages, whose
+        file on disk does not hold the content as read.
+        """
+        file_object = self.file_object
+        if type(file_object) is File:
+            file_object = file_object.file
+
+        if type(file_object) is not io.BufferedReader:
+            return None
+
+        path = file_object.name
+        if not isinstance(path, str) or not os.path.isabs(path):
+            return None
+
+        try:
+            stat_file_object = os.fstat(file_object.fileno())
+            stat_path = os.stat(path)
+        except (OSError, ValueError):
+            return None
+
+        if os.path.samestat(stat_file_object, stat_path):
+            return path
+
+    def _get_pdftoppm_page_image(self, path):
+        image_buffer = io.BytesIO()
+        command_pdftoppm(
+            path, f=self.page_number + 1, l=self.page_number + 1,
+            _out=image_buffer, _timeout=get_command_timeout()
+        )
+        image_buffer.seek(0)
+        return Image.open(fp=image_buffer)
 
     def get_page_count(self):
         # Content-based detections that overlap with CONVERTER_OFFICE_FILE_MIMETYPES

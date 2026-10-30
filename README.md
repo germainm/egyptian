@@ -44,6 +44,8 @@ listed.
 - Spread the retries of the OCR task on lock errors, and allow more of them
 - Give LibreOffice the extension of RTF files, which it did not always recognize without one
 - Remove NUL characters from file metadata, which PostgreSQL rejects
+- Render the pages of PDF files stored as plain files in place, instead of copying the whole
+  file to the temporary directory for each page
 
 ### More file formats
 
