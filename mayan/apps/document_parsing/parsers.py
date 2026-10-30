@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.converter.classes import ConverterBase
 from mayan.apps.converter.literals import CONVERTER_OFFICE_FILE_MIMETYPES
-from mayan.apps.storage.utils import NamedTemporaryFile
+from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from .exceptions import ParserError
 from .settings import setting_pdftotext_path, setting_pdftotext_timeout
@@ -129,63 +129,75 @@ class PopplerParser(Parser):
     def execute(self, file_object, page_number):
         logger.debug('Parsing PDF page: %d', page_number)
 
+        # A PDF stored as a plain file is read in place: copying the whole
+        # file for each page wrote hundreds of gigabytes for an import of
+        # large PDFs.
+        path = get_file_object_path(file_object=file_object)
+        if path:
+            return self._execute_pdftotext(path=path, page_number=page_number)
+
         with NamedTemporaryFile() as temporary_file_object:
             copyfileobj(fsrc=file_object, fdst=temporary_file_object)
             temporary_file_object.seek(0)
 
-            command = []
-            command.append(self.pdftotext_path)
-            command.append('-f')
-            command.append(
-                str(page_number)
+            return self._execute_pdftotext(
+                path=temporary_file_object.name, page_number=page_number
             )
-            command.append('-l')
-            command.append(
-                str(page_number)
-            )
-            command.append(temporary_file_object.name)
-            command.append('-')
 
-            timeout = setting_pdftotext_timeout.value
+    def _execute_pdftotext(self, path, page_number):
+        command = []
+        command.append(self.pdftotext_path)
+        command.append('-f')
+        command.append(
+            str(page_number)
+        )
+        command.append('-l')
+        command.append(
+            str(page_number)
+        )
+        command.append(path)
+        command.append('-')
 
-            with subprocess.Popen(
-                command, close_fds=True, stderr=subprocess.PIPE,
-                stdout=subprocess.PIPE
-            ) as process:
-                try:
-                    output, error_output = process.communicate(
-                        timeout=timeout
-                    )
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.communicate()
+        timeout = setting_pdftotext_timeout.value
 
-                    error_message = _(
-                        message='pdftotext did not finish parsing page '
-                        '%(page_number)d after %(timeout)d seconds and was '
-                        'terminated.'
-                    ) % {'page_number': page_number, 'timeout': timeout}
-                    logger.error(error_message)
-
-                    raise ParserError(error_message)
-
-                return_code = process.returncode
-
-            if return_code != 0:
-                logger.error(error_output)
-
-                raise ParserError
-
-            if output == b'\x0c':
-                logger.debug('Parser didn\'t return any output')
-                return ''
-
-            if output[-3:] == b'\x0a\x0a\x0c':
-                return force_str(
-                    s=output[:-3]
+        with subprocess.Popen(
+            command, close_fds=True, stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE
+        ) as process:
+            try:
+                output, error_output = process.communicate(
+                    timeout=timeout
                 )
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
 
-            return force_str(s=output)
+                error_message = _(
+                    message='pdftotext did not finish parsing page '
+                    '%(page_number)d after %(timeout)d seconds and was '
+                    'terminated.'
+                ) % {'page_number': page_number, 'timeout': timeout}
+                logger.error(error_message)
+
+                raise ParserError(error_message)
+
+            return_code = process.returncode
+
+        if return_code != 0:
+            logger.error(error_output)
+
+            raise ParserError
+
+        if output == b'\x0c':
+            logger.debug('Parser didn\'t return any output')
+            return ''
+
+        if output[-3:] == b'\x0a\x0a\x0c':
+            return force_str(
+                s=output[:-3]
+            )
+
+        return force_str(s=output)
 
 
 class OfficePopplerParser(PopplerParser):

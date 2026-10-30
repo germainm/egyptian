@@ -1,4 +1,5 @@
 import dbm
+import io
 import logging
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ import tempfile
 import uuid
 
 from django.apps import apps
+from django.core.files.base import File
 from django.utils.module_loading import import_string
 
 from .classes import DefinedStorage, PassthroughStorage
@@ -118,6 +120,34 @@ def fs_cleanup(filename, suppress_exceptions=True):
                 """Ignore exception."""
             else:
                 raise
+
+
+def get_file_object_path(file_object):
+    """
+    Path of the file on disk read through the file object, when it is a
+    plain file opened by a file system storage, so that a command can read
+    it in place instead of a copy; None for anything else, such as the files
+    of the encrypted or compressed storages, whose file on disk does not
+    hold the content as read.
+    """
+    if type(file_object) is File:
+        file_object = file_object.file
+
+    if type(file_object) is not io.BufferedReader:
+        return None
+
+    path = file_object.name
+    if not isinstance(path, str) or not os.path.isabs(path):
+        return None
+
+    try:
+        stat_file_object = os.fstat(file_object.fileno())
+        stat_path = os.stat(path)
+    except (OSError, ValueError):
+        return None
+
+    if os.path.samestat(stat_file_object, stat_path):
+        return path
 
 
 def get_storage_subclass(dotted_path):

@@ -1,7 +1,6 @@
 import io
 import logging
 import math
-import os
 import re
 import shutil
 import struct
@@ -10,11 +9,10 @@ from PIL import Image
 import pypdf
 import sh
 
-from django.core.files.base import File
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
-from mayan.apps.storage.utils import NamedTemporaryFile
+from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from ..classes import ConverterBase
 from ..exceptions import PageCountError
@@ -146,7 +144,7 @@ class Python(ConverterBase):
             # A PDF stored as a plain file is read in place: copying the
             # whole file for each page filled the temporary directory with
             # large PDFs, several pages being rendered at the same time.
-            path = self._get_file_object_path()
+            path = get_file_object_path(file_object=self.file_object)
             if path:
                 return self._get_pdftoppm_page_image(path=path)
 
@@ -161,33 +159,6 @@ class Python(ConverterBase):
                 return self._get_pdftoppm_page_image(
                     path=new_file_object.name
                 )
-
-    def _get_file_object_path(self):
-        """
-        Path of the file on disk read through the file object, when it is a
-        plain file opened by a file system storage; None for anything else,
-        such as the files of the encrypted or compressed storages, whose
-        file on disk does not hold the content as read.
-        """
-        file_object = self.file_object
-        if type(file_object) is File:
-            file_object = file_object.file
-
-        if type(file_object) is not io.BufferedReader:
-            return None
-
-        path = file_object.name
-        if not isinstance(path, str) or not os.path.isabs(path):
-            return None
-
-        try:
-            stat_file_object = os.fstat(file_object.fileno())
-            stat_path = os.stat(path)
-        except (OSError, ValueError):
-            return None
-
-        if os.path.samestat(stat_file_object, stat_path):
-            return path
 
     def _get_pdftoppm_page_image(self, path, resolution=None):
         arguments = (path,)
