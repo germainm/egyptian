@@ -1,9 +1,38 @@
 # Egyptian — a fork based on Mayan EDMS® 4.x
 
 **Egyptian** is a production fork of [Mayan EDMS](https://gitlab.com/mayan-edms/mayan-edms) 4.x,
-maintained by [mypalace.ca](https://egyptian-apps.mypalace.ca).
+maintained by [mypalace.ca](https://www.mypalace.ca/).
 It ships bug fixes that have not yet been merged upstream, and serves as the base for a set of
 commercial extensions built and used in production.
+
+---
+
+## What's new — October 30, 2026
+
+Fixes for large imports, tested in production on October 29 and 30 with more than 380
+documents and 18,000 pages (PDF files, office documents, EPUB books):
+
+- **No more copy of the whole PDF file for every page.** Mayan EDMS 4.12.2 copies the entire
+  PDF file to the temporary directory each time it renders a page (pdftoppm) or extracts its
+  text (pdftotext): with 7 workers on a 223 MB file, 1.6 GB of copies at once, enough to fill
+  the disk during an import. Egyptian now reads the stored file in place. The files of the
+  encrypted and compressed storages are still copied, since their file on disk does not hold
+  the content as read.
+- **Oversized pages are rendered instead of failing.** Very tall pages, such as captures of
+  whole web pages (1,626 × 8,138 points), stopped with a decompression bomb error. They are now
+  rendered at the resolution that fits the pixel limit of Pillow.
+- **Office documents and EPUB books are OCRed to the last page.** All their pages are rendered
+  from the same intermediate file: each page now waits for its lock (up to 30 seconds) instead
+  of failing at once — on the test bench, 68 of 70 attempts failed with 7 workers before the
+  fix — and the OCR retries are spread over 5 to 60 seconds, up to 20 times. An EPUB book is
+  converted once, not once per page.
+- **RTF files and file metadata.** LibreOffice gets the extension of RTF files, which it did
+  not always recognize without one, and the NUL characters that PostgreSQL rejects are removed
+  from file metadata (PDF files made by old versions of Acrobat).
+
+Also new: the **System** menu of Egyptian opens the [documentation wiki](https://wiki.mypalace.ca/en/home)
+and a page of the Egyptian applications, installed or not, with the documentation, the forum
+and the store page of each one.
 
 ---
 
@@ -106,6 +135,13 @@ SVG, RAW photo, DXF, STL, DICOM and HEIF/HEIC formats.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.
+
+---
+
+## Documentation
+
+**[wiki.mypalace.ca](https://wiki.mypalace.ca/en/home)** — installation, operations, reference
+guides, development, and one page per Egyptian application, in English and in French.
 
 ---
 
