@@ -89,8 +89,10 @@ class ClientBackendSentry(ClientBackend):
             value=self.kwargs.get('attach_stacktrace', False)
         )
 
+        # Personal data (user, IP address, cookies) is sent only when asked
+        # for explicitly.
         options['send_default_pii'] = any_to_bool(
-            value=self.kwargs.get('send_default_pii', True)
+            value=self.kwargs.get('send_default_pii', False)
         )
 
         options['server_name'] = self.kwargs.get('server_name')

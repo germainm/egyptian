@@ -78,6 +78,8 @@ listed.
   directory for each page
 - Render oversized PDF pages (captures of whole web pages) at the resolution that fits the
   pixel limit of Pillow, instead of failing with a decompression bomb error
+- Sentry: do not send personal data (user, IP address, cookies) unless `send_default_pii` is
+  enabled explicitly
 
 ### More file formats
 
