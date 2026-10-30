@@ -19,3 +19,19 @@ def get_stored_driver_id_list(document_type, driver_class_list):
     return list(
         queryset.values_list('stored_driver_id', flat=True)
     )
+
+
+def remove_nul_characters(value):
+    """
+    PostgreSQL text cannot hold NUL characters, which the metadata of some
+    files contains (PDF files made by Acrobat 4.0).
+    """
+    if isinstance(value, bytes):
+        # Byte values are saved as str(value) by the text field: pypdf
+        # returns the strings it cannot decode as ByteStringObject.
+        value = str(value)
+
+    if isinstance(value, str):
+        return value.replace('\x00', '')
+    else:
+        return value

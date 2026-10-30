@@ -1,4 +1,5 @@
 import logging
+import random
 
 from celery import chord
 
@@ -8,6 +9,12 @@ from django.db import OperationalError
 
 from mayan.apps.lock_manager.exceptions import LockError
 from mayan.celery import app
+
+from .literals import (
+    TASK_DOCUMENT_VERSION_PAGE_OCR_LOCK_RETRY_DELAY_MAXIMUM,
+    TASK_DOCUMENT_VERSION_PAGE_OCR_LOCK_RETRY_DELAY_MINIMUM,
+    TASK_DOCUMENT_VERSION_PAGE_OCR_LOCK_RETRY_MAXIMUM
+)
 
 logger = logging.getLogger(name=__name__)
 
@@ -88,7 +95,16 @@ def task_document_version_page_ocr_process(
         )
         raise self.retry(exc=exception)
     except LockError as exception:
-        raise self.retry(exc=exception)
+        # The pages of an office document or EPUB file all read the same
+        # intermediate file, which is locked while each page is rendered:
+        # spread the retries so that the pages do not collide again.
+        raise self.retry(
+            countdown=random.randint(
+                TASK_DOCUMENT_VERSION_PAGE_OCR_LOCK_RETRY_DELAY_MINIMUM,
+                TASK_DOCUMENT_VERSION_PAGE_OCR_LOCK_RETRY_DELAY_MAXIMUM
+            ), exc=exception,
+            max_retries=TASK_DOCUMENT_VERSION_PAGE_OCR_LOCK_RETRY_MAXIMUM
+        )
     except (OperationalError, FileNotFoundError) as exception:
         raise self.retry(exc=exception)
 

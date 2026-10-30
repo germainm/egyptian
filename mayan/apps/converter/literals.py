@@ -113,6 +113,12 @@ CONVERTER_OFFICE_FILE_MIMETYPES = (
     'text/rtf'
 )
 
+# Extension of the temporary copy given to LibreOffice, for the formats that
+# its content detection does not always recognize without one.
+CONVERTER_OFFICE_FILE_EXTENSIONS = {
+    'text/rtf': '.rtf'
+}
+
 if platform.system() in ('FreeBSD', 'OpenBSD', 'Darwin'):
     DEFAULT_LIBREOFFICE_PATH = '/usr/local/bin/libreoffice'
     DEFAULT_PDFINFO_PATH = '/usr/local/bin/pdfinfo'

@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from datetime import timedelta
 import logging
+import random
+import time
 
 from django.apps import apps
 from django.core.files.base import ContentFile
@@ -22,6 +24,11 @@ from mayan.apps.storage.classes import DefinedStorage
 
 from .events import event_cache_partition_purged, event_cache_purged
 from .exceptions import FileCachingException
+from .literals import (
+    CACHE_PARTITION_FILE_READ_LOCK_DELAY_MAXIMUM,
+    CACHE_PARTITION_FILE_READ_LOCK_DELAY_MINIMUM,
+    CACHE_PARTITION_FILE_READ_LOCK_WAIT_MAXIMUM
+)
 from .settings import (
     setting_eviction_grace_period,
     setting_maximum_failed_prune_attempts,
@@ -339,6 +346,29 @@ class CachePartitionFileBusinessLogicMixin:
     def _lock_manager_get_lock_name(self, *args, **kwargs):
         return self.partition.get_file_lock_name(filename=self.filename)
 
+    def _acquire_read_lock(self, name):
+        """
+        Readers wait for their turn instead of failing at once: all the pages
+        of an office document or EPUB file are rendered from the same
+        intermediate file, each one reading it under this lock.
+        """
+        locking_backend_class = LockingBackend.get_backend()
+        deadline = time.monotonic() + CACHE_PARTITION_FILE_READ_LOCK_WAIT_MAXIMUM
+
+        while True:
+            try:
+                return locking_backend_class.acquire_lock(name=name)
+            except LockError:
+                if time.monotonic() >= deadline:
+                    raise
+
+                time.sleep(
+                    random.uniform(
+                        CACHE_PARTITION_FILE_READ_LOCK_DELAY_MINIMUM,
+                        CACHE_PARTITION_FILE_READ_LOCK_DELAY_MAXIMUM
+                    )
+                )
+
     @acquire_lock_class_method
     def _open_for_writing(self):
         try:
@@ -393,8 +423,7 @@ class CachePartitionFileBusinessLogicMixin:
         lock_name = self._lock_manager_get_lock_name()
 
         try:
-            locking_backend_class = LockingBackend.get_backend()
-            self._lock = locking_backend_class.acquire_lock(name=lock_name)
+            self._lock = self._acquire_read_lock(name=lock_name)
         except LockError:
             logger.debug('unable to obtain lock: %s', lock_name)
             raise

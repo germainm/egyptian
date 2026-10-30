@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 import shlex
 import shutil
+import zipfile
 
 import PIL
 from PIL import Image, ImageFile
@@ -33,6 +34,7 @@ from .exceptions import (
     AppImageError, InvalidOfficeFormat, LayerError, OfficeConversionError
 )
 from .literals import (
+    CONVERTER_EPUB_MIME_TYPE, CONVERTER_OFFICE_FILE_EXTENSIONS,
     CONVERTER_OFFICE_FILE_MIMETYPES, DEFAULT_LIBREOFFICE_ARGUMENTS,
     DEFAULT_LIBREOFFICE_ENVIRONMENT, DEFAULT_LIBREOFFICE_PATH,
     DEFAULT_PAGE_NUMBER, DEFAULT_PILLOW_FORMAT,
@@ -136,6 +138,46 @@ class ConverterBase:
         return MAP_PILLOW_FORMAT_TO_MIME_TYPE.get(output_format)
 
     @staticmethod
+    def is_epub_zip(file_object):
+        """
+        EPUB files without a valid "mimetype" member are detected as ZIP
+        archives; their META-INF/container.xml member identifies them.
+        """
+        try:
+            file_object.seek(0)
+            with zipfile.ZipFile(file=file_object) as zip_file:
+                return 'META-INF/container.xml' in zip_file.namelist()
+        except Exception:
+            return False
+        finally:
+            file_object.seek(0)
+
+    @classmethod
+    def is_epub_format(cls, mime_type, file_object_opener):
+        if mime_type == CONVERTER_EPUB_MIME_TYPE:
+            return True
+
+        if mime_type == 'application/zip':
+            with file_object_opener() as file_object:
+                return cls.is_epub_zip(file_object=file_object)
+
+        return False
+
+    @classmethod
+    def is_intermediate_format(cls, mime_type, file_object_opener):
+        """
+        Formats converted to PDF once per file, by LibreOffice or Calibre,
+        and rendered from that intermediate file instead of being converted
+        again for each page.
+        """
+        if cls.is_office_format(mime_type=mime_type):
+            return True
+
+        return cls.is_epub_format(
+            mime_type=mime_type, file_object_opener=file_object_opener
+        )
+
+    @staticmethod
     def is_office_format(mime_type):
         is_office_mime_type = mime_type in CONVERTER_OFFICE_FILE_MIMETYPES
         is_msg_mime_type = mime_type in MSG_MIME_TYPES
@@ -147,7 +189,10 @@ class ConverterBase:
         cls, cache_partition, mime_type, source_file_object_opener,
         filename='intermediate_file'
     ):
-        if not cls.is_office_format(mime_type=mime_type):
+        is_intermediate_format = cls.is_intermediate_format(
+            mime_type=mime_type, file_object_opener=source_file_object_opener
+        )
+        if not is_intermediate_format:
             return source_file_object_opener()
 
         CachePartitionFile = apps.get_model(
@@ -324,7 +369,9 @@ class ConverterBase:
                 _(message='LibreOffice not installed or not found.')
             )
 
-        with NamedTemporaryFile() as temporary_file_object:
+        suffix = CONVERTER_OFFICE_FILE_EXTENSIONS.get(self.mime_type, '')
+
+        with NamedTemporaryFile(suffix=suffix) as temporary_file_object:
             self.file_object.seek(0)
             shutil.copyfileobj(
                 fsrc=self.file_object, fdst=temporary_file_object

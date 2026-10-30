@@ -247,13 +247,18 @@ class DocumentFilePageBusinessLogicMixin:
                     try:
                         with self.document_file.get_intermediate_file() as file_object:
                             converter_class = ConverterBase.get_converter_class()
-                            # Office formats are converted to PDF by
-                            # get_intermediate_file via LibreOffice; let the
-                            # converter auto-detect that PDF. All other formats
-                            # return the original file, so pass the stored MIME
-                            # type to avoid falling back to text/plain.
+                            # Office formats and EPUB files are converted to
+                            # PDF by get_intermediate_file via LibreOffice or
+                            # Calibre; let the converter auto-detect that PDF.
+                            # All other formats return the original file, so
+                            # pass the stored MIME type to avoid falling back
+                            # to text/plain.
                             document_file_mime_type = self.document_file.mimetype
-                            if ConverterBase.is_office_format(mime_type=document_file_mime_type):
+                            is_intermediate_format = ConverterBase.is_intermediate_format(
+                                file_object_opener=self.document_file.open,
+                                mime_type=document_file_mime_type
+                            )
+                            if is_intermediate_format:
                                 document_file_mime_type = None
                             converter_instance = converter_class(
                                 file_object=file_object,

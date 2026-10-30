@@ -182,7 +182,8 @@ class Python(ConverterBase):
                 return self._get_djvu_page_count()
 
             if self.mime_type == CONVERTER_EPUB_MIME_TYPE or self._is_epub_zip():
-                return self._get_epub_page_count()
+                # Already converted by to_pdf() in super().get_page_count().
+                return self.get_pypdf_page_count(file_object=self.soffice_file)
 
             if self.mime_type in CONVERTER_MARKDOWN_MIME_TYPES:
                 return self._get_markdown_page_count()
@@ -208,6 +209,20 @@ class Python(ConverterBase):
             if self.soffice_file:
                 self.soffice_file.close()
                 self.soffice_file = None
+
+    def to_pdf(self):
+        # EPUB files are converted as a whole, like office documents, so that
+        # ConverterBase.get_intermediate_file() keeps the PDF in the cache
+        # instead of Calibre converting the book again for each page.
+        if self.mime_type == CONVERTER_EPUB_MIME_TYPE or self._is_epub_zip():
+            temporary_file_object = NamedTemporaryFile()
+            temporary_file_object.write(
+                self._epub_to_pdf_bytes()
+            )
+            temporary_file_object.seek(0)
+            return temporary_file_object
+
+        return super().to_pdf()
 
     def get_pillow_page_count(self):
         page_count = 1
@@ -643,16 +658,7 @@ class Python(ConverterBase):
         """Return True if file is a ZIP that contains META-INF/container.xml (EPUB)."""
         if self.mime_type != 'application/zip':
             return False
-        import zipfile
-        try:
-            self.file_object.seek(0)
-            with zipfile.ZipFile(self.file_object) as zf:
-                result = 'META-INF/container.xml' in zf.namelist()
-            self.file_object.seek(0)
-            return result
-        except Exception:
-            self.file_object.seek(0)
-            return False
+        return self.is_epub_zip(file_object=self.file_object)
 
     def _epub_to_pdf_bytes(self):
         if not command_ebook_convert:
@@ -671,18 +677,21 @@ class Python(ConverterBase):
             os.close(fd)
             os.unlink(out_path)
             try:
-                command_ebook_convert(in_file.name, out_path)
+                command_ebook_convert(
+                    in_file.name, out_path, _timeout=get_command_timeout()
+                )
                 with open(out_path, 'rb') as f:
                     return f.read()
+            except (sh.ErrorReturnCode, sh.TimeoutException) as exception:
+                raise PageCountError(
+                    'Error converting the EPUB file to PDF with Calibre; '
+                    '{}'.format(exception)
+                ) from exception
             finally:
                 try:
                     os.unlink(out_path)
                 except OSError:
                     pass
-
-    def _get_epub_page_count(self):
-        pdf_bytes = self._epub_to_pdf_bytes()
-        return self.get_pypdf_page_count(file_object=io.BytesIO(pdf_bytes))
 
     def _convert_epub(self):
         pdf_bytes = self._epub_to_pdf_bytes()

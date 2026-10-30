@@ -39,6 +39,11 @@ listed.
 #### Core
 
 - Retry the OCR task on FileNotFoundError
+- Let the readers of a cached file wait for its lock (up to 30 s) instead of failing at once:
+  all the pages of an office document are rendered from the same intermediate file
+- Spread the retries of the OCR task on lock errors, and allow more of them
+- Give LibreOffice the extension of RTF files, which it did not always recognize without one
+- Remove NUL characters from file metadata, which PostgreSQL rejects
 
 ### More file formats
 

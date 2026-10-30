@@ -22,6 +22,7 @@ from .settings import (
     setting_auto_process, setting_drivers_arguments,
     setting_maximum_value_length
 )
+from .utils import remove_nul_characters
 
 logger = logging.getLogger(name=__name__)
 
@@ -341,7 +342,11 @@ class FileMetadataDriver(
                 document_file=document_file
             )
 
-            file_metadata_dictionary = file_metadata_dictionary or {}
+            file_metadata_dictionary = {
+                remove_nul_characters(value=key): remove_nul_characters(
+                    value=value
+                ) for key, value in (file_metadata_dictionary or {}).items()
+            }
 
             internal_name_dictionary = {}
             for key in file_metadata_dictionary.keys():
