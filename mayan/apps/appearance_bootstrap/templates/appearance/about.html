@@ -30,6 +30,8 @@
     {% navigation_get_link 'mayan.apps.common.links.link_release_notes' as link_release_notes %}
     {% navigation_get_link 'mayan.apps.common.links.link_source_code' as link_source_code %}
     {% navigation_get_link 'mayan.apps.common.links.link_support' as link_support %}
+    {% navigation_get_link 'mayan.apps.common.links.link_wiki' as link_wiki %}
+    {% url 'common:egyptian_apps_view' as url_egyptian_apps %}
     {% url 'common:license_view' as url_license %}
     {% url 'common:trademark_policy_view' as url_trademark_policy %}
 
@@ -89,6 +91,24 @@
                         </div>
                         <div class="flex-grow-1 ms-3">
                             {% blocktrans %}Applications that extend {{ project_title }}: <a class="new_window" href="{{ project_website }}">{{ project_website }}</a>.{% endblocktrans %}
+                        </div>
+                    </li>
+
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
+                            {% icons_get_icon 'mayan.apps.common.icons.icon_documentation' %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            {% blocktrans with link_wiki.url as link_wiki_url %}<a class="new_window" href="{{ link_wiki_url }}">Documentation</a> of {{ project_title }} and of its applications.{% endblocktrans %}
+                        </div>
+                    </li>
+
+                    <li class="d-flex bg-body p-2 mb-1">
+                        <div class="flex-shrink-0">
+                            {% icons_get_icon 'mayan.apps.common.icons.icon_egyptian_apps' %}
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            {% blocktrans %}<a href="{{ url_egyptian_apps }}">Applications</a> of {{ project_title }}: documentation, forum and store page of each one.{% endblocktrans %}
                         </div>
                     </li>
                 </ul>

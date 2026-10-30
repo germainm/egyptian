@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import login_not_required
 from django.templatetags.static import static
@@ -15,12 +16,17 @@ from mayan.apps.views.view_mixins import (
 from .classes import ModelCopy
 from .forms import LicenseForm, TrademarkPolicyForm
 from .icons import (
-    icon_about, icon_home, icon_license, icon_object_copy, icon_setup,
-    icon_tools, icon_trademark_policy
+    icon_about, icon_egyptian_apps, icon_home, icon_license, icon_object_copy,
+    icon_setup, icon_tools, icon_trademark_policy
+)
+from .literals import (
+    EGYPTIAN_APPS, URL_EGYPTIAN_APP_FORUM, URL_EGYPTIAN_APP_STORE,
+    URL_EGYPTIAN_APPS, URL_WIKI, URL_WIKI_APP
 )
 from .menus import menu_tools, menu_setup
 from .permissions import permission_object_copy
 from .settings import setting_home_view
+from .utils import get_language_url
 
 
 class AboutView(SimpleView):
@@ -29,6 +35,31 @@ class AboutView(SimpleView):
     }
     template_name = 'appearance/about.html'
     view_icon = icon_about
+
+
+class EgyptianAppsView(SimpleView):
+    template_name = 'common/egyptian_apps.html'
+    view_icon = icon_egyptian_apps
+
+    def get_extra_context(self):
+        return {
+            'egyptian_apps': [
+                {
+                    'installed': apps.is_installed(
+                        app_name='mayan.apps.{}'.format(module)
+                    ),
+                    'name': name,
+                    'url_documentation': get_language_url(
+                        url=URL_WIKI_APP, slug=slug
+                    ),
+                    'url_forum': URL_EGYPTIAN_APP_FORUM.format(slug=slug),
+                    'url_store': URL_EGYPTIAN_APP_STORE.format(slug=slug)
+                } for module, slug, name in EGYPTIAN_APPS
+            ],
+            'title': _(message='Egyptian applications'),
+            'url_egyptian_apps': URL_EGYPTIAN_APPS,
+            'url_wiki': get_language_url(url=URL_WIKI)
+        }
 
 
 @method_decorator(login_not_required, name='dispatch')

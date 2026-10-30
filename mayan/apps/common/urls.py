@@ -2,8 +2,9 @@ from django.urls import re_path
 
 from .api_views import APIContentTypeDetailView, APIContentTypeListView
 from .views import (
-    AboutView, FaviconRedirectView, HomeView, LicenseView, ObjectCopyView,
-    RootView, SetupListView, ToolsListView, TrademarkPolicyView
+    AboutView, EgyptianAppsView, FaviconRedirectView, HomeView, LicenseView,
+    ObjectCopyView, RootView, SetupListView, ToolsListView,
+    TrademarkPolicyView
 )
 
 urlpatterns_misc = [
@@ -25,6 +26,10 @@ urlpatterns = [
     ),
     re_path(
         route=r'^about/$', name='about_view', view=AboutView.as_view()
+    ),
+    re_path(
+        route=r'^egyptian_apps/$', name='egyptian_apps_view',
+        view=EgyptianAppsView.as_view()
     ),
     re_path(
         route=r'^license/$', name='license_view', view=LicenseView.as_view()

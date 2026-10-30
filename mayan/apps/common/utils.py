@@ -7,6 +7,7 @@ import types
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models.constants import LOOKUP_SEP
 from django.utils.text import slugify
+from django.utils.translation import get_language
 
 from .compatibility import Iterable
 from .exceptions import ResolverError, ResolverPipelineError
@@ -465,3 +466,12 @@ def return_related(instance, related_field):
     return reduce(
         getattr, related_field.split(LOOKUP_SEP), instance
     )
+
+
+def get_language_url(url, **kwargs):
+    """
+    URL of a page published in English and in French (wiki of Egyptian):
+    {language} is the language of the user, English for the other languages.
+    """
+    language = 'fr' if (get_language() or '').startswith('fr') else 'en'
+    return url.format(language=language, **kwargs)

@@ -106,7 +106,7 @@ class DependenciesApp(MayanAppConfig):
         )
 
         menu_system.bind_links(
-            links=(link_packages_licenses,), position=7
+            links=(link_packages_licenses,), position=9
         )
         menu_list_facet.bind_links(
             links=(link_dependency_group_entry_list,),

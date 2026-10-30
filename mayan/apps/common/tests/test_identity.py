@@ -6,10 +6,11 @@ it as the upstream project and keeps its copyright notice.
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import translation
 
 import mayan
 
-from ..links import link_support
+from ..links import link_support, link_wiki
 
 
 class EgyptianIdentityTestCase(TestCase):
@@ -66,3 +67,31 @@ class EgyptianIdentityTestCase(TestCase):
         self.assertContains(response, "Trademarks")
         self.assertContains(response, "Egyptian is a fork based on Mayan EDMS")
         self.assertContains(response, "Mayan EDMS Trademark Policy")
+
+    def test_documentation_links(self):
+        # Wiki of Egyptian in the language of the user and page of the
+        # Egyptian applications (documentation, forum and store page).
+        self.assertEqual(link_wiki.url, "https://wiki.mypalace.ca/en/home")
+        with translation.override("fr"):
+            self.assertEqual(link_wiki.url, "https://wiki.mypalace.ca/fr/home")
+
+        self.client.force_login(user=self.user)
+        self.assertContains(self.client.get("/"), "https://wiki.mypalace.ca/en/home")
+        self.assertContains(self.client.get("/"), "/egyptian_apps/")
+
+        response = self.client.get("/egyptian_apps/")
+        self.assertContains(response, "https://wiki.mypalace.ca/en/egyptian/egyptian-apps/ocr-viewer")
+        self.assertContains(response, "https://egyptian-apps.mypalace.ca/forum/ocr-viewer/")
+        self.assertContains(response, "https://egyptian-apps.mypalace.ca/apps/ocr-viewer/")
+        self.assertContains(response, "https://wiki.mypalace.ca/en/egyptian/egyptian-apps/", count=13)
+
+        response = self.client.get("/about/")
+        self.assertContains(response, "https://wiki.mypalace.ca/en/home")
+        self.assertContains(response, "/egyptian_apps/")
+
+        self.user.locale_profile.language = "fr"
+        self.user.locale_profile.save()
+        response = self.client.get("/egyptian_apps/")
+        self.assertContains(response, "https://wiki.mypalace.ca/fr/egyptian/egyptian-apps/ocr-viewer")
+        self.assertContains(response, "Applications Egyptian")
+        self.assertContains(self.client.get("/"), "https://wiki.mypalace.ca/fr/home")

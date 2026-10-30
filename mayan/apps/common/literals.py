@@ -45,3 +45,29 @@ URL_RELEASE_NOTES = 'https://docs.mayan-edms.com/releases/index.html'
 URL_SOURCE_CODE = 'https://gitlab.com/mayan-edms/mayan-edms'
 URL_STORE = 'https://teespring.com/stores/mayan-edms'
 URL_SUPPORT = 'https://egyptian-apps.mypalace.ca/forum/'
+
+# Egyptian: applications site and documentation wiki. The pages of the wiki
+# exist in English and in French: {language} follows the language of the user.
+URL_EGYPTIAN_APPS = 'https://egyptian-apps.mypalace.ca/'
+URL_EGYPTIAN_APP_FORUM = 'https://egyptian-apps.mypalace.ca/forum/{slug}/'
+URL_EGYPTIAN_APP_STORE = 'https://egyptian-apps.mypalace.ca/apps/{slug}/'
+URL_WIKI = 'https://wiki.mypalace.ca/{language}/home'
+URL_WIKI_APP = 'https://wiki.mypalace.ca/{language}/egyptian/egyptian-apps/{slug}'
+
+# Applications of egyptian-apps.mypalace.ca: Python module, slug on the site
+# and on the wiki, name.
+EGYPTIAN_APPS = (
+    ('acl_explorer', 'acl-explorer', 'ACL Explorer'),
+    ('activity_report', 'activity-report', 'Activity Report'),
+    ('approvals', 'approvals', 'Approvals'),
+    ('document_autotag', 'document-autotag', 'Autotag'),
+    ('image_barcode_extract', 'image-barcode-extract', 'Barcode Extract'),
+    ('document_embedding', 'document-embedding', 'Document Embedding'),
+    ('document_health', 'document-health', 'Document Health'),
+    ('document_ner', 'document-ner', 'Document NER'),
+    ('document_qa', 'document-qa', 'Document Q&A'),
+    ('ocr_viewer', 'ocr-viewer', 'OCR Viewer'),
+    ('themes', 'themes', 'Themes'),
+    ('document_version_diff', 'document-version-diff', 'Version Diff'),
+    ('workflow_ui', 'workflow-ui', 'Workflow UI')
+)

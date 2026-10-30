@@ -1,0 +1,49 @@
+{% extends 'appearance/base.html' %}
+
+{% load i18n %}
+
+{% load icons_tags %}
+
+{% block title %}{% trans 'Egyptian applications' %}{% endblock %}
+
+{% block content %}
+    <div id="row">
+        <div class="col-12 col-xl-10 offset-xl-1">
+            <div class="card card-body bg-body-secondary border-0">
+                <p>
+                    {% blocktrans %}Applications that extend Egyptian, sold or offered on <a class="new_window" href="{{ url_egyptian_apps }}">egyptian-apps.mypalace.ca</a>. Each one has its page on the <a class="new_window" href="{{ url_wiki }}">documentation wiki</a> and its own forum.{% endblocktrans %}
+                </p>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>{% trans 'Application' %}</th>
+                                <th>{% trans 'On this server' %}</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for app in egyptian_apps %}
+                                <tr>
+                                    <td>{{ app.name }}</td>
+                                    <td>
+                                        {% if app.installed %}
+                                            <span class="badge text-bg-success">{% trans 'Installed on this server' %}</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">{% trans 'Not installed on this server' %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-nowrap">
+                                        <a class="new_window" href="{{ app.url_documentation }}">{% icons_get_icon 'mayan.apps.common.icons.icon_documentation' %} {% trans 'Documentation' %}</a>
+                                        &middot; <a class="new_window" href="{{ app.url_forum }}">{% trans 'Forum' %}</a>
+                                        &middot; <a class="new_window" href="{{ app.url_store }}">{% trans 'Store page' %}</a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

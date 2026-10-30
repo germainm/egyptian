@@ -6,6 +6,7 @@ icon_changelog = Icon(
     driver_name='fontawesome', symbol='clock-rotate-left'
 )
 icon_documentation = Icon(driver_name='fontawesome', symbol='book')
+icon_egyptian_apps = Icon(driver_name='fontawesome', symbol='puzzle-piece')
 icon_forum = Icon(
     driver_name='fontawesome', symbol='comment'
 )

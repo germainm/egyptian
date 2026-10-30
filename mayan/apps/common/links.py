@@ -4,7 +4,7 @@ from mayan.apps.navigation.links import Link, Separator
 from mayan.apps.navigation.utils import get_content_type_kwargs_factory
 
 from .icons import (
-    icon_about, icon_book, icon_documentation, icon_forum,
+    icon_about, icon_book, icon_documentation, icon_egyptian_apps, icon_forum,
     icon_knowledge_base, icon_license, icon_mailing_list, icon_object_copy,
     icon_release_notes, icon_setup, icon_source_code, icon_store,
     icon_support, icon_tools, icon_trademark_policy
@@ -12,9 +12,24 @@ from .icons import (
 from .literals import (
     URL_BOOK, URL_DOCUMENTATION, URL_FORUM, URL_KNOWLEDGE_BASE,
     URL_MAILING_LIST, URL_RELEASE_NOTES, URL_SOURCE_CODE, URL_STORE,
-    URL_SUPPORT
+    URL_SUPPORT, URL_WIKI
 )
 from .permissions import permission_object_copy
+from .utils import get_language_url
+
+
+class LinkLanguage(Link):
+    """
+    Link to a page published in English and in French: its URL follows the
+    language of the user (see get_language_url).
+    """
+    @property
+    def url(self):
+        return get_language_url(url=self._url)
+
+    @url.setter
+    def url(self, value):
+        self._url = value
 
 
 def object_copy_conditional_disable(context, resolved_object):
@@ -41,6 +56,10 @@ link_book = Link(
 link_documentation = Link(
     icon=icon_documentation, tags='new_window',
     text=_(message='Documentation'), url=URL_DOCUMENTATION
+)
+link_egyptian_apps = Link(
+    icon=icon_egyptian_apps, text=_(message='Egyptian applications'),
+    view='common:egyptian_apps_view'
 )
 link_forum = Link(
     icon=icon_forum, tags='new_window', text=_(message='Forum'),
@@ -86,6 +105,10 @@ link_store = Link(
 link_support = Link(
     icon=icon_support, tags='new_window', text=_(message='Support'),
     url=URL_SUPPORT
+)
+link_wiki = LinkLanguage(
+    icon=icon_documentation, tags='new_window',
+    text=_(message='Egyptian documentation'), url=URL_WIKI
 )
 link_tools = Link(
     icon=icon_tools, text=_(message='Tools'), view='common:tools_list'
