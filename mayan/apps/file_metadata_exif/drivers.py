@@ -63,10 +63,11 @@ class FileMetadataDriverEXIF(FileMetadataDriver):
                     )
                 except sh.ErrorReturnCode_1 as exception:
                     # Exit code 1 with its JSON output: exiftool does not
-                    # read this format ("Unknown file type") or this file
-                    # ("File format error": RAR 5, RPM, damaged files). Its
-                    # file tags (name, size, type, dates) and the error are
-                    # kept, as for any file.
+                    # know this format ("Unknown file type") or cannot read
+                    # it ("File format error": RAR 5 and RPM with exiftool
+                    # 12.57). The tags it still gives (file name, size,
+                    # permissions) and the error are kept. Damaged files
+                    # only get a warning, with exit code 0.
                     try:
                         result = json.loads(s=exception.stdout)[0]
                     except (IndexError, KeyError, TypeError, ValueError):

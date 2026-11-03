@@ -72,10 +72,11 @@ of that test:
 - **SVGZ drawings.** A compressed SVG drawing (`.svgz`, which `file` reports as
   `application/gzip`) is recognized from its content and shown as a drawing; it is
   decompressed within 64 MB.
-- **exiftool metadata of the formats it cannot read.** exiftool 12.57 (Debian 12) ends with
-  an error on RAR 5 archives, RPM packages and damaged files ("File format error"): an error
-  was logged on the document file and no metadata kept. Its file tags (name, size, type,
-  dates) and its error message are now kept, as for the formats it does not know.
+- **exiftool metadata of RAR 5 archives and RPM packages.** exiftool 12.57 (Debian 12) cannot
+  read RAR 5 archives and RPM packages: it ends with exit code 1 and the error "File format
+  error". An error was logged on the document file and no metadata was kept. The tags it still
+  gives (file name, size and permissions, ExifTool version) and its error message are now kept,
+  as for the formats it does not know ("Unknown file type").
 - **DICOM files shown as the file asks.** The pixel values were stretched between their
   minimum and their maximum. They now go through the modality LUT and the window (or VOI
   LUT) of the file, top level or functional groups of the enhanced multi-frame images;
@@ -195,7 +196,8 @@ listed.
 - Give archives pages (summary and list of the entries) instead of a page count error, and
   extract their text for the search
 - Show SVGZ drawings, decompressed within a limit
-- Keep the exiftool file tags when exiftool cannot read a file instead of logging an error
+- Keep the exiftool tags of RAR 5 archives and RPM packages, which exiftool 12.57 cannot read,
+  instead of logging an error
 
 ### More file formats
 
