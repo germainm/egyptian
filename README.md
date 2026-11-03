@@ -33,10 +33,11 @@ of that test:
 - **Photoshop files with layers** are rendered as their merged image, on one page.
 - **GPS tracks on a map.** A GPX file was shown as its XML source, on 22 pages for a walk of
   5 km. Its page is now a map of its tracks, routes and named waypoints, headed by its name,
-  date, distance, duration and elevation gain, which the OCR reads. The map background comes
-  from the tile server of the map of the Itinéraires app when it is installed, else from
-  OpenStreetMap: only the zoom level and the numbers of the tiles of the area are sent, and
-  the tiles are cached for 7 days. Set the `map_tile_url` entry of
+  date, distance, duration and elevation gain, which the OCR reads. The distance and the
+  moving time are those of the Itinéraires app (gpxpy), with the total time when the track has
+  stops. The map background comes from the tile server of the map of the Itinéraires app when
+  it is installed, else from OpenStreetMap: only the zoom level and the numbers of the tiles
+  of the area are sent, and the tiles are cached for 7 days. Set the `map_tile_url` entry of
   `CONVERTER_GRAPHICS_BACKEND_ARGUMENTS` to an empty value to draw the tracks without map
   background, with no request to the outside.
 - **Audio files get a page.** MP3, FLAC, M4A/AAC, Ogg Vorbis and Opus, WAV, AIFF and WMA files
@@ -50,9 +51,12 @@ of that test:
   palette colors and MONOCHROME1 images are shown right. A multi-frame file has one page per
   frame (an ultrasound loop of 30 frames gives 30 pages). Structured reports, ECG and
   radiotherapy plans, which hold no image, get a page of their main attributes with the
-  content of the report or the 12 leads of the ECG. An image that no installed decoder
+  content of the report or the 12 leads of the ECG. Images smaller than 512 pixels (dose
+  grids, thumbnails) are enlarged without smoothing. An image that no installed decoder
   can read (JPEG lossless, JPEG-LS, 12-bit JPEG) gets the same page, with the reason and the
-  package to install: `python-gdcm`, or `pylibjpeg` with `pylibjpeg-libjpeg`.
+  missing package: `python-gdcm` (BSD license; JPEG lossless, JPEG-LS, JPEG 2000; now in the
+  production requirements), or `pylibjpeg` with `pylibjpeg-libjpeg` (GPLv3; also 12-bit
+  JPEG).
 - **Raw photos in the colors of the camera.** They were developed with a daylight white
   balance, which gave a color cast (cyan with Sigma, pink with Olympus, green with Pentax);
   they now use the white balance recorded by the camera.

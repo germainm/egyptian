@@ -4,7 +4,7 @@ Pages of a DICOM file.
 - Images: one page per frame, shown as the file asks: modality LUT (rescale
   slope and intercept), then the window or VOI LUT of the file (top level or
   functional groups of the enhanced multi-frame images), palette colors,
-  MONOCHROME1 inverted.
+  MONOCHROME1 inverted; images smaller than 512 pixels are enlarged.
 - Objects without image (structured reports, ECG, radiotherapy plans) and
   images that no installed decoder can read: pages of the main attributes,
   with the content of the structured report and the leads of the ECG.
@@ -31,10 +31,8 @@ ECG_GRID = (246, 205, 210)
 ECG_TRACE = (26, 31, 46)
 SR_DEPTH_MAXIMUM = 12
 SR_LINES_MAXIMUM = 2000
-DECODER_HINTS = (
-    'install python-gdcm, or pylibjpeg with pylibjpeg-libjpeg (JPEG '
-    'lossless, JPEG-LS, 12-bit JPEG) and pylibjpeg-openjpeg (JPEG 2000)'
-)
+# Smaller images (dose grids, thumbnails) are enlarged to this size.
+IMAGE_SIZE_MINIMUM = 512
 
 SUMMARY_ATTRIBUTES = (
     ('PatientName', 'Patient'),
@@ -88,6 +86,23 @@ def _transfer_syntax(dataset):
     ) or ImplicitVRLittleEndian
 
 
+def _decoder_hints():
+    """The decoder packages that are not installed, and what they add."""
+    from importlib.util import find_spec
+
+    hints = []
+    if find_spec('gdcm') is None:
+        hints.append('python-gdcm (JPEG lossless, JPEG-LS, JPEG 2000)')
+    if find_spec('pylibjpeg') is None or find_spec('libjpeg') is None:
+        hints.append(
+            'pylibjpeg with pylibjpeg-libjpeg (JPEG lossless, JPEG-LS, '
+            '12-bit JPEG)'
+        )
+    if not hints:
+        return 'none of the installed decoders reads this file'
+    return 'install ' + ' or '.join(hints)
+
+
 def _decoder_problem(dataset):
     """Why the pixel data cannot be decoded, or None."""
     from pydicom.pixels import get_decoder
@@ -101,7 +116,7 @@ def _decoder_problem(dataset):
         return 'no decoder exists for {} in pydicom'.format(transfer_syntax.name)
     if not decoder.is_available:
         return 'no decoder installed for {}: {}'.format(
-            transfer_syntax.name, DECODER_HINTS
+            transfer_syntax.name, _decoder_hints()
         )
     return None
 
@@ -474,6 +489,21 @@ def get_dicom_page_count(file_object):
     return page_count
 
 
+def _enlarge(image):
+    """
+    Enlarge a small image by a whole factor, without smoothing: each pixel
+    becomes a square of its value.
+    """
+    size = max(image.size)
+    if not size or size >= IMAGE_SIZE_MINIMUM:
+        return image
+    factor = math.ceil(IMAGE_SIZE_MINIMUM / size)
+    return image.resize(
+        size=(image.width * factor, image.height * factor),
+        resample=Image.Resampling.NEAREST
+    )
+
+
 def render_dicom_page(file_object, page_number):
     dataset, page_count, layout = _plan(file_object=file_object)
     if layout is not None:
@@ -487,8 +517,10 @@ def render_dicom_page(file_object, page_number):
         message = ' '.join(lines[:3]) or type(exception).__name__
         layout = SummaryLayout(
             dataset=dataset, note='Image not decoded: {} ({}).'.format(
-                clean_text(message, maximum_length=200), DECODER_HINTS
+                clean_text(message, maximum_length=200), _decoder_hints()
             )
         )
         return layout.render(page_number=0)
-    return _frame_image(dataset=dataset, array=array, index=index)
+    return _enlarge(
+        image=_frame_image(dataset=dataset, array=array, index=index)
+    )

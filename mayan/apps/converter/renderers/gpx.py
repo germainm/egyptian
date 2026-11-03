@@ -1,6 +1,7 @@
 """
 Page of a GPS track (GPX file): map of its tracks, routes and waypoints over
-map tiles, with its name, date, distance, duration and elevation gain.
+map tiles, with its name, date, distance, duration and elevation gain. The
+figures are those of the Itinéraires app (gpxpy) when gpxpy is installed.
 
 The tiles come from the tile server of the setting (OpenStreetMap by default,
 or the map of the Itinéraires app). Only the zoom level and the tile numbers
@@ -156,12 +157,54 @@ def _distance(point_a, point_b):
     return 2 * EARTH_RADIUS * math.asin(min(1, math.sqrt(a)))
 
 
+def _gpxpy_figures(tracks):
+    """
+    Distance with the elevation, moving time and smoothed climb of the
+    tracks, computed by gpxpy as the Itinéraires app does; None without
+    gpxpy.
+    """
+    try:
+        from gpxpy.gpx import GPX, GPXTrack, GPXTrackPoint, GPXTrackSegment
+    except ImportError:
+        return None
+
+    document = GPX()
+    for track in tracks:
+        gpx_track = GPXTrack()
+        for segment in track['segments']:
+            gpx_track.segments.append(
+                GPXTrackSegment(
+                    points=[
+                        GPXTrackPoint(
+                            latitude=point['latitude'],
+                            longitude=point['longitude'],
+                            elevation=point['elevation'], time=point['time']
+                        ) for point in segment
+                    ]
+                )
+            )
+        document.tracks.append(gpx_track)
+    try:
+        moving_data = document.get_moving_data()
+        return {
+            'distance': document.length_3d() or document.length_2d() or 0,
+            'moving_time': moving_data.moving_time if moving_data else None,
+            'elevation_gain': document.get_uphill_downhill().uphill
+        }
+    except Exception as exception:
+        logger.warning('gpxpy cannot measure the GPX tracks; %s', exception)
+        return None
+
+
 def get_summary(gpx):
-    lines = []
-    for track in gpx['tracks']:
-        lines.extend(track['segments'])
-    for route in gpx['routes']:
-        lines.append(route['points'])
+    # The recorded tracks, like the Itinéraires app; the planned routes only
+    # in a file without track.
+    if gpx['tracks']:
+        lines = [
+            segment for track in gpx['tracks'] for segment in track['segments']
+        ]
+    else:
+        lines = [route['points'] for route in gpx['routes']]
     distance = sum(
         _distance(line[index], line[index + 1])
         for line in lines for index in range(len(line) - 1)
@@ -175,6 +218,13 @@ def get_summary(gpx):
         max(0, elevations[index + 1] - elevations[index])
         for index in range(len(elevations) - 1)
     )
+    moving_time = None
+    figures = _gpxpy_figures(tracks=gpx['tracks']) if gpx['tracks'] else None
+    if figures:
+        distance = figures['distance'] or distance
+        moving_time = figures['moving_time']
+        if elevations:
+            gain = figures['elevation_gain']
     name = gpx['name'] or next(
         (
             item['name'] for item in gpx['tracks'] + gpx['routes']
@@ -182,7 +232,8 @@ def get_summary(gpx):
         ), ''
     )
     return {
-        'name': name, 'distance': distance, 'points': len(points),
+        'name': name, 'distance': distance, 'moving_time': moving_time,
+        'points': len(points),
         'start': min(times) if times else None,
         'end': max(times) if times else None,
         'elevation_gain': gain if elevations else None,
@@ -364,11 +415,14 @@ def render_gpx_page(data, tile_url, tile_attribution, maximum_zoom, user_agent):
     if summary['distance']:
         figures.append('{:.2f} km'.format(summary['distance'] / 1000))
     if summary['start'] and summary['end'] and summary['end'] > summary['start']:
-        figures.append(
-            format_duration_words(
-                (summary['end'] - summary['start']).total_seconds()
+        total_time = (summary['end'] - summary['start']).total_seconds()
+        duration = format_duration_words(total_time)
+        if summary['moving_time'] and total_time - summary['moving_time'] >= 60:
+            # Stops: the moving time first, as in the Itinéraires app.
+            duration = '{} moving ({} total)'.format(
+                format_duration_words(summary['moving_time']), duration
             )
-        )
+        figures.append(duration)
     if summary['elevation_gain'] is not None:
         figures.append(
             '+{:.0f} m ({:.0f} – {:.0f} m)'.format(
@@ -377,11 +431,16 @@ def render_gpx_page(data, tile_url, tile_attribution, maximum_zoom, user_agent):
             )
         )
     figures.append('{} points'.format(summary['points']))
-    font_figures = get_font(size=32)
+    text_figures = ' · '.join(figures)
+    # One line: a smaller font for the long ones.
+    for size in (32, 30, 28, 26, 24):
+        font_figures = get_font(size=size)
+        if draw.textlength(text_figures, font=font_figures) <= content_width:
+            break
     y = draw_lines(
         draw=draw, xy=(PAGE_MARGIN, y + 4),
         lines=wrap_text(
-            draw=draw, text=' · '.join(figures), font=font_figures,
+            draw=draw, text=text_figures, font=font_figures,
             width=content_width, maximum_lines=1
         ), font=font_figures, fill=PAGE_INK_MUTED
     )

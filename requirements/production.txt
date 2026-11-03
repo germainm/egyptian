@@ -54,6 +54,7 @@ pyotp==2.9.0
 sentence-transformers>=3.0
 pypdf==6.16.1
 python-dateutil==2.9.0.post0
+python-gdcm>=3.0
 pytz==2026.2
 qrcode==8.2
 rawpy>=0.21
