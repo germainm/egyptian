@@ -58,10 +58,12 @@ of that test:
   uncompressed size, the start of its text and, for gzip, its original name and date. Nothing
   is extracted: only the directory of the archive is read, by the zipfile module for ZIP files
   and by libarchive (Python package `libarchive-c`, now in the production requirements) for
-  the other formats, with only the formats of the file type enabled. Reading stops after 30
-  seconds, 4 GB decompressed or 20,000 entries: a decompression bomb gets a page that says
-  where the listing stopped. Chinese, Japanese and Korean names use an installed CJK font
-  (Noto Sans CJK, WenQuanYi Zen Hei or IPA Gothic).
+  the other formats, with only the formats of the file type enabled. RAR archives that
+  libarchive stops reading (RAR 1.5 to 4 solid archives, RAR 1.5) are listed from their
+  headers; an empty archive says so. Reading stops after 30 seconds, 4 GB decompressed or
+  20,000 entries: a decompression bomb gets a page that says where the listing stopped.
+  Chinese, Japanese and Korean names use an installed CJK font (Noto Sans CJK, WenQuanYi Zen
+  Hei or IPA Gothic).
 - **SVGZ drawings.** A compressed SVG drawing (`.svgz`, which `file` reports as
   `application/gzip`) is recognized from its content and shown as a drawing; it is
   decompressed within 64 MB.

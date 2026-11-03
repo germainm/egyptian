@@ -132,6 +132,7 @@ class ArchiveListing:
         self.stop_reason = ''
         self.comment = ''
         self.leading_fields = []
+        self.volume = False
         self.fields = []
         self.notes = []
         self.encrypted_entries = 0
@@ -638,6 +639,52 @@ RAR_MIME_TYPES = (
 RPM_MIME_TYPES = ('application/x-rpm', 'application/x-redhat-package-manager')
 
 
+def _list_rar_from_headers(file_object, listing):
+    """
+    When libarchive stops reading a RAR archive (RAR 1.5 to 4 solid
+    archives, RAR 1.5), the entries read from the headers of the archive.
+    """
+    from .archive_headers import list_rar_entries
+
+    error_notes = [
+        note for note in listing.notes
+        if note.startswith('The archive could not be read')
+    ]
+    if listing.names_encrypted or not (
+        error_notes or listing.stop_reason.startswith('read error')
+    ):
+        return False
+    result = list_rar_entries(file_object=file_object)
+    if not result or len(result[0]) < listing.entries_read:
+        return False
+    entries, continues = result
+    for note in error_notes:
+        listing.notes.remove(note)
+    listing.entries = []
+    listing.entries_read = listing.encrypted_entries = 0
+    listing.stop_reason = ''
+    try:
+        for entry in entries:
+            modified = entry['modified']
+            if isinstance(modified, int):
+                modified = _local_time(modified)
+            listing.add(
+                path=entry['path'], size=entry['size'], modified=modified,
+                kind=entry['kind'], encrypted=entry['encrypted']
+            )
+    except ListingStopped as exception:
+        listing.stop_reason = str(exception)
+    if continues and not listing.stop_reason:
+        listing.stop_reason = _NEXT_VOLUME
+    return True
+
+
+_NEXT_VOLUME = (
+    'the archive continues in its next volume, whose entries are listed '
+    'with it'
+)
+
+
 def _add_header_fields(file_object, mime_type, listing):
     """Header of an RPM package, properties of a RAR archive."""
     from .archive_headers import get_rar_fields, get_rpm_fields
@@ -651,14 +698,14 @@ def _add_header_fields(file_object, mime_type, listing):
             fields = get_rar_fields(file_object=file_object)
             listing.fields[0:0] = fields
             properties = dict(fields).get('Properties', '')
-            if 'volume' in properties and listing.stop_reason.startswith(
+            listing.volume = 'volume' in properties
+            if not _list_rar_from_headers(
+                file_object=file_object, listing=listing
+            ) and 'volume' in properties and listing.stop_reason.startswith(
                 'read error'
             ):
                 # The data of the last entry continues in the next volume.
-                listing.stop_reason = (
-                    'the archive continues in its next volume, whose '
-                    'entries are listed with it'
-                )
+                listing.stop_reason = _NEXT_VOLUME
     except Exception as exception:
         logger.debug('Archive header not read; %s', exception)
     finally:
@@ -789,6 +836,16 @@ def _count(number, singular, plural):
     return '{:,} {}'.format(number, singular if number == 1 else plural)
 
 
+def _was_read(listing):
+    """The archive was read to its end (not a single compressed file)."""
+    return bool(listing.format) and listing.format != 'Compressed file' and not (
+        listing.names_encrypted or any(
+            note.startswith('The archive could not be read')
+            for note in listing.notes
+        )
+    )
+
+
 def summary_fields(listing):
     files = [entry for entry in listing.entries if entry['kind'] == 'file']
     directories = sum(
@@ -800,6 +857,14 @@ def summary_fields(listing):
         fields.append(('Format', listing.format))
     if listing.compression:
         fields.append(('Compression', listing.compression))
+    if not listing.entries and listing.complete and _was_read(listing=listing):
+        fields.append(
+            (
+                'Entries', 'none starting in this volume (it continues the '
+                'previous volume of the set)' if listing.volume
+                else 'none (empty archive)'
+            )
+        )
     if listing.entries:
         counts = [_count(len(files), 'file', 'files')]
         if directories:

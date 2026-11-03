@@ -416,3 +416,70 @@ class EXIFToolDriverTestCase(SimpleTestCase):
 
         with self.assertRaises(sh.ErrorReturnCode_1):
             self.process(stdout=b'not json')
+
+
+def make_rar4_solid():
+    def block(kind, flags, body=b'', data=b''):
+        if data:
+            flags |= 0x8000
+        size = 7 + len(body)
+        return struct.pack('<HBHH', 0, kind, flags, size) + body + data
+
+    def file_block(name, data):
+        body = struct.pack(
+            '<IIBIIBBHI', len(data), len(data), 3, 0,
+            (44 << 25) | (6 << 21) | (1 << 16) | (12 << 11), 29, 0x33,
+            len(name), 0o100644
+        ) + name
+        return block(kind=0x74, flags=0x0010, body=body, data=data)
+
+    return io.BytesIO(
+        b'Rar!\x1a\x07\x00' + block(kind=0x73, flags=0x0008, body=bytes(6)) +
+        file_block(b'premier.txt', b'aaaa') + file_block(b'dossier\\second.txt', b'bb') +
+        block(kind=0x7b, flags=0)
+    )
+
+
+class RarEntriesTestCase(SimpleTestCase):
+    def test_rar4_entries_from_headers(self):
+        from ..renderers.archive_headers import list_rar_entries
+
+        entries, continues = list_rar_entries(file_object=make_rar4_solid())
+        self.assertEqual(
+            [(entry['path'], entry['size']) for entry in entries],
+            [('premier.txt', 4), ('dossier/second.txt', 2)]
+        )
+        self.assertEqual(str(entries[0]['modified']), '2024-06-01 12:00:00')
+        self.assertFalse(continues)
+
+    def test_rar5_entries_from_headers(self):
+        from ..renderers.archive_headers import list_rar_entries
+
+        entries, continues = list_rar_entries(file_object=make_rar5(comment=b'x'))
+        self.assertEqual([entry['path'] for entry in entries], ['a.txt'])
+
+    def test_fallback_when_libarchive_stops(self):
+        listing = archive.ArchiveListing(title='RAR archive')
+        listing.add(path='premier.txt', size=4)
+        listing.stop_reason = 'read error: RAR solid archive support unavailable.'
+        self.assertTrue(
+            archive._list_rar_from_headers(file_object=make_rar4_solid(), listing=listing)
+        )
+        self.assertTrue(listing.complete)
+        self.assertEqual(listing.entries_read, 2)
+
+    def test_no_fallback_when_libarchive_read_everything(self):
+        listing = archive.ArchiveListing(title='RAR archive')
+        listing.add(path='premier.txt', size=4)
+        self.assertFalse(
+            archive._list_rar_from_headers(file_object=make_rar4_solid(), listing=listing)
+        )
+
+    @unittest.skipUnless(LIBARCHIVE, 'libarchive-c not installed')
+    def test_empty_archive(self):
+        listing = list_archive(
+            file_object=io.BytesIO(bytes(10240)), mime_type='application/x-tar'
+        )
+        self.assertIn(
+            ('Entries', 'none (empty archive)'), archive.summary_fields(listing=listing)
+        )
