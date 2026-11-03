@@ -133,6 +133,7 @@ class ArchiveListing:
         self.comment = ''
         self.leading_fields = []
         self.volume = False
+        self.continues_in_next_volume = False
         self.fields = []
         self.notes = []
         self.encrypted_entries = 0
@@ -674,20 +675,15 @@ def _list_rar_from_headers(file_object, listing):
             )
     except ListingStopped as exception:
         listing.stop_reason = str(exception)
-    if continues and not listing.stop_reason:
-        listing.stop_reason = _NEXT_VOLUME
+    listing.continues_in_next_volume = continues and bool(listing.entries)
     return True
-
-
-_NEXT_VOLUME = (
-    'the archive continues in its next volume, whose entries are listed '
-    'with it'
-)
 
 
 def _add_header_fields(file_object, mime_type, listing):
     """Header of an RPM package, properties of a RAR archive."""
-    from .archive_headers import get_rar_fields, get_rpm_fields
+    from .archive_headers import (
+        get_rar_fields, get_rpm_fields, list_rar_entries
+    )
 
     try:
         if mime_type in RPM_MIME_TYPES:
@@ -701,11 +697,15 @@ def _add_header_fields(file_object, mime_type, listing):
             listing.volume = 'volume' in properties
             if not _list_rar_from_headers(
                 file_object=file_object, listing=listing
-            ) and 'volume' in properties and listing.stop_reason.startswith(
-                'read error'
-            ):
-                # The data of the last entry continues in the next volume.
-                listing.stop_reason = _NEXT_VOLUME
+            ) and listing.volume:
+                if listing.stop_reason.startswith('read error'):
+                    # The data of the last entry continues in the next
+                    # volume: the listing of this volume is complete.
+                    listing.stop_reason = ''
+                result = list_rar_entries(file_object=file_object)
+                listing.continues_in_next_volume = bool(
+                    result and result[1] and listing.entries
+                )
     except Exception as exception:
         logger.debug('Archive header not read; %s', exception)
     finally:
@@ -802,6 +802,10 @@ def list_archive(file_object, mime_type):
         listing.notes.append(
             'The names of the entries are encrypted: the content of the '
             'archive cannot be listed without its password.'
+        )
+    if listing.continues_in_next_volume:
+        listing.notes.append(
+            'The last entry continues in the next volume of the set.'
         )
     if not listing.complete:
         listing.notes.append(

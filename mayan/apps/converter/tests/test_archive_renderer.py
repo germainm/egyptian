@@ -483,3 +483,38 @@ class RarEntriesTestCase(SimpleTestCase):
         self.assertIn(
             ('Entries', 'none (empty archive)'), archive.summary_fields(listing=listing)
         )
+
+
+class RarVolumeTestCase(SimpleTestCase):
+    def make_volume(self, first):
+        signature = b'Rar!\x1a\x07\x01\x00'
+        # Volume (0x0001) with its number (0x0002): 0 for the first one.
+        main = rar5_block(kind=1, fields=[0x0003, 0 if first else 1])
+        # The file starts in volume 1 (header flag 0x0010: continues in the
+        # next volume) and goes on in volume 2 (0x0008 | 0x0010).
+        file_header = rar5_block(
+            kind=2, fields=[0, 100, 0, 0, 1, 5, b'a.bin'], data=b'abcd',
+            flags=0x0010 if first else 0x0018
+        )
+        return io.BytesIO(signature + main + file_header)
+
+    @unittest.skipUnless(LIBARCHIVE, 'libarchive-c not installed')
+    def test_first_volume(self):
+        listing = list_archive(
+            file_object=self.make_volume(first=True), mime_type='application/x-rar'
+        )
+        self.assertEqual([entry['path'] for entry in listing.entries], ['a.bin'])
+        self.assertTrue(listing.complete)
+        self.assertIn(
+            'The last entry continues in the next volume of the set.', listing.notes
+        )
+
+    @unittest.skipUnless(LIBARCHIVE, 'libarchive-c not installed')
+    def test_next_volume(self):
+        listing = list_archive(
+            file_object=self.make_volume(first=False), mime_type='application/x-rar'
+        )
+        self.assertEqual(listing.entries, [])
+        fields = dict(archive.summary_fields(listing=listing))
+        self.assertIn('none starting in this volume', fields['Entries'])
+        self.assertEqual(fields['Properties'], 'volume 2 of a set')
