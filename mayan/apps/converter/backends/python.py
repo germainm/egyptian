@@ -1,3 +1,4 @@
+import html
 import io
 import logging
 import math
@@ -15,7 +16,8 @@ from django.utils.translation import gettext_lazy as _
 from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from ..classes import ConverterBase
-from ..exceptions import PageCountError
+from ..exceptions import AppImageError, PageCountError
+from ..literals import IMAGE_ERROR_BROKEN_FILE
 from ..literals import (
     CONVERTER_DICOM_MIME_TYPES, CONVERTER_DJVU_MIME_TYPES,
     CONVERTER_DXF_MIME_TYPES, CONVERTER_EML_MIME_TYPE,
@@ -102,6 +104,29 @@ except sh.CommandNotFound:
     command_ebook_convert = None
 
 
+def get_weasyprint_url_fetcher():
+    """
+    Fetcher that only loads the resources embedded in the document (data:
+    URLs). The HTML of an email comes from its sender: following its links
+    would make the server request any address it names, local files and
+    services of the internal network included.
+    """
+    import weasyprint
+
+    try:
+        return weasyprint.URLFetcher(allowed_protocols=('data',))
+    except (AttributeError, TypeError):
+        # WeasyPrint older than 66, without URLFetcher.
+        def url_fetcher(url, *args, **kwargs):
+            if url.startswith('data:'):
+                return weasyprint.default_url_fetcher(url, *args, **kwargs)
+            raise ValueError(
+                'External resource not loaded: {}'.format(url[:100])
+            )
+
+        return url_fetcher
+
+
 class Python(ConverterBase):
     def convert(self, *args, **kwargs):
         super().convert(*args, **kwargs)
@@ -159,6 +184,28 @@ class Python(ConverterBase):
                 return self._get_pdftoppm_page_image(
                     path=new_file_object.name
                 )
+
+    def seek_page(self, page_number):
+        """
+        Raw photos and DICOM files go straight to their renderer. Pillow
+        would otherwise open the 160 x 120 preview that heads TIFF based raw
+        photos (NEF, DNG) or stop at the TIFF header that precedes some
+        DICOM files.
+        """
+        if self.mime_type not in CONVERTER_RAW_PHOTO_MIME_TYPES and self.mime_type not in CONVERTER_DICOM_MIME_TYPES:
+            return super().seek_page(page_number=page_number)
+
+        self.file_object.seek(0)
+        try:
+            self.image = self.convert(page_number=page_number)
+        except Exception as exception:
+            error_message = 'Unable to render the document page; {}'.format(
+                exception
+            )
+            logger.error(error_message)
+            raise AppImageError(
+                details=error_message, error_name=IMAGE_ERROR_BROKEN_FILE
+            ) from exception
 
     def _get_pdftoppm_page_image(self, path, resolution=None):
         arguments = (path,)
@@ -260,8 +307,12 @@ class Python(ConverterBase):
             if self.mime_type in CONVERTER_MARKDOWN_MIME_TYPES:
                 return self._get_markdown_page_count()
 
+            if self.mime_type == CONVERTER_EML_MIME_TYPE:
+                return self.get_pypdf_page_count(
+                    file_object=io.BytesIO(self._eml_to_pdf_bytes())
+                )
+
             if self.mime_type in (
-                CONVERTER_EML_MIME_TYPE,
                 *CONVERTER_DXF_MIME_TYPES,
                 *CONVERTER_STL_MIME_TYPES,
                 *CONVERTER_DICOM_MIME_TYPES,
@@ -309,6 +360,11 @@ class Python(ConverterBase):
             raise PageCountError(error_message)
         finally:
             self.file_object.seek(0)
+
+        if image.format == 'PSD':
+            # The frames of a Photoshop file are its layers; the page is the
+            # merged composite (see ConverterBase.seek_page).
+            return 1
 
         while True:
             try:
@@ -506,8 +562,18 @@ class Python(ConverterBase):
             except Exception:
                 return 1
 
-    def _convert_eml(self):
+    @staticmethod
+    def _get_email_part_text(part):
+        payload = part.get_payload(decode=True) or b''
+        charset = part.get_content_charset() or 'utf-8'
+        try:
+            return payload.decode(charset, errors='replace')
+        except LookupError:
+            return payload.decode('utf-8', errors='replace')
+
+    def _eml_to_pdf_bytes(self):
         import email as email_lib
+        import email.policy
         import weasyprint
         self.file_object.seek(0)
         msg = email_lib.message_from_binary_file(
@@ -520,29 +586,29 @@ class Python(ConverterBase):
         to_addr = msg.get('To', '')
         date = msg.get('Date', '')
 
+        # The HTML part is kept as HTML; plain text is escaped, its "<" would
+        # otherwise be read as markup. Attachments are not rendered.
         body = ''
         if msg.is_multipart():
             for part in msg.walk():
+                if part.get_content_disposition() == 'attachment':
+                    continue
                 ct = part.get_content_type()
                 if ct == 'text/html':
-                    body = part.get_payload(decode=True).decode(
-                        part.get_content_charset() or 'utf-8', errors='replace'
-                    )
+                    body = self._get_email_part_text(part=part)
                     break
                 if ct == 'text/plain' and not body:
                     body = '<pre>{}</pre>'.format(
-                        part.get_payload(decode=True).decode(
-                            part.get_content_charset() or 'utf-8', errors='replace'
-                        )
+                        html.escape(self._get_email_part_text(part=part))
                     )
         else:
-            payload = msg.get_payload(decode=True)
-            if payload:
-                body = '<pre>{}</pre>'.format(
-                    payload.decode(msg.get_content_charset() or 'utf-8', errors='replace')
-                )
+            text = self._get_email_part_text(part=msg)
+            if msg.get_content_type() == 'text/html':
+                body = text
+            elif text:
+                body = '<pre>{}</pre>'.format(html.escape(text))
 
-        html = (
+        document_html = (
             '<!DOCTYPE html><html><head>'
             '<meta charset="utf-8">'
             '<style>body{{font-family:sans-serif;margin:2em;}} '
@@ -556,12 +622,20 @@ class Python(ConverterBase):
             '<div><span class="label">Objet&nbsp;:</span> <strong>{subject}</strong></div>'
             '</div>{body}</body></html>'
         ).format(
-            from_=from_addr, to=to_addr, date=date,
-            subject=subject, body=body
+            from_=html.escape(str(from_addr)), to=html.escape(str(to_addr)),
+            date=html.escape(str(date)), subject=html.escape(str(subject)),
+            body=body
         )
 
-        pdf_bytes = weasyprint.HTML(string=html).write_pdf()
-        return self._pdf_bytes_to_image(pdf_bytes)
+        return weasyprint.HTML(
+            string=document_html, url_fetcher=get_weasyprint_url_fetcher()
+        ).write_pdf()
+
+    def _convert_eml(self):
+        page_number = getattr(self, 'page_number', 0)
+        return self._pdf_bytes_to_image(
+            self._eml_to_pdf_bytes(), page_number=page_number
+        )
 
     def _markdown_to_pdf_bytes(self):
         import markdown as md_lib

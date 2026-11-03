@@ -17,6 +17,7 @@ from mayan.apps.databases.classes import ModelQueryFields
 from mayan.apps.events.decorators import method_event
 from mayan.apps.events.event_managers import EventManagerMethodAfter
 from mayan.apps.mime_types.classes import MIMETypeBackend
+from mayan.apps.mime_types.refinement import refine_mime_type
 from mayan.apps.storage.hashing import chunk_hash_file_object
 from mayan.apps.storage.model_mixins import ModelMixinFileFieldOpen
 
@@ -36,6 +37,8 @@ _MIME_TYPE_EXTENSION_OVERRIDES = frozenset((
     'model/x.stl-ascii',
     'model/x.stl-binary',
     'application/sla',
+    # .eml files whose headers are not recognized from their content.
+    'message/rfc822',
 ))
 
 from ..events import event_document_file_created, event_document_file_edited
@@ -353,6 +356,12 @@ class DocumentFileBusinessLogicMixin(ModelMixinFileFieldOpen):
                     mimetype_backend = MIMETypeBackend.get_backend_instance()
                     self.mimetype, self.encoding = mimetype_backend.get_mime_type(
                         file_object=file_object
+                    )
+                    # Generic types (application/zip, image/tiff,
+                    # application/octet-stream, text/plain) are refined from
+                    # the content for the formats that file does not identify.
+                    self.mimetype = refine_mime_type(
+                        file_object=file_object, mime_type=self.mimetype
                     )
                 # When libmagic returns the generic text/plain, refine using
                 # the original filename extension for formats that have a

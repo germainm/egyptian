@@ -7,6 +7,36 @@ commercial extensions built and used in production.
 
 ---
 
+## What's new — November 3, 2026
+
+Every file format of the converter was tested with 86 sample files found on the web (test
+corpora of Apache Tika, Pillow and pydicom, raw.pixls.us, video samples). These fixes come out
+of that test:
+
+- **Transparent images are no longer black.** PNG files with transparency, SVG drawings, icons:
+  the page image is a JPEG, and the transparent pixels lost their alpha channel on the way. They
+  are now laid over a white background, and the barcode reader finds the codes they hold.
+- **Formats recognized from their content when `file` gives a generic type:** DOCX, XLSX and
+  PPTX files whose archive does not start with `[Content_Types].xml`, OpenDocument formulas
+  (`application/zip`); DICOM files preceded by a TIFF header and raw photos built on TIFF —
+  DNG, NEF, ARW, PEF (`image/tiff`); EMF drawings and Panasonic RW2 photos
+  (`application/octet-stream`); emails that start with headers unknown to `file`, as saved by
+  Thunderbird or Outlook.com (`text/plain`).
+- **Raw photos at full resolution.** NEF and DNG files showed the 160 × 120 preview stored in
+  their header, ARW, PEF, RW2 and X3F files had no page at all: all are now developed by rawpy.
+- **More formats rendered by LibreOffice:** WMF and EMF drawings, CSV files, XML files (GPX
+  tracks included) and Python scripts named `text/x-script.python` by `file` 5.41 and later.
+  XML files are shown as their source: read as plain text, they cannot make LibreOffice load
+  external resources. HTML files are not added: LibreOffice loads the
+  images and style sheets they link to, so the server would request any address that an
+  uploaded file names.
+- **Photoshop files with layers** are rendered as their merged image, on one page.
+- **Emails on all their pages.** An email was cut to its first page; its attachments are no
+  longer shown as base64 text, its plain text is escaped, and the rendering loads no external
+  resource (only the images embedded in the message).
+
+---
+
 ## What's new — October 30, 2026
 
 Fixes for large imports, tested in production on October 29 and 30 with more than 380
@@ -80,12 +110,25 @@ listed.
   pixel limit of Pillow, instead of failing with a decompression bomb error
 - Sentry: do not send personal data (user, IP address, cookies) unless `send_default_pii` is
   enabled explicitly
+- Lay images with transparency over a white background before saving the page image as JPEG,
+  instead of letting the transparent pixels turn black
+- Refine the generic MIME types returned by `file` (`application/zip`, `image/tiff`,
+  `application/octet-stream`, `text/plain`) from the content: Office Open XML and OpenDocument
+  archives, DICOM files with a TIFF header, raw photos built on TIFF, EMF drawings, Panasonic
+  raw photos, emails
+- Generate the intermediate PDF file with the stored MIME type of the document file instead of
+  detecting it again
+- Render Photoshop files with layers as their merged image, on one page, instead of failing
+  on frame 0
+- Render the XML files and the Python scripts (`text/xml`, `text/x-script.python`) as plain
+  text, and the CSV, WMF and EMF files, with LibreOffice
 
 ### More file formats
 
-The converter also renders SVG, RAW photo, DXF, STL and DICOM files and HEIF/HEIC images,
-and, when their tools are installed, videos (first frame, FFmpeg), DjVu (djvulibre), EPUB
-(Calibre), EML and Markdown (WeasyPrint).
+The converter also renders SVG, RAW photo (CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF, X3F),
+DXF, STL and DICOM files and HEIF/HEIC images, WMF and EMF drawings and CSV files (LibreOffice),
+and, when their tools are installed, videos (first frame, FFmpeg), DjVu (djvulibre, bundled
+files), EPUB (Calibre), EML and Markdown (WeasyPrint).
 
 ---
 

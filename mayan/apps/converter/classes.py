@@ -22,6 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from mayan.apps.file_caching.exceptions import FileCachingException
 from mayan.apps.lock_manager.backends.base import LockingBackend
 from mayan.apps.mime_types.classes import MIMETypeBackend
+from mayan.apps.mime_types.refinement import refine_mime_type
 from mayan.apps.navigation.links import Link
 from mayan.apps.storage.compressed_files import MsgArchive
 from mayan.apps.storage.literals import MSG_MIME_TYPES
@@ -35,7 +36,8 @@ from .exceptions import (
 )
 from .literals import (
     CONVERTER_EPUB_MIME_TYPE, CONVERTER_OFFICE_FILE_EXTENSIONS,
-    CONVERTER_OFFICE_FILE_MIMETYPES, DEFAULT_LIBREOFFICE_ARGUMENTS,
+    CONVERTER_OFFICE_FILE_MIMETYPES, CONVERTER_OFFICE_TEXT_MIME_TYPES,
+    DEFAULT_LIBREOFFICE_ARGUMENTS,
     DEFAULT_LIBREOFFICE_ENVIRONMENT, DEFAULT_LIBREOFFICE_PATH,
     DEFAULT_PAGE_NUMBER, DEFAULT_PILLOW_FORMAT,
     INTERMEDIATE_FILE_GENERATION_MAXIMUM_ATTEMPTS,
@@ -54,6 +56,34 @@ logger = logging.getLogger(name=__name__)
 libreoffice_path = setting_graphics_backend_arguments.value.get(
     'libreoffice_path', DEFAULT_LIBREOFFICE_PATH
 )
+
+IMAGE_TRANSPARENCY_BACKGROUND_COLOR = (255, 255, 255)
+IMAGE_MODES_WITH_ALPHA = ('LA', 'La', 'PA', 'RGBA', 'RGBa')
+
+
+def image_flatten_transparency(image):
+    """
+    Return the image composited over a white background when it has
+    transparency, or the image itself otherwise. Converting an image with
+    transparency straight to RGB drops the alpha channel: the transparent
+    pixels keep their color values, usually black, and logos, signatures
+    or SVG drawings come out as black rectangles.
+    """
+    if image.mode not in IMAGE_MODES_WITH_ALPHA and 'transparency' not in image.info:
+        return image
+
+    try:
+        image_rgba = image.convert(mode='RGBA')
+    except (OSError, ValueError) as exception:
+        logger.debug('Unable to flatten the transparency; %s', exception)
+        return image
+
+    background = Image.new(
+        mode='RGBA', size=image_rgba.size,
+        color=IMAGE_TRANSPARENCY_BACKGROUND_COLOR + (255,)
+    )
+    background.alpha_composite(image_rgba)
+    return background.convert(mode='RGB')
 
 
 def get_command_libreoffice():
@@ -224,7 +254,9 @@ class ConverterBase:
                 try:
                     with source_file_object_opener() as file_object:
                         converter_class = cls.get_converter_class()
-                        converter = converter_class(file_object=file_object)
+                        converter = converter_class(
+                            file_object=file_object, mime_type=mime_type
+                        )
                         with converter.to_pdf() as pdf_file_object:
                             with cache_partition.create_file(filename=filename) as cache_file_object:
                                 shutil.copyfileobj(
@@ -269,7 +301,10 @@ class ConverterBase:
             mime_type_result = mime_type_backend.get_mime_type(
                 file_object=file_object, mime_type_only=False
             )
-            self.mime_type = mime_type_result[0]
+            # Same refinement as the stored MIME type of document files.
+            self.mime_type = refine_mime_type(
+                file_object=file_object, mime_type=mime_type_result[0]
+            )
         self.soffice_file = None
         Image.init()
         self.command_libreoffice = command_libreoffice
@@ -293,10 +328,13 @@ class ConverterBase:
         if output_format.upper() == 'JPEG':
             new_mode = 'RGB'
 
-        if self.image.mode != new_mode:
-            image = self.image.convert(mode=new_mode)
-        else:
-            image = self.image
+        image = self.image
+
+        if new_mode == 'RGB':
+            image = image_flatten_transparency(image=image)
+
+        if image.mode != new_mode:
+            image = image.convert(mode=new_mode)
 
         image.save(fp=image_buffer, format=output_format)
 
@@ -343,7 +381,11 @@ class ConverterBase:
             )
         else:
             try:
-                self.image.seek(frame=page_number)
+                # Pillow exposes the layers of a Photoshop file as frames
+                # numbered from 1 and refuses frame 0; the image as opened is
+                # the merged composite, the only page of the file.
+                if self.image.format != 'PSD':
+                    self.image.seek(frame=page_number)
             except Exception as exception:
                 error_message = 'Unable to seek document page; {}'.format(
                     exception
@@ -401,7 +443,7 @@ class ConverterBase:
                     '_env': environment, '_timeout': get_command_timeout()
                 }
 
-                if self.mime_type == 'text/plain':
+                if self.mime_type in CONVERTER_OFFICE_TEXT_MIME_TYPES:
                     kwargs.update(
                         {'infilter': 'Text (encoded):UTF8,LF,,,'}
                     )

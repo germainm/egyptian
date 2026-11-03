@@ -25,6 +25,7 @@ CONVERTER_RAW_PHOTO_MIME_TYPES = (
     'image/x-fuji-raf',
     'image/x-panasonic-rw2',
     'image/x-sigma-x3f',
+    'image/x-x3f',
     'image/x-pentax-pef',
 )
 
@@ -103,21 +104,43 @@ CONVERTER_OFFICE_FILE_MIMETYPES = (
     'application/vnd.openxmlformats-officedocument.wordprocessingml.template',
     'application/vnd.ms-office',
     'application/xml',
+    # Windows metafiles: Pillow identifies them but cannot draw them outside
+    # of Windows, LibreOffice can.
+    'image/emf',
+    'image/wmf',
+    'image/x-emf',
+    'image/x-wmf',
+    'text/csv',
     'text/x-c',
     'text/x-c++',
     'text/x-pascal',
     'text/x-msdos-batch',
     'text/x-python',
+    # Name given to Python scripts by file 5.41 and later.
+    'text/x-script.python',
     'text/x-shellscript',
     'text/plain',
-    'text/rtf'
+    'text/rtf',
+    'text/xml'
 )
 
 # Extension of the temporary copy given to LibreOffice, for the formats that
 # its content detection does not always recognize without one.
 CONVERTER_OFFICE_FILE_EXTENSIONS = {
+    'image/emf': '.emf',
+    'image/wmf': '.wmf',
+    'image/x-emf': '.emf',
+    'image/x-wmf': '.wmf',
+    'text/csv': '.csv',
     'text/rtf': '.rtf'
 }
+
+# Formats given to LibreOffice as plain text, its import filters being
+# bypassed: XML files are shown as their source instead of being interpreted
+# (an interpreted XML document can reference external resources).
+CONVERTER_OFFICE_TEXT_MIME_TYPES = (
+    'text/plain', 'text/x-script.python', 'text/xml'
+)
 
 if platform.system() in ('FreeBSD', 'OpenBSD', 'Darwin'):
     DEFAULT_LIBREOFFICE_PATH = '/usr/local/bin/libreoffice'
