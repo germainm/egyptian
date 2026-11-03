@@ -45,6 +45,24 @@ of that test:
   their cover when the file holds one, their waveform, and their duration, encoding and bit
   rate (ffprobe and ffmpeg). The OCR reads them: an audio file is found by its title or
   artist.
+- **Archives get pages.** ZIP, JAR, TAR (also gzip, bzip2, xz and zstd compressed), 7z, RAR,
+  ISO, CAB, LHA, DEB, RPM, CPIO, XAR and WARC files had no page. Their pages now show the
+  format, the compression, the number of files and folders, the sizes, the dates, the comment
+  of the archive and of its entries, the encryption (entries that need a password, or names
+  that are themselves encrypted), the owners of TAR files and the manifest of JAR files, then
+  the list of the entries (name, size, date), up to 2,000 on the pages. The text of the pages
+  is extracted for the search, with the names of up to 20,000 entries. A single compressed
+  file (`.gz`, `.bz2`, `.xz`, `.zst`) shows its uncompressed size, the start of its text and,
+  for gzip, its original name and date. Nothing is extracted: only the directory of the
+  archive is read, by the zipfile module for ZIP files and by libarchive (Python package
+  `libarchive-c`, now in the production requirements) for the other formats, with only the
+  formats of the file type enabled. Reading stops after 30 seconds, 4 GB decompressed or
+  20,000 entries: a decompression bomb gets a page that says where the listing stopped.
+  Chinese, Japanese and Korean names use an installed CJK font (Noto Sans CJK, WenQuanYi Zen
+  Hei or IPA Gothic).
+- **SVGZ drawings.** A compressed SVG drawing (`.svgz`, which `file` reports as
+  `application/gzip`) is recognized from its content and shown as a drawing; it is
+  decompressed within 64 MB.
 - **DICOM files shown as the file asks.** The pixel values were stretched between their
   minimum and their maximum. They now go through the modality LUT and the window (or VOI
   LUT) of the file, top level or functional groups of the enhanced multi-frame images;
@@ -161,14 +179,18 @@ listed.
 - Develop raw photos with the white balance of the camera instead of a daylight balance
 - Show DICOM images through their modality LUT and window instead of stretching their values,
   one page per frame
+- Give archives pages (summary and list of the entries) instead of a page count error, and
+  extract their text for the search
+- Show SVGZ drawings, decompressed within a limit
 
 ### More file formats
 
 The converter also renders SVG, RAW photo (CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF, X3F),
 DXF, STL and DICOM files (images, structured reports, ECG) and HEIF/HEIC images, GPX tracks
-(map), WMF and EMF drawings and CSV files (LibreOffice), and, when their tools are installed,
-videos (first frame, FFmpeg), audio files (tags, cover and waveform, FFmpeg), DjVu
-(djvulibre, bundled files), EPUB (Calibre), EML and Markdown (WeasyPrint).
+(map), WMF and EMF drawings and CSV files (LibreOffice), ZIP and JAR archives, and, when their
+tools are installed, other archives and compressed files (libarchive), videos (first frame,
+FFmpeg), audio files (tags, cover and waveform, FFmpeg), DjVu (djvulibre, bundled files), EPUB
+(Calibre), EML and Markdown (WeasyPrint).
 
 ---
 
@@ -214,9 +236,10 @@ docker compose up --detach
 `docker/docker-compose.yml` uses `mypalace/egyptian:s4.12` (`MAYAN_DOCKER_IMAGE_NAME`,
 `MAYAN_DOCKER_IMAGE_TAG`). Set your own passwords in `docker/.env` before real use.
 
-The image has the tools of all the file formats added to the converter: FFmpeg (videos),
-djvulibre (DjVu), Calibre (EPUB), WeasyPrint (EML, Markdown) and the Python libraries of the
-SVG, RAW photo, DXF, STL, DICOM and HEIF/HEIC formats.
+The image has the tools of all the file formats added to the converter: FFmpeg (videos, audio
+files), djvulibre (DjVu), Calibre (EPUB), libarchive (archives), WeasyPrint (EML, Markdown)
+and the Python libraries of the SVG, RAW photo, DXF, STL, DICOM (with python-gdcm), HEIF/HEIC
+and archive formats.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.

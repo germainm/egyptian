@@ -20,7 +20,14 @@ FONT_FILES = {
     'regular': ('DejaVuSans.ttf', 'LiberationSans-Regular.ttf'),
     'bold': ('DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf'),
     'mono': ('DejaVuSansMono.ttf', 'LiberationMono-Regular.ttf'),
+    # Chinese, Japanese and Korean, missing from DejaVu and Liberation:
+    # fonts that also have the Latin letters.
+    'cjk': ('NotoSansCJK-Regular.ttc', 'wqy-zenhei.ttc', 'ipagp.ttf'),
 }
+CJK_RANGES = (
+    (0x1100, 0x11FF), (0x2E80, 0x9FFF), (0xA960, 0xA97F), (0xAC00, 0xD7FF),
+    (0xF900, 0xFAFF), (0xFE30, 0xFE4F), (0xFF00, 0xFFEF), (0x20000, 0x2FA1F)
+)
 
 _fonts = {}
 
@@ -35,12 +42,34 @@ def get_font(size, style='regular'):
             except OSError:
                 continue
         else:
-            logger.warning(
-                'No TrueType font found for the page renderers (%s); '
-                'install fonts-dejavu-core.', ', '.join(FONT_FILES[style])
-            )
-            _fonts[key] = ImageFont.load_default(size=size)
+            if style == 'cjk':
+                _fonts[key] = None
+            else:
+                logger.warning(
+                    'No TrueType font found for the page renderers (%s); '
+                    'install fonts-dejavu-core.', ', '.join(FONT_FILES[style])
+                )
+                _fonts[key] = ImageFont.load_default(size=size)
     return _fonts[key]
+
+
+def has_cjk(text):
+    return any(
+        start <= ord(character) <= end for character in text
+        for start, end in CJK_RANGES
+    )
+
+
+def font_for(text, size, style='regular'):
+    """
+    The font of the style, or a CJK font when the text holds Chinese,
+    Japanese or Korean characters and such a font is installed.
+    """
+    if has_cjk(text):
+        font = get_font(size=size, style='cjk')
+        if font:
+            return font
+    return get_font(size=size, style=style)
 
 
 def clean_text(value, maximum_length=500):
@@ -104,12 +133,14 @@ def draw_fields(draw, xy, fields, width, size=30, label_width=None):
         ) + size
     for label, value in fields:
         draw.text((x, y), label, font=font_label, fill=PAGE_INK_MUTED)
+        text = clean_text(value)
+        font = font_for(text=text, size=size) if has_cjk(text) else font_value
         lines = wrap_text(
-            draw=draw, text=clean_text(value), font=font_value,
+            draw=draw, text=text, font=font,
             width=width - label_width, maximum_lines=3
         )
         y = draw_lines(
-            draw=draw, xy=(x + label_width, y), lines=lines, font=font_value
+            draw=draw, xy=(x + label_width, y), lines=lines, font=font
         )
         y += int(size * 0.35)
     return y

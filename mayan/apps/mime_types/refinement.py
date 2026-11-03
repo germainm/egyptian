@@ -15,10 +15,12 @@ path, the parser and the metadata drivers made for them:
 Each check reads a few bytes or the archive directory only, and returns the
 MIME type unchanged when the content does not match or cannot be read.
 """
+import gzip
 import logging
 import re
 import struct
 import zipfile
+import zlib
 
 logger = logging.getLogger(name=__name__)
 
@@ -29,6 +31,7 @@ MIME_TYPE_EMF = 'image/emf'
 MIME_TYPE_EPUB = 'application/epub+zip'
 MIME_TYPE_GPX = 'application/gpx+xml'
 MIME_TYPE_PANASONIC_RAW = 'image/x-panasonic-rw2'
+MIME_TYPE_SVG = 'image/svg+xml'
 
 DICOM_PREFIX_OFFSET = 128
 DICOM_PREFIX = b'DICM'
@@ -40,6 +43,7 @@ EMF_SIGNATURE = b' EMF'
 PANASONIC_RAW_HEADER = b'IIU\x00'
 
 GPX_READ_SIZE = 4096
+GZIP_MIME_TYPES = ('application/gzip', 'application/x-gzip')
 GPX_MIME_TYPES = ('application/xml', 'text/plain', 'text/xml')
 REGULAR_EXPRESSION_XML_ELEMENT = re.compile(
     pattern=rb'<(?:[A-Za-z_][\w.\-]*:)?([A-Za-z_][\w.\-]*)[\s>/]'
@@ -187,6 +191,21 @@ def is_gpx(file_object):
     if not head.startswith(b'<'):
         return False
     return get_xml_root_name(head=head) == b'gpx'
+
+
+def is_svgz(file_object):
+    """
+    True for a gzip file that holds an SVG drawing (SVGZ). Only the start of
+    the drawing is decompressed.
+    """
+    file_object.seek(0)
+    try:
+        with gzip.GzipFile(fileobj=file_object, mode='rb') as gzip_file:
+            head = gzip_file.read(GPX_READ_SIZE)
+    except (EOFError, OSError, zlib.error):
+        return False
+    head = head.lstrip(b'\xef\xbb\xbf \t\r\n')
+    return head.startswith(b'<') and get_xml_root_name(head=head) == b'svg'
 
 
 def is_dicom(file_object):
@@ -361,6 +380,9 @@ def refine_mime_type(file_object, mime_type):
 
         if mime_type in GPX_MIME_TYPES and is_gpx(file_object=file_object):
             return MIME_TYPE_GPX
+
+        if mime_type in GZIP_MIME_TYPES and is_svgz(file_object=file_object):
+            return MIME_TYPE_SVG
 
         if mime_type == 'text/plain':
             if is_email(file_object=file_object):

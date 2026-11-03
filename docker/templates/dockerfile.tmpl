@@ -71,8 +71,9 @@ set -x \
 && (/usr/bin/freshclam || echo "freshclam failed: no ClamAV database in the image, run freshclam in the container.")
 
 # Tools of the file formats added by Egyptian to the converter: videos (FFmpeg),
-# DjVu (djvulibre), EPUB (Calibre) and, for WeasyPrint (EML, Markdown), Pango and
-# HarfBuzz. Installed after the removals above, which could take them away.
+# DjVu (djvulibre), EPUB (Calibre), archives (libarchive, read by libarchive-c)
+# and, for WeasyPrint (EML, Markdown), Pango and HarfBuzz. Installed after the
+# removals above, which could take them away.
 ENV QT_QPA_PLATFORM=offscreen
 
 RUN --mount=type=cache,target=/var/cache/apt \
@@ -81,6 +82,7 @@ apt-get update \
     calibre \
     djvulibre-bin \
     ffmpeg \
+    libarchive13t64 \
     libharfbuzz-subset0 \
     libpango-1.0-0 \
     libpangoft2-1.0-0

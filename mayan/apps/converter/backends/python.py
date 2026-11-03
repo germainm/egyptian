@@ -17,6 +17,9 @@ from django.utils.translation import gettext_lazy as _
 from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from ..classes import ConverterBase
+from ..renderers.archive import (
+    ARCHIVE_MIME_TYPES as CONVERTER_ARCHIVE_MIME_TYPES
+)
 from ..exceptions import AppImageError, PageCountError
 from ..literals import IMAGE_ERROR_BROKEN_FILE
 from ..literals import (
@@ -38,6 +41,23 @@ from ..settings import (
 )
 
 logger = logging.getLogger(name=__name__)
+
+SVGZ_MAXIMUM_SIZE = 64 * 1024 * 1024
+
+
+def gunzip_svg(data):
+    """The SVG drawing of an SVGZ file, SVGZ_MAXIMUM_SIZE bytes at most."""
+    import zlib
+
+    decompressor = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+    drawing = decompressor.decompress(data, SVGZ_MAXIMUM_SIZE + 1)
+    if len(drawing) > SVGZ_MAXIMUM_SIZE:
+        raise ValueError(
+            'SVGZ drawing larger than {} MB once decompressed.'.format(
+                SVGZ_MAXIMUM_SIZE // 1024 // 1024
+            )
+        )
+    return drawing
 pdftoppm_path = setting_graphics_backend_arguments.value.get(
     'pdftoppm_path', DEFAULT_PDFTOPPM_PATH
 )
@@ -191,7 +211,12 @@ class Python(ConverterBase):
         if self.mime_type == CONVERTER_SVG_MIME_TYPE:
             import cairosvg
             self.file_object.seek(0)
-            png_bytes = cairosvg.svg2png(file_obj=self.file_object)
+            data = self.file_object.read()
+            if data[:2] == b'\x1f\x8b':
+                # SVGZ: decompressed here, within a limit; CairoSVG would
+                # decompress all of it (decompression bomb).
+                data = gunzip_svg(data=data)
+            png_bytes = cairosvg.svg2png(bytestring=data)
             self.file_object.seek(0)
             return Image.open(fp=io.BytesIO(png_bytes))
 
@@ -233,6 +258,13 @@ class Python(ConverterBase):
         if self.mime_type == CONVERTER_GPX_MIME_TYPE:
             return self._convert_gpx()
 
+        if self.mime_type in CONVERTER_ARCHIVE_MIME_TYPES:
+            from ..renderers.archive import get_archive_layout
+
+            return get_archive_layout(
+                file_object=self.file_object, mime_type=self.mime_type
+            ).render(page_number=getattr(self, 'page_number', 0))
+
         if self.mime_type == 'application/pdf' and command_pdftoppm:
             # A PDF stored as a plain file is read in place: copying the
             # whole file for each page filled the temporary directory with
@@ -255,15 +287,16 @@ class Python(ConverterBase):
 
     def seek_page(self, page_number):
         """
-        Raw photos, DICOM, audio and GPX files go straight to their
-        renderer. Pillow would otherwise open the 160 x 120 preview that
+        Raw photos, DICOM, audio, GPX files and archives go straight to
+        their renderer. Pillow would otherwise open the 160 x 120 preview that
         heads TIFF based raw photos (NEF, DNG) or stop at the TIFF header
         that precedes some DICOM files.
         """
         if self.mime_type not in (
             *CONVERTER_RAW_PHOTO_MIME_TYPES, *CONVERTER_DICOM_MIME_TYPES,
-            *CONVERTER_AUDIO_MIME_TYPES, CONVERTER_GPX_MIME_TYPE
-        ):
+            *CONVERTER_AUDIO_MIME_TYPES, CONVERTER_GPX_MIME_TYPE,
+            *CONVERTER_ARCHIVE_MIME_TYPES
+        ) or self._is_epub_zip():
             return super().seek_page(page_number=page_number)
 
         self.file_object.seek(0)
@@ -397,6 +430,13 @@ class Python(ConverterBase):
 
             if self.mime_type in CONVERTER_MARKDOWN_MIME_TYPES:
                 return self._get_markdown_page_count()
+
+            if self.mime_type in CONVERTER_ARCHIVE_MIME_TYPES:
+                from ..renderers.archive import get_archive_layout
+
+                return get_archive_layout(
+                    file_object=self.file_object, mime_type=self.mime_type
+                ).page_count
 
             if self.mime_type == CONVERTER_EML_MIME_TYPE:
                 return self.get_pypdf_page_count(

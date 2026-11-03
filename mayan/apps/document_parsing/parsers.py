@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.converter.classes import ConverterBase
 from mayan.apps.converter.literals import CONVERTER_OFFICE_FILE_MIMETYPES
+from mayan.apps.converter.renderers.archive import ARCHIVE_MIME_TYPES
 from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from .exceptions import ParserError
@@ -211,9 +212,59 @@ class OfficePopplerParser(PopplerParser):
             )
 
 
+class ArchiveParser(Parser):
+    """
+    Text of the pages of an archive: its summary and the names, sizes and
+    dates of its entries, as on the page images, for the search. The
+    archive is listed once for all its pages.
+    """
+    def process_document_file(self, document_file):
+        from mayan.apps.converter.renderers.archive import get_archive_layout
+
+        DocumentFilePageContent = apps.get_model(
+            app_label='document_parsing',
+            model_name='DocumentFilePageContent'
+        )
+        try:
+            with document_file.open() as file_object:
+                layout = get_archive_layout(
+                    file_object=file_object, mime_type=document_file.mimetype
+                )
+        except Exception as exception:
+            error_message = _(message='Exception parsing page; %s') % exception
+            logger.error(error_message, exc_info=True)
+            raise ParserError(error_message)
+
+        for document_file_page in document_file.pages.all():
+            DocumentFilePageContent.objects.update_or_create(
+                document_file_page=document_file_page, defaults={
+                    'content': layout.text(
+                        page_number=document_file_page.page_number - 1
+                    )
+                }
+            )
+
+    def process_document_file_page(self, document_file_page):
+        self.mime_type = document_file_page.document_file.mimetype
+        super().process_document_file_page(
+            document_file_page=document_file_page
+        )
+
+    def execute(self, file_object, page_number):
+        from mayan.apps.converter.renderers.archive import get_archive_layout
+
+        return get_archive_layout(
+            file_object=file_object, mime_type=self.mime_type
+        ).text(page_number=page_number - 1)
+
+
 Parser.register(
     mimetypes=('application/pdf',),
     parser_classes=(PopplerParser,)
+)
+Parser.register(
+    mimetypes=ARCHIVE_MIME_TYPES,
+    parser_classes=(ArchiveParser,)
 )
 Parser.register(
     mimetypes=CONVERTER_OFFICE_FILE_MIMETYPES,

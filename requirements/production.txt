@@ -38,6 +38,7 @@ graphviz==0.21
 greenlet==3.5.0
 gunicorn==26.0.0
 jsonschema==4.26.0
+libarchive-c>=5.0
 matplotlib>=3.9,<3.11
 mozilla-django-oidc==5.0.2
 nh3==0.3.6
