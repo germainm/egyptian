@@ -49,20 +49,26 @@ of that test:
   ISO, CAB, LHA, DEB, RPM, CPIO, XAR and WARC files had no page. Their pages now show the
   format, the compression, the number of files and folders, the sizes, the dates, the comment
   of the archive and of its entries, the encryption (entries that need a password, or names
-  that are themselves encrypted), the owners of TAR files and the manifest of JAR files, then
-  the list of the entries (name, size, date), up to 2,000 on the pages. The text of the pages
-  is extracted for the search, with the names of up to 20,000 entries. A single compressed
-  file (`.gz`, `.bz2`, `.xz`, `.zst`) shows its uncompressed size, the start of its text and,
-  for gzip, its original name and date. Nothing is extracted: only the directory of the
-  archive is read, by the zipfile module for ZIP files and by libarchive (Python package
-  `libarchive-c`, now in the production requirements) for the other formats, with only the
-  formats of the file type enabled. Reading stops after 30 seconds, 4 GB decompressed or
-  20,000 entries: a decompression bomb gets a page that says where the listing stopped.
-  Chinese, Japanese and Korean names use an installed CJK font (Noto Sans CJK, WenQuanYi Zen
-  Hei or IPA Gothic).
+  that are themselves encrypted), the owners of TAR files, the manifest of JAR files, the
+  header of RPM packages (name, version, summary, license, vendor, build date, signature) and
+  the properties of RAR archives (version, method and dictionary, solid, locked, recovery
+  record, volume, system, comment), then the list of the entries (name, size, date), up to
+  2,000 on the pages. The text of the pages is extracted for the search, with the names of up
+  to 20,000 entries. A single compressed file (`.gz`, `.bz2`, `.xz`, `.zst`) shows its
+  uncompressed size, the start of its text and, for gzip, its original name and date. Nothing
+  is extracted: only the directory of the archive is read, by the zipfile module for ZIP files
+  and by libarchive (Python package `libarchive-c`, now in the production requirements) for
+  the other formats, with only the formats of the file type enabled. Reading stops after 30
+  seconds, 4 GB decompressed or 20,000 entries: a decompression bomb gets a page that says
+  where the listing stopped. Chinese, Japanese and Korean names use an installed CJK font
+  (Noto Sans CJK, WenQuanYi Zen Hei or IPA Gothic).
 - **SVGZ drawings.** A compressed SVG drawing (`.svgz`, which `file` reports as
   `application/gzip`) is recognized from its content and shown as a drawing; it is
   decompressed within 64 MB.
+- **exiftool metadata of the formats it cannot read.** exiftool 12.57 (Debian 12) ends with
+  an error on RAR 5 archives, RPM packages and damaged files ("File format error"): an error
+  was logged on the document file and no metadata kept. Its file tags (name, size, type,
+  dates) and its error message are now kept, as for the formats it does not know.
 - **DICOM files shown as the file asks.** The pixel values were stretched between their
   minimum and their maximum. They now go through the modality LUT and the window (or VOI
   LUT) of the file, top level or functional groups of the enhanced multi-frame images;
@@ -182,6 +188,7 @@ listed.
 - Give archives pages (summary and list of the entries) instead of a page count error, and
   extract their text for the search
 - Show SVGZ drawings, decompressed within a limit
+- Keep the exiftool file tags when exiftool cannot read a file instead of logging an error
 
 ### More file formats
 

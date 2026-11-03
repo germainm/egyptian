@@ -62,9 +62,21 @@ class FileMetadataDriverEXIF(FileMetadataDriver):
                         path_document_file, _timeout=self.exiftool_timeout
                     )
                 except sh.ErrorReturnCode_1 as exception:
-                    result = json.loads(s=exception.stdout)[0]
+                    # Exit code 1 with its JSON output: exiftool does not
+                    # read this format ("Unknown file type") or this file
+                    # ("File format error": RAR 5, RPM, damaged files). Its
+                    # file tags (name, size, type, dates) and the error are
+                    # kept, as for any file.
+                    try:
+                        result = json.loads(s=exception.stdout)[0]
+                    except (IndexError, KeyError, TypeError, ValueError):
+                        raise exception
 
-                    if result.get('Error', '') == 'Unknown file type':
+                    if result.get('Error'):
+                        logger.info(
+                            'EXIFTool cannot read document file %s: %s',
+                            document_file, result['Error']
+                        )
                         return result
 
                     raise

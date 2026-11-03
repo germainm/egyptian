@@ -131,6 +131,7 @@ class ArchiveListing:
         self.entries_read = 0
         self.stop_reason = ''
         self.comment = ''
+        self.leading_fields = []
         self.fields = []
         self.notes = []
         self.encrypted_entries = 0
@@ -631,6 +632,39 @@ def _list_compressed_file(file_object, listing, compression):
             break
 
 
+RAR_MIME_TYPES = (
+    'application/x-rar', 'application/vnd.rar', 'application/x-rar-compressed'
+)
+RPM_MIME_TYPES = ('application/x-rpm', 'application/x-redhat-package-manager')
+
+
+def _add_header_fields(file_object, mime_type, listing):
+    """Header of an RPM package, properties of a RAR archive."""
+    from .archive_headers import get_rar_fields, get_rpm_fields
+
+    try:
+        if mime_type in RPM_MIME_TYPES:
+            leading, fields = get_rpm_fields(file_object=file_object)
+            listing.leading_fields.extend(leading)
+            listing.fields[0:0] = fields
+        elif mime_type in RAR_MIME_TYPES:
+            fields = get_rar_fields(file_object=file_object)
+            listing.fields[0:0] = fields
+            properties = dict(fields).get('Properties', '')
+            if 'volume' in properties and listing.stop_reason.startswith(
+                'read error'
+            ):
+                # The data of the last entry continues in the next volume.
+                listing.stop_reason = (
+                    'the archive continues in its next volume, whose '
+                    'entries are listed with it'
+                )
+    except Exception as exception:
+        logger.debug('Archive header not read; %s', exception)
+    finally:
+        file_object.seek(0)
+
+
 def list_archive(file_object, mime_type):
     if mime_type in ZIP_MIME_TYPES:
         listing = ArchiveListing(title=ZIP_MIME_TYPES[mime_type])
@@ -715,6 +749,7 @@ def list_archive(file_object, mime_type):
         )
     finally:
         file_object.seek(0)
+    _add_header_fields(file_object=file_object, mime_type=mime_type, listing=listing)
 
     if listing.names_encrypted:
         listing.notes.append(
@@ -760,7 +795,7 @@ def summary_fields(listing):
         1 for entry in listing.entries if entry['kind'] == 'directory'
     )
     others = len(listing.entries) - len(files) - directories
-    fields = []
+    fields = list(listing.leading_fields)
     if listing.format:
         fields.append(('Format', listing.format))
     if listing.compression:

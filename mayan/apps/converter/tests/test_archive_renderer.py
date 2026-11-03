@@ -9,6 +9,7 @@ import struct
 import tarfile
 import unittest
 import zipfile
+import zlib
 from unittest import mock
 
 from django.test import SimpleTestCase
@@ -264,3 +265,154 @@ class SVGZTestCase(SimpleTestCase):
         with mock.patch.object(python, 'SVGZ_MAXIMUM_SIZE', 1024):
             with self.assertRaises(ValueError):
                 python.gunzip_svg(data=gzip.compress(b'<svg>' + b' ' * 4096 + b'</svg>'))
+
+
+def rpm_header(entries):
+    """An RPM header structure of (tag, type, value) entries."""
+    index, store = b'', b''
+    for tag, kind, value in entries:
+        if kind == 4:
+            while len(store) % 4:
+                store += b'\x00'
+            data, count = struct.pack('>I', value), 1
+        else:
+            data, count = value.encode() + b'\x00', 1
+        index += struct.pack('>iiii', tag, kind, len(store), count)
+        store += data
+    return b'\x8e\xad\xe8\x01\x00\x00\x00\x00' + struct.pack(
+        '>II', len(entries), len(store)
+    ) + index + store
+
+
+def make_rpm(signed=False):
+    lead = b'\xed\xab\xee\xdb\x03\x00' + bytes(90)
+    signature = rpm_header([(268, 6, 'signature')] if signed else [])
+    signature += bytes(-len(signature) % 8)
+    header = rpm_header(
+        [
+            (1000, 6, 'exemple'), (1001, 6, '2.1'), (1002, 6, '3'),
+            (1022, 6, 'noarch'), (1004, 9, 'Paquet d’essai'),
+            (1014, 6, 'MIT'), (1006, 4, 1717243200), (1007, 6, 'banc')
+        ]
+    )
+    return io.BytesIO(lead + signature + header + b'payload')
+
+
+def rar5_block(kind, fields, data=b'', flags=0):
+    def vint(value):
+        out = b''
+        while True:
+            byte = value & 0x7f
+            value >>= 7
+            out += bytes([byte | (0x80 if value else 0)])
+            if not value:
+                return out
+    body = vint(kind) + vint(flags | (0x0002 if data else 0))
+    if data:
+        body += vint(len(data))
+    body += b''.join(vint(field) if isinstance(field, int) else field for field in fields)
+    header = vint(len(body)) + body
+    return struct.pack('<I', zlib.crc32(header)) + header + data
+
+
+def make_rar5(comment):
+    signature = b'Rar!\x1a\x07\x01\x00'
+    main = rar5_block(kind=1, fields=[0x0004 | 0x0010])
+    # Service header CMT: flags, unpacked size, attributes, compression
+    # (method 0), system, name length, name.
+    cmt = rar5_block(
+        kind=3, fields=[0, len(comment), 0, 0, 1, 3, b'CMT'],
+        data=comment
+    )
+    # File header: compression method 3 (Normal), dictionary 2^3 x 128 KB.
+    file_header = rar5_block(
+        kind=2, fields=[0, 4, 0, (3 << 7) | (3 << 10), 0, 5, b'a.txt'],
+        data=b'abcd'
+    )
+    return io.BytesIO(signature + main + cmt + file_header)
+
+
+class HeaderFieldsTestCase(SimpleTestCase):
+    def test_rpm_header(self):
+        from ..renderers.archive_headers import get_rpm_fields
+
+        leading, fields = get_rpm_fields(file_object=make_rpm())
+        self.assertEqual(
+            leading, [
+                ('Package', 'exemple-2.1-3.noarch'),
+                ('Summary', 'Paquet d’essai')
+            ]
+        )
+        fields = dict(fields)
+        self.assertEqual(fields['License'], 'MIT')
+        self.assertEqual(fields['Built'], '2024-06-01 12:00 UTC on banc')
+        self.assertEqual(fields['Signature'], 'none')
+
+    def test_rpm_signature(self):
+        from ..renderers.archive_headers import get_rpm_fields
+
+        fields = dict(get_rpm_fields(file_object=make_rpm(signed=True))[1])
+        self.assertIn('present', fields['Signature'])
+
+    def test_rpm_truncated(self):
+        from ..renderers.archive_headers import get_rpm_fields
+
+        data = make_rpm().getvalue()[:120]
+        with self.assertRaises(ValueError):
+            get_rpm_fields(file_object=io.BytesIO(data))
+
+    def test_rar5_properties_and_comment(self):
+        from ..renderers.archive_headers import get_rar_fields
+
+        fields = dict(get_rar_fields(file_object=make_rar5(comment=b'Commentaire\n\x00')))
+        self.assertEqual(fields['RAR version'], 'RAR 5')
+        self.assertEqual(fields['Properties'], 'solid, locked')
+        self.assertEqual(fields['Method'], 'Normal, dictionary 1.0 MB')
+        self.assertEqual(fields['Comment'], 'Commentaire')
+
+    def test_rar5_damaged_header(self):
+        from ..renderers.archive_headers import get_rar_fields
+
+        data = bytearray(make_rar5(comment=b'x').getvalue())
+        data[8] ^= 0xff
+        fields = dict(get_rar_fields(file_object=io.BytesIO(bytes(data))))
+        self.assertEqual(fields['Properties'], 'damaged header')
+
+    def test_rpm_page(self):
+        layout = get_archive_layout(file_object=make_rpm(), mime_type='application/x-rpm')
+        text = layout.text(page_number=0)
+        self.assertIn('Package: exemple-2.1-3.noarch', text)
+        layout.render(page_number=0)
+
+
+class EXIFToolDriverTestCase(SimpleTestCase):
+    def process(self, stdout):
+        import sh
+
+        from mayan.apps.file_metadata_exif.drivers import FileMetadataDriverEXIF
+
+        driver = FileMetadataDriverEXIF.__new__(FileMetadataDriverEXIF)
+        driver.exiftool_timeout = 10
+        driver.command_exiftool = mock.Mock(
+            side_effect=sh.ErrorReturnCode_1(
+                full_cmd='exiftool -j file', stdout=stdout, stderr=b'',
+                truncate=False
+            )
+        )
+        with mock.patch.object(
+            FileMetadataDriverEXIF, 'get_document_file_path'
+        ) as get_path:
+            get_path.return_value.__enter__.return_value = '/tmp/file'
+            return driver._process(document_file='file')
+
+    def test_format_error_keeps_the_file_tags(self):
+        result = self.process(
+            stdout=b'[{"FileSize": "3.0 kB", "Error": "File format error"}]'
+        )
+        self.assertEqual(result['FileSize'], '3.0 kB')
+
+    def test_error_without_json_is_raised(self):
+        import sh
+
+        with self.assertRaises(sh.ErrorReturnCode_1):
+            self.process(stdout=b'not json')
