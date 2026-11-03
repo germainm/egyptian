@@ -10,6 +10,7 @@ from PIL import Image
 import pypdf
 import sh
 
+from django.apps import apps
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
@@ -19,13 +20,16 @@ from ..classes import ConverterBase
 from ..exceptions import AppImageError, PageCountError
 from ..literals import IMAGE_ERROR_BROKEN_FILE
 from ..literals import (
+    CONVERTER_AUDIO_MIME_TYPES, CONVERTER_GPX_MIME_TYPE,
     CONVERTER_DICOM_MIME_TYPES, CONVERTER_DJVU_MIME_TYPES,
     CONVERTER_DXF_MIME_TYPES, CONVERTER_EML_MIME_TYPE,
     CONVERTER_EPUB_MIME_TYPE, CONVERTER_MARKDOWN_MIME_TYPES,
     CONVERTER_RAW_PHOTO_MIME_TYPES, CONVERTER_STL_MIME_TYPES,
     CONVERTER_SVG_MIME_TYPE,
     CONVERTER_VIDEO_MIME_TYPES, DEFAULT_DJVU_PATH, DEFAULT_DJVUSED_PATH,
-    DEFAULT_EBOOK_CONVERT_PATH, DEFAULT_FFMPEG_PATH, DEFAULT_PDFTOPPM_DPI,
+    DEFAULT_EBOOK_CONVERT_PATH, DEFAULT_FFMPEG_PATH, DEFAULT_FFPROBE_PATH,
+    DEFAULT_MAP_TILE_ATTRIBUTION, DEFAULT_MAP_TILE_MAXIMUM_ZOOM,
+    DEFAULT_MAP_TILE_URL, DEFAULT_MAP_TILE_USER_AGENT, DEFAULT_PDFTOPPM_DPI,
     DEFAULT_PDFTOPPM_FORMAT, DEFAULT_PDFTOPPM_PATH, DEFAULT_PDFINFO_PATH,
     DEFAULT_PILLOW_MAXIMUM_IMAGE_PIXELS
 )
@@ -82,6 +86,14 @@ try:
 except sh.CommandNotFound:
     command_ffmpeg = None
 
+ffprobe_path = setting_graphics_backend_arguments.value.get(
+    'ffprobe_path', DEFAULT_FFPROBE_PATH
+)
+try:
+    command_ffprobe = sh.Command(path=ffprobe_path)
+except sh.CommandNotFound:
+    command_ffprobe = None
+
 djvu_path = setting_graphics_backend_arguments.value.get(
     'ddjvu_path', DEFAULT_DJVU_PATH
 )
@@ -102,6 +114,51 @@ try:
     command_ebook_convert = sh.Command(path=ebook_convert_path)
 except sh.CommandNotFound:
     command_ebook_convert = None
+
+
+def get_map_tile_settings():
+    """
+    Tile server of the GPX pages: the `map_tile_*` entries of
+    CONVERTER_GRAPHICS_BACKEND_ARGUMENTS, else the map of the Itinéraires
+    app when it is installed, else OpenStreetMap.
+    """
+    from ..renderers.gpx import html_to_text
+
+    arguments = setting_graphics_backend_arguments.value
+    url = arguments.get('map_tile_url')
+    attribution = arguments.get('map_tile_attribution')
+    maximum_zoom = arguments.get('map_tile_maximum_zoom')
+    if url is None and apps.is_installed('mayan.apps.itineraires'):
+        try:
+            from mayan.apps.itineraires.settings import (
+                setting_tile_attribution, setting_tile_maximum_zoom,
+                setting_tile_url
+            )
+        except ImportError:
+            pass
+        else:
+            url = setting_tile_url.value
+            if attribution is None:
+                attribution = html_to_text(setting_tile_attribution.value)
+            if maximum_zoom is None:
+                maximum_zoom = setting_tile_maximum_zoom.value
+    if url is None:
+        url = DEFAULT_MAP_TILE_URL
+    if attribution is None:
+        attribution = DEFAULT_MAP_TILE_ATTRIBUTION
+    try:
+        maximum_zoom = min(
+            int(maximum_zoom), DEFAULT_MAP_TILE_MAXIMUM_ZOOM
+        )
+    except (TypeError, ValueError):
+        maximum_zoom = DEFAULT_MAP_TILE_MAXIMUM_ZOOM
+    user_agent = arguments.get(
+        'map_tile_user_agent', DEFAULT_MAP_TILE_USER_AGENT
+    )
+    return {
+        'tile_url': url or '', 'tile_attribution': attribution or '',
+        'maximum_zoom': maximum_zoom, 'user_agent': user_agent
+    }
 
 
 def get_weasyprint_url_fetcher():
@@ -163,7 +220,18 @@ class Python(ConverterBase):
             return self._convert_epub()
 
         if self.mime_type in CONVERTER_DICOM_MIME_TYPES:
-            return self._convert_dicom()
+            from ..renderers.dicom import render_dicom_page
+
+            return render_dicom_page(
+                file_object=self.file_object,
+                page_number=getattr(self, 'page_number', 0)
+            )
+
+        if self.mime_type in CONVERTER_AUDIO_MIME_TYPES:
+            return self._convert_audio()
+
+        if self.mime_type == CONVERTER_GPX_MIME_TYPE:
+            return self._convert_gpx()
 
         if self.mime_type == 'application/pdf' and command_pdftoppm:
             # A PDF stored as a plain file is read in place: copying the
@@ -187,12 +255,15 @@ class Python(ConverterBase):
 
     def seek_page(self, page_number):
         """
-        Raw photos and DICOM files go straight to their renderer. Pillow
-        would otherwise open the 160 x 120 preview that heads TIFF based raw
-        photos (NEF, DNG) or stop at the TIFF header that precedes some
-        DICOM files.
+        Raw photos, DICOM, audio and GPX files go straight to their
+        renderer. Pillow would otherwise open the 160 x 120 preview that
+        heads TIFF based raw photos (NEF, DNG) or stop at the TIFF header
+        that precedes some DICOM files.
         """
-        if self.mime_type not in CONVERTER_RAW_PHOTO_MIME_TYPES and self.mime_type not in CONVERTER_DICOM_MIME_TYPES:
+        if self.mime_type not in (
+            *CONVERTER_RAW_PHOTO_MIME_TYPES, *CONVERTER_DICOM_MIME_TYPES,
+            *CONVERTER_AUDIO_MIME_TYPES, CONVERTER_GPX_MIME_TYPE
+        ):
             return super().seek_page(page_number=page_number)
 
         self.file_object.seek(0)
@@ -297,6 +368,26 @@ class Python(ConverterBase):
             if self.mime_type in CONVERTER_RAW_PHOTO_MIME_TYPES:
                 return 1
 
+            if self.mime_type in CONVERTER_AUDIO_MIME_TYPES:
+                if not command_ffmpeg or not command_ffprobe:
+                    raise PageCountError(
+                        'ffmpeg and ffprobe not installed or not found.'
+                    )
+                return 1
+
+            if self.mime_type == CONVERTER_GPX_MIME_TYPE:
+                return 1
+
+            if self.mime_type in CONVERTER_DICOM_MIME_TYPES:
+                from ..renderers.dicom import get_dicom_page_count
+
+                try:
+                    return get_dicom_page_count(file_object=self.file_object)
+                except Exception as exception:
+                    raise PageCountError(
+                        'Unable to read the DICOM file; {}'.format(exception)
+                    ) from exception
+
             if self.mime_type in CONVERTER_DJVU_MIME_TYPES:
                 return self._get_djvu_page_count()
 
@@ -315,7 +406,6 @@ class Python(ConverterBase):
             if self.mime_type in (
                 *CONVERTER_DXF_MIME_TYPES,
                 *CONVERTER_STL_MIME_TYPES,
-                *CONVERTER_DICOM_MIME_TYPES,
             ) or self._is_dxf_text() or self._is_stl_file():
                 return 1
 
@@ -519,8 +609,44 @@ class Python(ConverterBase):
             self.file_object.seek(0)
             tmp.flush()
             with rawpy.imread(tmp.name) as raw:
-                rgb = raw.postprocess()
+                # The white balance of the camera: the default daylight
+                # balance gives a color cast (cyan with Sigma, pink with
+                # Olympus, green with Pentax).
+                rgb = raw.postprocess(use_camera_wb=True)
         return Image.fromarray(rgb)
+
+    def _convert_audio(self):
+        from ..renderers.audio import render_audio_page
+
+        if not command_ffmpeg or not command_ffprobe:
+            raise PageCountError(
+                'ffmpeg and ffprobe not installed or not found.'
+            )
+        path = get_file_object_path(file_object=self.file_object)
+        if path:
+            return render_audio_page(
+                command_ffmpeg=command_ffmpeg, command_ffprobe=command_ffprobe,
+                path=path, timeout=get_command_timeout()
+            )
+        with NamedTemporaryFile() as temporary_file_object:
+            self.file_object.seek(0)
+            shutil.copyfileobj(
+                fsrc=self.file_object, fdst=temporary_file_object
+            )
+            self.file_object.seek(0)
+            temporary_file_object.flush()
+            return render_audio_page(
+                command_ffmpeg=command_ffmpeg, command_ffprobe=command_ffprobe,
+                path=temporary_file_object.name, timeout=get_command_timeout()
+            )
+
+    def _convert_gpx(self):
+        from ..renderers.gpx import GPX_MAXIMUM_SIZE, render_gpx_page
+
+        self.file_object.seek(0)
+        data = self.file_object.read(GPX_MAXIMUM_SIZE + 1)
+        self.file_object.seek(0)
+        return render_gpx_page(data=data, **get_map_tile_settings())
 
     def _convert_djvu(self):
         if not command_ddjvu:
@@ -843,39 +969,6 @@ class Python(ConverterBase):
         pdf_bytes = self._epub_to_pdf_bytes()
         page_number = getattr(self, 'page_number', 0)
         return self._pdf_bytes_to_image(pdf_bytes, page_number=page_number)
-
-    def _convert_dicom(self):
-        import pydicom
-        import numpy as np
-
-        self.file_object.seek(0)
-        ds = pydicom.dcmread(self.file_object, force=True)
-        self.file_object.seek(0)
-
-        pixel_array = ds.pixel_array
-
-        # Multi-frame DICOM: (frames, rows, cols) or (frames, rows, cols, 3).
-        # Last dim == 3 or 4 means color channels, not frames.
-        if pixel_array.ndim == 3 and pixel_array.shape[2] not in (3, 4):
-            pixel_array = pixel_array[0]  # first frame → (rows, cols)
-        elif pixel_array.ndim == 4:
-            pixel_array = pixel_array[0]  # first frame → (rows, cols, 3)
-
-        # Normalize to 8-bit
-        arr_min, arr_max = pixel_array.min(), pixel_array.max()
-        if arr_max > arr_min:
-            pixel_array = (
-                (pixel_array - arr_min) / (arr_max - arr_min) * 255
-            ).astype('uint8')
-        else:
-            pixel_array = pixel_array.astype('uint8')
-
-        if pixel_array.ndim == 2:
-            return Image.fromarray(pixel_array, mode='L').convert('RGB')
-        elif pixel_array.ndim == 3 and pixel_array.shape[2] == 4:
-            return Image.fromarray(pixel_array, mode='RGBA').convert('RGB')
-        else:
-            return Image.fromarray(pixel_array)
 
     def _pdf_bytes_to_image(self, pdf_bytes, page_number=0):
         """Converts one page of a PDF (bytes) to Image via pdftoppm."""

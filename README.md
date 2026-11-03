@@ -31,6 +31,31 @@ of that test:
   images and style sheets they link to, so the server would request any address that an
   uploaded file names.
 - **Photoshop files with layers** are rendered as their merged image, on one page.
+- **GPS tracks on a map.** A GPX file was shown as its XML source, on 22 pages for a walk of
+  5 km. Its page is now a map of its tracks, routes and named waypoints, headed by its name,
+  date, distance, duration and elevation gain, which the OCR reads. The map background comes
+  from the tile server of the map of the Itinéraires app when it is installed, else from
+  OpenStreetMap: only the zoom level and the numbers of the tiles of the area are sent, and
+  the tiles are cached for 7 days. Set the `map_tile_url` entry of
+  `CONVERTER_GRAPHICS_BACKEND_ARGUMENTS` to an empty value to draw the tracks without map
+  background, with no request to the outside.
+- **Audio files get a page.** MP3, FLAC, M4A/AAC, Ogg Vorbis and Opus, WAV, AIFF and WMA files
+  had no page. Their page now shows their tags (title, artist, album, date, track, genre…),
+  their cover when the file holds one, their waveform, and their duration, encoding and bit
+  rate (ffprobe and ffmpeg). The OCR reads them: an audio file is found by its title or
+  artist.
+- **DICOM files shown as the file asks.** The pixel values were stretched between their
+  minimum and their maximum. They now go through the modality LUT and the window (or VOI
+  LUT) of the file, top level or functional groups of the enhanced multi-frame images;
+  palette colors and MONOCHROME1 images are shown right. A multi-frame file has one page per
+  frame (an ultrasound loop of 30 frames gives 30 pages). Structured reports, ECG and
+  radiotherapy plans, which hold no image, get a page of their main attributes with the
+  content of the report or the 12 leads of the ECG. An image that no installed decoder
+  can read (JPEG lossless, JPEG-LS, 12-bit JPEG) gets the same page, with the reason and the
+  package to install: `python-gdcm`, or `pylibjpeg` with `pylibjpeg-libjpeg`.
+- **Raw photos in the colors of the camera.** They were developed with a daylight white
+  balance, which gave a color cast (cyan with Sigma, pink with Olympus, green with Pentax);
+  they now use the white balance recorded by the camera.
 - **Files that LibreOffice cannot convert no longer break the upload.** When LibreOffice writes
   no PDF file, fails or times out, the error is logged on the document file and the document
   gets its version and its file metadata, like any other format the converter cannot read.
@@ -129,13 +154,17 @@ listed.
   text, and the CSV, WMF and EMF files, with LibreOffice
 - Log the error and complete the upload when LibreOffice writes no PDF file, fails or times
   out, instead of leaving a document without version
+- Develop raw photos with the white balance of the camera instead of a daylight balance
+- Show DICOM images through their modality LUT and window instead of stretching their values,
+  one page per frame
 
 ### More file formats
 
 The converter also renders SVG, RAW photo (CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF, X3F),
-DXF, STL and DICOM files and HEIF/HEIC images, WMF and EMF drawings and CSV files (LibreOffice),
-and, when their tools are installed, videos (first frame, FFmpeg), DjVu (djvulibre, bundled
-files), EPUB (Calibre), EML and Markdown (WeasyPrint).
+DXF, STL and DICOM files (images, structured reports, ECG) and HEIF/HEIC images, GPX tracks
+(map), WMF and EMF drawings and CSV files (LibreOffice), and, when their tools are installed,
+videos (first frame, FFmpeg), audio files (tags, cover and waveform, FFmpeg), DjVu
+(djvulibre, bundled files), EPUB (Calibre), EML and Markdown (WeasyPrint).
 
 ---
 

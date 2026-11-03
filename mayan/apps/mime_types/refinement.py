@@ -27,6 +27,7 @@ MIME_TYPE_DNG = 'image/x-adobe-dng'
 MIME_TYPE_EMAIL = 'message/rfc822'
 MIME_TYPE_EMF = 'image/emf'
 MIME_TYPE_EPUB = 'application/epub+zip'
+MIME_TYPE_GPX = 'application/gpx+xml'
 MIME_TYPE_PANASONIC_RAW = 'image/x-panasonic-rw2'
 
 DICOM_PREFIX_OFFSET = 128
@@ -37,6 +38,12 @@ EMF_SIGNATURE_OFFSET = 40
 EMF_SIGNATURE = b' EMF'
 
 PANASONIC_RAW_HEADER = b'IIU\x00'
+
+GPX_READ_SIZE = 4096
+GPX_MIME_TYPES = ('application/xml', 'text/plain', 'text/xml')
+REGULAR_EXPRESSION_XML_ELEMENT = re.compile(
+    pattern=rb'<(?:[A-Za-z_][\w.\-]*:)?([A-Za-z_][\w.\-]*)[\s>/]'
+)
 
 # Main part of each Office Open XML format, the first found wins.
 OOXML_MAIN_PARTS = (
@@ -141,6 +148,45 @@ def get_zip_mime_type(file_object):
                 return MIME_TYPE_EPUB
     except (zipfile.BadZipFile, KeyError, OSError, RuntimeError, ValueError) as exception:
         logger.debug('Unable to read the ZIP archive; %s', exception)
+
+
+def get_xml_root_name(head):
+    """
+    Local name of the first element of the XML data, after the
+    declarations, processing instructions, comments and DOCTYPE; None when
+    it is not within the data.
+    """
+    position = 0
+    while True:
+        start = head.find(b'<', position)
+        if start < 0:
+            return None
+        if head.startswith(b'<?', start):
+            end = head.find(b'?>', start)
+        elif head.startswith(b'<!--', start):
+            end = head.find(b'-->', start)
+        elif head.startswith(b'<!', start):
+            # DOCTYPE, with its internal subset between brackets.
+            close = head.find(b'>', start)
+            bracket = head.find(b'[', start, close if close >= 0 else len(head))
+            end = head.find(b']', bracket) if bracket >= 0 else close
+            end = head.find(b'>', end) if end >= 0 else -1
+        else:
+            match = REGULAR_EXPRESSION_XML_ELEMENT.match(head, start)
+            return match.group(1) if match else None
+        if end < 0:
+            return None
+        position = end + 1
+
+
+def is_gpx(file_object):
+    """True when the root element of the XML file is <gpx> (GPS track)."""
+    head = _read_at(
+        file_object=file_object, offset=0, size=GPX_READ_SIZE
+    ).lstrip(b'\xef\xbb\xbf \t\r\n')
+    if not head.startswith(b'<'):
+        return False
+    return get_xml_root_name(head=head) == b'gpx'
 
 
 def is_dicom(file_object):
@@ -312,6 +358,9 @@ def refine_mime_type(file_object, mime_type):
             if header == PANASONIC_RAW_HEADER:
                 return MIME_TYPE_PANASONIC_RAW
             return mime_type
+
+        if mime_type in GPX_MIME_TYPES and is_gpx(file_object=file_object):
+            return MIME_TYPE_GPX
 
         if mime_type == 'text/plain':
             if is_email(file_object=file_object):

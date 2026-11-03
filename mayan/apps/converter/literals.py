@@ -62,6 +62,42 @@ CONVERTER_DICOM_MIME_TYPES = (
     'application/x-dicom',
 )
 
+CONVERTER_AUDIO_MIME_TYPES = (
+    'audio/aac',
+    'audio/aiff',
+    'audio/amr',
+    'audio/flac',
+    'audio/mp3',
+    'audio/mp4',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/opus',
+    'audio/vnd.wave',
+    'audio/wav',
+    'audio/webm',
+    'audio/x-aac',
+    'audio/x-aiff',
+    'audio/x-flac',
+    'audio/x-hx-aac-adts',
+    'audio/x-m4a',
+    'audio/x-matroska',
+    'audio/x-ms-wma',
+    'audio/x-wav',
+)
+
+CONVERTER_GPX_MIME_TYPE = 'application/gpx+xml'
+
+# Map of the GPX pages: Leaflet style tile address ({z}, {x}, {y}, {s}).
+# The `map_tile_url` entry of CONVERTER_GRAPHICS_BACKEND_ARGUMENTS replaces
+# it; an empty value draws the tracks without map background.
+DEFAULT_MAP_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+DEFAULT_MAP_TILE_ATTRIBUTION = '© OpenStreetMap contributors'
+DEFAULT_MAP_TILE_MAXIMUM_ZOOM = 18
+DEFAULT_MAP_TILE_USER_AGENT = (
+    'Egyptian-EDMS/4.12 (document page preview; '
+    '+https://github.com/germainm/egyptian)'
+)
+
 DEFAULT_DJVU_PATH = '/usr/bin/ddjvu'
 DEFAULT_DJVUSED_PATH = '/usr/bin/djvused'
 DEFAULT_EBOOK_CONVERT_PATH = '/usr/bin/ebook-convert'
