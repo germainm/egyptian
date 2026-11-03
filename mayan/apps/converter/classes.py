@@ -32,7 +32,8 @@ from mayan.apps.storage.utils import (
 )
 
 from .exceptions import (
-    AppImageError, InvalidOfficeFormat, LayerError, OfficeConversionError
+    AppImageError, InvalidOfficeFormat, LayerError, OfficeConversionError,
+    PageCountError
 )
 from .literals import (
     CONVERTER_EPUB_MIME_TYPE, CONVERTER_OFFICE_FILE_EXTENSIONS,
@@ -347,6 +348,14 @@ class ConverterBase:
             self.soffice_file = self.to_pdf()
         except InvalidOfficeFormat as exception:
             logger.debug('Is not an office format document; %s', exception)
+        except OfficeConversionError as exception:
+            # Reported like any other format the converter cannot read: the
+            # error is logged on the document file and the upload completes,
+            # instead of leaving a document without version.
+            raise PageCountError(
+                'Unable to convert the file to PDF with LibreOffice; '
+                '{}'.format(exception)
+            ) from exception
 
     def seek_page(self, page_number):
         self.file_object.seek(0)
@@ -491,6 +500,14 @@ class ConverterBase:
                     fsrc=converted_file_object,
                     fdst=temporary_converted_file_object
                 )
+        except FileNotFoundError as exception:
+            # LibreOffice exits with status 0 without writing the PDF file
+            # when it cannot load the source file (formulas with LibreOffice
+            # 7.4, damaged files).
+            temporary_converted_file_object.close()
+            raise OfficeConversionError(
+                _(message='LibreOffice did not produce a PDF file.')
+            ) from exception
         except Exception:
             temporary_converted_file_object.close()
             raise

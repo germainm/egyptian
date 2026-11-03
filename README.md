@@ -31,6 +31,11 @@ of that test:
   images and style sheets they link to, so the server would request any address that an
   uploaded file names.
 - **Photoshop files with layers** are rendered as their merged image, on one page.
+- **Files that LibreOffice cannot convert no longer break the upload.** When LibreOffice writes
+  no PDF file, fails or times out, the error is logged on the document file and the document
+  gets its version and its file metadata, like any other format the converter cannot read.
+  OpenDocument formulas are in this case: LibreOffice 7.4 does not load them without its
+  interface. Before, the upload stopped and left a document without version.
 - **Emails on all their pages.** An email was cut to its first page; its attachments are no
   longer shown as base64 text, its plain text is escaped, and the rendering loads no external
   resource (only the images embedded in the message).
@@ -122,6 +127,8 @@ listed.
   on frame 0
 - Render the XML files and the Python scripts (`text/xml`, `text/x-script.python`) as plain
   text, and the CSV, WMF and EMF files, with LibreOffice
+- Log the error and complete the upload when LibreOffice writes no PDF file, fails or times
+  out, instead of leaving a document without version
 
 ### More file formats
 
