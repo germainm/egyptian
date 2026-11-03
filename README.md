@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="mayan/apps/appearance/static/appearance/images/egyptian-about.png"
+       alt="Egyptian: a golden pyramid and the sun over the desert" width="640">
+</p>
+
 # Egyptian — a fork based on Mayan EDMS® 4.x
 
 **Egyptian** is a production fork of [Mayan EDMS](https://gitlab.com/mayan-edms/mayan-edms) 4.x,
@@ -252,6 +257,25 @@ and archive formats.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.
+
+---
+
+## Tests
+
+The renderers of the formats added to the converter and the refinement of the MIME types have
+unit tests (72): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, audio files,
+emails without remote resources, transparency, and the content-based MIME types. They need no
+database, no network and no sample file: their files are built in memory. Run them from an
+Egyptian installation, with the same environment variables as for `migrate`:
+
+```bash
+/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.mime_types
+```
+
+The tests that need a tool or a library that is not installed (FFmpeg, libarchive-c,
+WeasyPrint, pydicom, gpxpy) are skipped. The Egyptian extensions have their own tests in their
+repositories.
 
 ---
 
