@@ -85,7 +85,6 @@ drf-spectacular==0.30.0
 drf-spectacular-sidecar==2026.7.1
 elasticsearch==9.4.0
 esprima==4.0.1
-extract-msg==0.55.0
 furl==2.1.4
 fusepy==3.0.1
 gevent==26.4.0
@@ -97,6 +96,7 @@ jsonschema==4.26.0
 mozilla-django-oidc==5.0.2
 nh3==0.3.6
 node-semver==0.9.0
+olefile==0.47
 ollama==0.6.2
 openai==2.53.0
 pycountry==26.2.16

@@ -9,8 +9,10 @@ and needs nothing that reading DICOM pixels does not already need: numpy.
 
 The inverse DCT is the integer form of the algorithm of Loeffler, Ligtenberg
 and Moschytz (1989), scaled as in the "slow integer" method of libjpeg of the
-Independent JPEG Group: its results are those of libjpeg-turbo, except for the
-components with fewer samples than the others, enlarged here by repetition.
+Independent JPEG Group. The components with fewer samples than the others are
+enlarged by the same filter as libjpeg-turbo by default: a triangle over the
+neighbors for twice the samples, repetition for the other factors. The results
+are those of libjpeg-turbo.
 
 The data comes from outside: images are limited in pixels and in time, a file
 too short to hold the image it declares is refused, an error in the
@@ -47,7 +49,7 @@ MARKER_SOF_UNSUPPORTED = {
 MARKER_SOS = 0xDA
 
 REGEX_END_OF_SCAN = re.compile(pattern=b'\xff[^\x00\xd0-\xd7\xff]')
-REGEX_RESTART = re.compile(pattern=b'\xff+[\xd0-\xd7]')
+REGEX_RESTART = re.compile(pattern=b'\xff\xff*[\xd0-\xd7]')
 
 ZIGZAG = (
     0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33,
@@ -505,6 +507,74 @@ def _inverse_dct(blocks, precision):
     return numpy.clip(samples, 0, (1 << precision) - 1)
 
 
+def _double_columns(samples, shift, bias_left, bias_right):
+    """
+    Two samples for each one along the rows: three quarters of it and a quarter
+    of its neighbor on that side. The samples at the ends have no neighbor on
+    their outer side and count for all of it.
+    """
+    import numpy
+
+    result = numpy.empty(
+        (samples.shape[0], samples.shape[1] * 2), dtype=numpy.int32
+    )
+    result[:, 0] = (samples[:, 0] * 4 + bias_left) >> shift
+    result[:, 1:-1:2] = (
+        samples[:, :-1] * 3 + samples[:, 1:] + bias_right
+    ) >> shift
+    result[:, 2::2] = (
+        samples[:, 1:] * 3 + samples[:, :-1] + bias_left
+    ) >> shift
+    result[:, -1] = (samples[:, -1] * 4 + bias_right) >> shift
+    return result
+
+
+def _enlarge(samples, factor_horizontal, factor_vertical):
+    """
+    The samples of a component multiplied along the rows and the columns, by
+    the filter that libjpeg-turbo chooses for these factors and this width. The
+    bias alternates so that the rounding does not move the values one way.
+    """
+    import numpy
+
+    wide_enough = samples.shape[1] > 2
+
+    if factor_horizontal == 2 and factor_vertical == 1 and wide_enough:
+        return _double_columns(
+            samples=samples.astype(numpy.int32), shift=2, bias_left=1,
+            bias_right=2
+        ).astype(numpy.uint16)
+
+    if factor_vertical == 2 and (
+        factor_horizontal == 1 or (factor_horizontal == 2 and wide_enough)
+    ):
+        samples = samples.astype(numpy.int32)
+        # The rows at the ends are their own neighbors outside the image.
+        above = samples * 3 + numpy.concatenate((samples[:1], samples[:-1]))
+        below = samples * 3 + numpy.concatenate((samples[1:], samples[-1:]))
+        if factor_horizontal == 1:
+            result = numpy.empty(
+                (samples.shape[0] * 2, samples.shape[1]), dtype=numpy.int32
+            )
+            result[0::2] = (above + 1) >> 2
+            result[1::2] = (below + 2) >> 2
+        else:
+            result = numpy.empty(
+                (samples.shape[0] * 2, samples.shape[1] * 2), dtype=numpy.int32
+            )
+            result[0::2] = _double_columns(
+                samples=above, shift=4, bias_left=8, bias_right=7
+            )
+            result[1::2] = _double_columns(
+                samples=below, shift=4, bias_left=8, bias_right=7
+            )
+        return result.astype(numpy.uint16)
+
+    return samples.repeat(factor_horizontal, axis=1).repeat(
+        factor_vertical, axis=0
+    )
+
+
 def _component_samples(frame, component, table):
     """The samples of a component, at the size of the image."""
     import numpy
@@ -527,12 +597,21 @@ def _component_samples(frame, component, table):
             8, component.blocks_wide * 8
         )
 
-    factor_h = frame.horizontal_maximum // component.horizontal
-    factor_v = frame.vertical_maximum // component.vertical
-    if factor_h > 1:
-        samples = samples.repeat(factor_h, axis=1)
-    if factor_v > 1:
-        samples = samples.repeat(factor_v, axis=0)
+    factor_horizontal = frame.horizontal_maximum // component.horizontal
+    factor_vertical = frame.vertical_maximum // component.vertical
+    if factor_horizontal > 1 or factor_vertical > 1:
+        # The filters must see the edge of the image, not the rest of the block.
+        samples = _enlarge(
+            samples=samples[
+                :_divide_up(
+                    frame.rows * component.vertical, frame.vertical_maximum
+                ), :_divide_up(
+                    frame.columns * component.horizontal,
+                    frame.horizontal_maximum
+                )
+            ], factor_horizontal=factor_horizontal,
+            factor_vertical=factor_vertical
+        )
 
     return samples[:frame.rows, :frame.columns]
 

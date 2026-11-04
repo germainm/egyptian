@@ -5,7 +5,6 @@ import shutil
 import tarfile
 import zipfile
 
-import extract_msg
 from pypdf import PdfReader
 
 try:
@@ -25,6 +24,7 @@ from .exceptions import (
     ArchiveMemberSizeExceeded, NoMIMETypeMatch
 )
 from .literals import MIME_TYPE_EML, MSG_MIME_TYPES
+from .outlook import OutlookMessage
 from .settings import (
     setting_compressed_file_compression_ratio_maximum,
     setting_compressed_file_input_size_maximum,
@@ -228,7 +228,7 @@ class EMLArchive(Archive):
 class MsgArchive(Archive):
     def _open(self, file_object):
         self._check_input_size(file_object=file_object)
-        self._archive = extract_msg.Message(path=file_object)
+        self._archive = OutlookMessage(file_object=file_object)
 
     def member_contents(self, filename):
         if filename == 'message.txt':
@@ -239,7 +239,7 @@ class MsgArchive(Archive):
             return content
 
         for member in self._archive.attachments:
-            if member.longFilename == filename:
+            if member.filename == filename:
                 content = force_bytes(s=member.data)
                 self._check_member_size(
                     filename=filename, member_size=len(content)
@@ -249,7 +249,7 @@ class MsgArchive(Archive):
     def members(self):
         results = []
         for attachments in self._archive.attachments:
-            results.append(attachments.longFilename)
+            results.append(attachments.filename)
 
         if self._archive.body:
             results.append('message.txt')
@@ -267,7 +267,7 @@ class MsgArchive(Archive):
             )
 
         for member in self._archive.attachments:
-            if member.longFilename == filename:
+            if member.filename == filename:
                 content = force_bytes(s=member.data)
                 self._check_member_size(
                     filename=filename, member_size=len(content)

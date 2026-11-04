@@ -20,9 +20,10 @@ commercial extensions built and used in production.
   GPL-2.0-only license of this project. They are now read by a decoder of this project, in
   Python with numpy (`mayan/apps/converter/renderers/jpeg_extended.py`), with no new dependency.
   Its values were compared with those of libjpeg-turbo 3.1.3: identical on 168 monochrome images
-  of all sizes and qualities and on color images with all their samples; color images with
-  fewer chroma samples have the same luma, their chroma is enlarged by repetition instead of
-  being smoothed. On the test server, a 512 × 512 image takes about 0.15 s and an image of 12.6
+  of all sizes and qualities, on 8,400 color images of 8 and 12 bits with all the chroma
+  samplings, from 1 to 301 pixels wide, the components with fewer samples being enlarged by the
+  same filter, and on the 43 JPEG images of the test data of pydicom and pylibjpeg. On the test
+  server, a 512 × 512 image takes about 0.15 s and an image of 12.6
   megapixels about 6 s. Images over 64 million samples or 2 minutes of decoding, and files too
   short for the size they declare, get the page of attributes with the reason.
 - **No more `python-gdcm`.** This package is under the Apache-2.0 license and bundles OpenSSL
@@ -34,9 +35,25 @@ commercial extensions built and used in production.
   30 JPEG 2000 files, 15 8-bit JPEG files; those of GDCM or libjpeg for 13 lossless JPEG files.
   The pages of 193 sample DICOM files are the same as before, except for 8 files that now have
   their image instead of a page of attributes, among them two in High-Throughput JPEG 2000 and
-  one in JPEG-LS that GDCM did not read. The lossless decoder is slower, being in Python: 7.8 s on
-  the test server for a mammogram of 14 megapixels, against 0.4 s in JPEG-LS. Do not install
-  `pylibjpeg-libjpeg` (GPLv3), an optional extra of `pylibjpeg`.
+  one in JPEG-LS that GDCM did not read. The lossless decoder reads the Huffman codes with numpy:
+  thousands of readers start along the stream, where they resynchronize by themselves, and a
+  part of the stream only counts if the reader of the previous part ended exactly on its first
+  bit. On the test server, a mammogram of 14 megapixels takes 0.9 s to decode (7.4 s with a
+  Python loop), and 1.3 to 1.7 s for its whole page (1.6 s with GDCM). The loop remains for what
+  the readers refuse: damaged data, streams that do not resynchronize, scans with several Huffman
+  tables. Both give the same result on 2,453 files, 360 of them damaged, and the values are those
+  of libjpeg-turbo in 1,902 comparisons. Do not install `pylibjpeg-libjpeg` (GPLv3), an optional
+  extra of `pylibjpeg`.
+- **No more `extract-msg`.** This package and `pcodedmp`, which it brought, are under the GPLv3,
+  which cannot be combined with the license of this project. Outlook `.msg` files are
+  now read by a reader of this project (`mayan/apps/storage/outlook.py`), written from the public
+  specification of the format, [MS-OXMSG], on `olefile` (BSD). 13 packages leave the installation.
+  On the 41 sample files of Apache POI, the text and the attachments are those of `extract-msg`,
+  except that the Russian and Chinese text of 8-bit files is now readable, an attached message is
+  an `.eml` file instead of an object without a name, and two damaged files that it refused are
+  read. The sender has an address when the file holds one, recipients taken from the Internet
+  headers keep their separators, and an address missing no longer gives `<None>`. One test file
+  has a subject in the wrong encoding: it announces no code page but the one of its HTML body.
 - **The text of emails is extracted.** It only came from the OCR of the page images. It is now
   read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
   headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
@@ -302,15 +319,15 @@ To regenerate the files of the image after a change to the workers, the queues o
 ## Tests
 
 The renderers of the formats added to the converter and the refinement of the MIME types have
-unit tests (129): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+unit tests (158): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
 encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit and
 lossless JPEG, audio files, emails and Markdown files without remote resources, the text of the emails,
-transparency, and the content-based MIME types. They need no database and no network: their
+the Outlook `.msg` files, transparency, and the content-based MIME types. They need no database and no network: their
 files are built in memory or come with pydicom. Run them from an Egyptian installation, with
 the same environment variables as for `migrate`:
 
 ```bash
-/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types
+/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types mayan.apps.storage
 ```
 
 The tests that need a tool or a library that is not installed (FFmpeg, libarchive-c,

@@ -15,11 +15,11 @@ PythonDependency(
 )
 PythonDependency(
     environments=(environment_production,), module=__name__,
-    name='extract-msg', version_string='==0.55.0'
+    name='google-cloud-storage', version_string='==3.10.1'
 )
 PythonDependency(
-    environments=(environment_production,), module=__name__,
-    name='google-cloud-storage', version_string='==3.10.1'
+    environments=(environment_production,), module=__name__, name='olefile',
+    version_string='==0.47'
 )
 PythonDependency(
     environments=(environment_testing,), module=__name__, name='psutil',

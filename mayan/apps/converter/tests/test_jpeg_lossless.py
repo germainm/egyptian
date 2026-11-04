@@ -6,8 +6,10 @@ were checked once against libjpeg-turbo. Being lossless, each image must give
 exactly the samples it was made from.
 """
 import base64
+import contextlib
 import hashlib
 import importlib.util
+import time
 import unittest
 from unittest import mock
 
@@ -370,6 +372,223 @@ class DecoderTestCase(SimpleTestCase):
 
 
 @unittest.skipUnless(PYDICOM, 'pydicom not installed')
+@contextlib.contextmanager
+def readers_results():
+    """The results of the arrays of readers, each one for a segment."""
+    original = jpeg_lossless._read_segment_with_readers
+    results = []
+
+    def wrapper(**kwargs):
+        results.append(original(**kwargs))
+        return results[-1]
+
+    with mock.patch.object(jpeg_lossless, '_read_segment_with_readers', wrapper):
+        yield results
+
+
+class ReadersTestCase(SimpleTestCase):
+    """
+    The arrays of readers against the Python loop, which defines the behavior.
+    """
+    def setUp(self):
+        import numpy
+
+        # Differences of many sizes, as in a real image: codes of many lengths.
+        random = numpy.random.default_rng(5)
+        self.source = (
+            random.normal(2000, 12, (128, 128)).astype(numpy.int64) +
+            numpy.arange(128) * 3
+        ).astype(numpy.uint16)
+
+    def assert_same(self, first, second):
+        # Not assertEqual: on lists this long, its message takes minutes.
+        import numpy
+
+        self.assertTrue(numpy.array_equal(first, second), 'Different samples.')
+
+    def decode_both(self, data):
+        with mock.patch.object(
+            jpeg_lossless, 'READERS_SAMPLES_MINIMUM', new=1 << 40
+        ):
+            expected = decode(data=data)
+        with readers_results() as results:
+            samples, precision = decode(data=data)
+        self.assert_same(samples, expected[0])
+        self.assertEqual(precision, expected[1])
+        return samples, results
+
+    def test_each_predictor(self):
+        for predictor in range(1, 8):
+            with self.subTest(predictor=predictor):
+                samples, results = self.decode_both(
+                    data=make_lossless_jpeg(
+                        predictor=predictor, source=self.source
+                    )
+                )
+                self.assertEqual(results, [True])
+                self.assert_same(samples[:, :, 0], self.source)
+
+    def test_diagonals_of_every_shape(self):
+        import numpy
+
+        random = numpy.random.default_rng(7)
+        for rows, columns in (
+            (1, 1), (1, 7), (7, 1), (2, 2), (2, 9), (9, 2), (3, 3), (5, 40),
+            (40, 5)
+        ):
+            source = random.integers(0, 4096, (rows, columns)).astype(
+                numpy.uint16
+            )
+            for predictor in (6, 7):
+                with self.subTest(
+                    rows=rows, columns=columns, predictor=predictor
+                ):
+                    samples, precision = decode(
+                        data=make_lossless_jpeg(
+                            predictor=predictor, source=source
+                        )
+                    )
+                    self.assert_same(samples[:, :, 0], source)
+
+    def test_long_differences_and_largest_one(self):
+        import numpy
+
+        # Codes of five bits with up to 15 additional bits do not fit in the 16
+        # bits of the tables, and a difference of 32768 has no additional bits.
+        random = numpy.random.default_rng(6)
+        source = random.normal(30000, 4000, (128, 128)).clip(0, 65535).astype(
+            numpy.uint16
+        )
+        source[:64] = (self.source[:64] % 512) + 200
+        source[::8, ::2] = 40000
+        source[::8, 1::2] = 7232
+        samples, results = self.decode_both(
+            data=make_lossless_jpeg(precision=16, source=source)
+        )
+        self.assertEqual(results, [True])
+        self.assert_same(samples[:, :, 0], source)
+
+    def test_fixtures_of_libjpeg_turbo(self):
+        # Too small for the readers to succeed each time: the result must not
+        # depend on it.
+        with mock.patch.multiple(
+            jpeg_lossless, READERS_SAMPLES_MINIMUM=1,
+            READERS_SPACING_MINIMUM=256, READERS_SYNCHRONIZATION=16
+        ):
+            for predictor, data in enumerate(
+                (
+                    JPEG_PREDICTOR_1, JPEG_PREDICTOR_2, JPEG_PREDICTOR_3,
+                    JPEG_PREDICTOR_4, JPEG_PREDICTOR_5, JPEG_PREDICTOR_6,
+                    JPEG_PREDICTOR_7
+                ), start=1
+            ):
+                with self.subTest(predictor=predictor):
+                    samples, precision = decode(data=data)
+                    self.assert_same(samples[:, :, 0], make_source())
+
+    def test_restart_intervals_and_transform(self):
+        import numpy
+
+        source = numpy.tile(self.source, (2, 1))
+        source = (source >> 2) << 2
+        for predictor in (1, 4, 6, 7):
+            with self.subTest(predictor=predictor):
+                samples, results = self.decode_both(
+                    data=make_lossless_jpeg(
+                        predictor=predictor, source=source, restart_rows=128,
+                        transform=2
+                    )
+                )
+                self.assertEqual(results, [True, True])
+                self.assert_same(samples[:, :, 0], source)
+
+    def test_stream_that_does_not_resynchronize(self):
+        import numpy
+
+        # Codes of five bits only: a reader that starts inside one stays there.
+        source = numpy.full((128, 128), 1000, dtype=numpy.uint16)
+        samples, results = self.decode_both(
+            data=make_lossless_jpeg(source=source)
+        )
+        self.assertEqual(results, [False])
+        self.assert_same(samples[:, :, 0], source)
+
+    def test_truncated_streams(self):
+        data = make_lossless_jpeg(source=self.source)
+        start = data.index(b'\xff\xda') + 10
+        for share in (25, 50, 90, 99, 100):
+            with self.subTest(share=share):
+                self.decode_both(
+                    data=data[:start + (len(data) - 2 - start) * share // 100]
+                )
+        # The last code cut in two.
+        for missing in range(1, 8):
+            with self.subTest(missing=missing):
+                self.decode_both(data=data[:-2 - missing])
+
+    def test_invalid_codes(self):
+        data = make_lossless_jpeg(source=self.source)
+        start = data.index(b'\xff\xda') + 10
+        for position in (start + 1, (start + len(data)) // 2, len(data) - 20):
+            with self.subTest(position=position):
+                damaged = bytearray(data)
+                # Five bits of ones: the encoder gives no such code.
+                damaged[position:position + 6] = b'\xff\x00\xff\x00\xff\x00'
+                samples, results = self.decode_both(data=bytes(damaged))
+                self.assertEqual(results, [False])
+
+    def test_invalid_code_with_enough_data_after_it(self):
+        # The count of differences does not reveal the damage: more data comes.
+        data = make_lossless_jpeg(source=self.source)
+        start = data.index(b'\xff\xda') + 10
+        scan = bytearray(data[start:-2])
+        scan[len(scan) // 2:len(scan) // 2 + 6] = b'\xff\x00\xff\x00\xff\x00'
+        samples, results = self.decode_both(
+            data=data[:start] + bytes(scan) + data[start:-2] + data[-2:]
+        )
+        self.assertEqual(results, [False])
+
+    def test_data_after_the_image(self):
+        data = make_lossless_jpeg(source=self.source)
+        samples, results = self.decode_both(
+            data=data[:-2] + bytes(1000) + data[-2:]
+        )
+        self.assertEqual(results, [True])
+
+    def test_readers_at_the_end_of_the_stream(self):
+        # So many readers that some leave the data while they synchronize.
+        data = make_lossless_jpeg(source=self.source)
+        with mock.patch.multiple(
+            jpeg_lossless, READERS_SPACING_MINIMUM=8,
+            READERS_SPACING_SHIFT=30, READERS_SYNCHRONIZATION=2000
+        ):
+            samples, results = self.decode_both(data=data)
+        self.assert_same(samples[:, :, 0], self.source)
+
+    def test_reader_that_does_not_resynchronize_in_time(self):
+        # Too few differences to resynchronize: a part is taken over by the
+        # reader before it, up to one that fell on the right codes.
+        data = make_lossless_jpeg(source=self.source)
+        with mock.patch.multiple(
+            jpeg_lossless, READERS_FAILURES_DIVISOR=1,
+            READERS_SYNCHRONIZATION=8
+        ):
+            samples, results = self.decode_both(data=data)
+        self.assertEqual(results, [True])
+        self.assert_same(samples[:, :, 0], self.source)
+
+    def test_several_tables_read_by_the_loop(self):
+        with readers_results() as results, self.assertRaises(
+            jpeg_lossless.JPEGDecodeError
+        ):
+            jpeg_lossless._read_differences(
+                columns=2, count=1 << 16, deadline=time.monotonic() + 9,
+                restart_interval=0, segments=(b'',),
+                tables=[[0] * 65536, [0] * 65536]
+            )
+        self.assertEqual(results, [])
+
+
 class DICOMTestCase(SimpleTestCase):
     def _pixel_array(self, file_object, **kwargs):
         from pydicom.pixels import pixel_array
