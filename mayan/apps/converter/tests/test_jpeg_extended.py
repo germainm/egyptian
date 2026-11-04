@@ -182,7 +182,7 @@ class DecoderTestCase(SimpleTestCase):
 
 def make_dicom(
     frames=(JPEG_12_BITS,), photometric='MONOCHROME2', rows=16, columns=24,
-    samples=1, signed=0, bits=12
+    samples=1, signed=0, bits=12, transfer_syntax=None
 ):
     from pydicom.dataset import Dataset, FileMetaDataset
     from pydicom.encaps import encapsulate
@@ -193,7 +193,7 @@ def make_dicom(
     meta = FileMetaDataset()
     meta.MediaStorageSOPClassUID = SecondaryCaptureImageStorage
     meta.MediaStorageSOPInstanceUID = generate_uid()
-    meta.TransferSyntaxUID = JPEGExtended12Bit
+    meta.TransferSyntaxUID = transfer_syntax or JPEGExtended12Bit
     dataset = Dataset()
     dataset.file_meta = meta
     dataset.SOPClassUID = SecondaryCaptureImageStorage
@@ -243,7 +243,7 @@ class DICOMTestCase(SimpleTestCase):
         self.assertEqual(image.size, (256, 1024))
 
     def test_no_decoder_refusal_logged(self):
-        # GDCM and Pillow are not asked for the samples of 12 bits.
+        # Pillow is not asked for the samples of 12 bits.
         with self.assertNoLogs('pydicom', level='ERROR'):
             dicom.render_dicom_page(file_object=make_dicom(), page_number=0)
 

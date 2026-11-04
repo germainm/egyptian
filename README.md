@@ -25,6 +25,18 @@ commercial extensions built and used in production.
   being smoothed. On the test server, a 512 × 512 image takes about 0.15 s and an image of 12.6
   megapixels about 6 s. Images over 64 million samples or 2 minutes of decoding, and files too
   short for the size they declare, get the page of attributes with the reason.
+- **No more `python-gdcm`.** This package is under the Apache-2.0 license and bundles OpenSSL
+  1.1.1k. JPEG-LS is now read by `pyjpegls` (MIT, with CharLS under a BSD license), JPEG 2000 by
+  `pylibjpeg-openjpeg` (MIT, with OpenJPEG under a BSD license) with Pillow after it, and
+  lossless JPEG by a second decoder of this project
+  (`mayan/apps/converter/renderers/jpeg_lossless.py`), for all the predictors, from 2 to 16 bits.
+  On the real files of the test data of pydicom, the values are those of GDCM: 17 JPEG-LS files,
+  30 JPEG 2000 files, 15 8-bit JPEG files; those of GDCM or libjpeg for 13 lossless JPEG files.
+  The pages of 193 sample DICOM files are the same as before, except for 8 files that now have
+  their image instead of a page of attributes, among them two in High-Throughput JPEG 2000 and
+  one in JPEG-LS that GDCM did not read. The lossless decoder is slower, being in Python: 7.8 s on
+  the test server for a mammogram of 14 megapixels, against 0.4 s in JPEG-LS. Do not install
+  `pylibjpeg-libjpeg` (GPLv3), an optional extra of `pylibjpeg`.
 - **The text of emails is extracted.** It only came from the OCR of the page images. It is now
   read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
   headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
@@ -112,9 +124,7 @@ of that test:
   radiotherapy plans, which hold no image, get a page of their main attributes with the
   content of the report or the 12 leads of the ECG. Images smaller than 512 pixels (dose
   grids, thumbnails) are enlarged without smoothing. An image that no installed decoder
-  can read gets the same page, with the reason and the missing package: `python-gdcm` (JPEG
-  lossless, JPEG-LS, JPEG 2000; now in the production requirements; GDCM is under a BSD
-  license, this package of it under the Apache-2.0 license).
+  can read gets the same page, with the reason and the missing package.
 - **Raw photos in the colors of the camera.** They were developed with a daylight white
   balance, which gave a color cast (cyan with Sigma, pink with Olympus, green with Pentax);
   they now use the white balance recorded by the camera.
@@ -280,7 +290,8 @@ docker compose up --detach
 
 The image has the tools of all the file formats added to the converter: FFmpeg (videos, audio
 files), djvulibre (DjVu), Calibre (EPUB), libarchive (archives), WeasyPrint (EML, Markdown)
-and the Python libraries of the SVG, RAW photo, DXF, STL, DICOM (with python-gdcm), HEIF/HEIC
+and the Python libraries of the SVG, RAW photo, DXF, STL, DICOM (with pyjpegls and
+pylibjpeg-openjpeg), HEIF/HEIC
 and archive formats.
 
 To regenerate the files of the image after a change to the workers, the queues or
@@ -291,9 +302,9 @@ To regenerate the files of the image after a change to the workers, the queues o
 ## Tests
 
 The renderers of the formats added to the converter and the refinement of the MIME types have
-unit tests (107): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
-encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit JPEG,
-audio files, emails and Markdown files without remote resources, the text of the emails,
+unit tests (129): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit and
+lossless JPEG, audio files, emails and Markdown files without remote resources, the text of the emails,
 transparency, and the content-based MIME types. They need no database and no network: their
 files are built in memory or come with pydicom. Run them from an Egyptian installation, with
 the same environment variables as for `migrate`:
@@ -303,7 +314,7 @@ the same environment variables as for `migrate`:
 ```
 
 The tests that need a tool or a library that is not installed (FFmpeg, libarchive-c,
-WeasyPrint, pydicom, gpxpy) are skipped. The Egyptian extensions have their own tests in their
+WeasyPrint, pydicom, pyjpegls, pylibjpeg-openjpeg, gpxpy) are skipped. The Egyptian extensions have their own tests in their
 repositories.
 
 ---

@@ -137,6 +137,55 @@ def _divide_up(value, divisor):
     return (value + divisor - 1) // divisor
 
 
+def stop_if_late(deadline):
+    if time.monotonic() > deadline:
+        raise JPEGDecodeError(
+            'not decoded after {} seconds'.format(TIME_MAXIMUM)
+        )
+
+
+def split_scan(data):
+    """The segments of a scan, between its restart markers."""
+    return REGEX_RESTART.split(data)
+
+
+def read_segments(data, deadline):
+    """
+    The marker of each segment of the file, its content and, for a scan, the
+    entropy-coded data that follow its header.
+    """
+    if data[:2] != b'\xff\xd8':
+        raise JPEGDecodeError('no JPEG start of image')
+
+    position = 2
+    while position + 1 < len(data):
+        if data[position] != 0xFF or data[position + 1] in (0x00, 0xFF):
+            position += 1
+            continue
+
+        marker = data[position + 1]
+        position += 2
+        if marker == MARKER_EOI:
+            return
+        if 0xD0 <= marker <= 0xD8:
+            continue
+
+        # A file can hold any number of tables, each one takes time.
+        stop_if_late(deadline=deadline)
+
+        size = int.from_bytes(data[position:position + 2], 'big')
+        segment = data[position + 2:position + size]
+        position += size
+
+        if marker == MARKER_SOS:
+            match = REGEX_END_OF_SCAN.search(data, position)
+            end = match.start() if match else len(data)
+            yield marker, segment, data[position:end]
+            position = end
+        else:
+            yield marker, segment, b''
+
+
 def _read_quantization_tables(segment, tables):
     position = 0
     while position < len(segment):
@@ -156,7 +205,7 @@ def _read_quantization_tables(segment, tables):
         tables[identifier] = table
 
 
-def _read_huffman_tables(segment, tables):
+def read_huffman_tables(segment, tables):
     """
     Each table has one entry per value of the next 16 bits: the symbol
     multiplied by 256 plus the length of its code, 0 for an invalid code.
@@ -307,10 +356,8 @@ def _decode_scan(plan, mcus_wide, mcus_high, segments, restart_interval, deadlin
             while mcu < limit:
                 if position * 8 - bits >= size_bits:
                     raise DamagedSegment
-                if not mcu % 4096 and time.monotonic() > deadline:
-                    raise JPEGDecodeError(
-                        'not decoded after {} seconds'.format(TIME_MAXIMUM)
-                    )
+                if not mcu % 4096:
+                    stop_if_late(deadline=deadline)
 
                 row, column = divmod(mcu, mcus_wide)
                 for index in range(plan_size):
@@ -498,43 +545,20 @@ def decode_jpeg(data):
     """
     import numpy
 
-    if data[:2] != b'\xff\xd8':
-        raise JPEGDecodeError('no JPEG start of image')
-
     deadline = time.monotonic() + TIME_MAXIMUM
     decoded = 0
     frame = None
-    position = 2
     restart_interval = 0
     tables_huffman = {}
     tables_quantization = {}
 
-    while position + 1 < len(data):
-        if data[position] != 0xFF or data[position + 1] in (0x00, 0xFF):
-            position += 1
-            continue
-
-        marker = data[position + 1]
-        position += 2
-        if marker == MARKER_EOI:
-            break
-        if 0xD0 <= marker <= 0xD8:
-            continue
-
-        # A file can hold any number of tables, each one takes time.
-        if time.monotonic() > deadline:
-            raise JPEGDecodeError(
-                'not decoded after {} seconds'.format(TIME_MAXIMUM)
-            )
-
-        size = int.from_bytes(data[position:position + 2], 'big')
-        segment = data[position + 2:position + size]
-        position += size
-
+    for marker, segment, entropy_data in read_segments(
+        data=data, deadline=deadline
+    ):
         if marker == MARKER_DQT:
             _read_quantization_tables(segment, tables_quantization)
         elif marker == MARKER_DHT:
-            _read_huffman_tables(segment, tables_huffman)
+            read_huffman_tables(segment, tables_huffman)
         elif marker == MARKER_DRI:
             restart_interval = int.from_bytes(segment[:2], 'big')
         elif marker == MARKER_DNL:
@@ -554,14 +578,11 @@ def decode_jpeg(data):
             plan, mcus_wide, mcus_high = _scan_plan(
                 frame=frame, segment=segment, tables_huffman=tables_huffman
             )
-            match = REGEX_END_OF_SCAN.search(data, position)
-            end = match.start() if match else len(data)
             decoded += _decode_scan(
                 deadline=deadline, mcus_high=mcus_high, mcus_wide=mcus_wide,
                 plan=plan, restart_interval=restart_interval,
-                segments=REGEX_RESTART.split(data[position:end])
+                segments=split_scan(entropy_data)
             )
-            position = end
 
     if not frame:
         raise JPEGDecodeError('no frame header')
@@ -605,11 +626,9 @@ def _ybr_to_rgb(samples, precision):
     )
 
 
-def decode_frame(src, runner):
-    """Plugin function of pydicom: the bytes of a frame."""
+def get_frame_bytes(samples, precision, runner):
+    """The samples as pydicom expects them from a plugin."""
     import numpy
-
-    samples, precision = decode_jpeg(data=src)
 
     if samples.shape != (runner.rows, runner.columns, runner.samples_per_pixel):
         raise JPEGDecodeError(
@@ -640,6 +659,12 @@ def decode_frame(src, runner):
         data_type = '<u2' if bits_allocated == 16 else 'u1'
 
     return samples.astype(data_type).tobytes()
+
+
+def decode_frame(src, runner):
+    """Plugin function of pydicom: the bytes of a frame."""
+    samples, precision = decode_jpeg(data=src)
+    return get_frame_bytes(precision=precision, runner=runner, samples=samples)
 
 
 def is_available(uid):

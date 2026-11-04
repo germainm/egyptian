@@ -171,10 +171,50 @@ class DICOMTestCase(SimpleTestCase):
             self.assertGreaterEqual(pages, 1)
 
     def test_decoder_hints(self):
-        hint = dicom._decoder_hints()
-        self.assertTrue(hint.startswith('install') or hint.startswith('none of'))
-        # GPLv3, not compatible with the license of this project.
-        self.assertNotIn('pylibjpeg', hint)
+        with mock.patch('importlib.util.find_spec', return_value=None):
+            hint = dicom._decoder_hints()
+        self.assertIn('pyjpegls', hint)
+        self.assertIn('pylibjpeg-openjpeg', hint)
+        # GPLv3, Apache-2.0: not compatible with the license of this project.
+        self.assertNotIn('pylibjpeg-libjpeg', hint)
+        self.assertNotIn('gdcm', hint)
+
+        with mock.patch('importlib.util.find_spec', return_value=object()):
+            self.assertEqual(
+                dicom._decoder_hints(),
+                'none of the installed decoders reads this file'
+            )
+
+    def _assert_same_page_as_uncompressed(self, name):
+        from pydicom.data import get_testdata_file
+
+        pages = []
+        for file_name in ('MR_small.dcm', name):
+            path = get_testdata_file(file_name, download=False)
+            if not path:
+                self.skipTest('sample file of pydicom not installed')
+            with open(path, mode='rb') as file_object:
+                pages.append(
+                    dicom.render_dicom_page(
+                        file_object=file_object, page_number=0
+                    ).tobytes()
+                )
+        self.assertEqual(pages[0], pages[1])
+
+    @unittest.skipUnless(
+        importlib.util.find_spec('jpeg_ls'), 'pyjpegls not installed'
+    )
+    def test_jpeg_ls(self):
+        self._assert_same_page_as_uncompressed('MR_small_jpeg_ls_lossless.dcm')
+
+    @unittest.skipUnless(
+        importlib.util.find_spec('openjpeg'), 'pylibjpeg-openjpeg not installed'
+    )
+    def test_jpeg_2000(self):
+        self._assert_same_page_as_uncompressed('MR_small_jp2klossless.dcm')
+
+    def test_rle(self):
+        self._assert_same_page_as_uncompressed('MR_small_RLE.dcm')
 
 
 @unittest.skipUnless(FFMPEG, 'ffmpeg and ffprobe not installed')
