@@ -14,6 +14,13 @@ enlarged by the same filter as libjpeg-turbo by default: a triangle over the
 neighbors for twice the samples, repetition for the other factors. The results
 are those of libjpeg-turbo.
 
+A scan of one component, the case of nearly all these images, is read by arrays
+of readers (Klein and Wiseman, "Parallel Huffman decoding with applications to
+JPEG files", 2003): see jpeg_lossless.py, the difference being that a reader
+also knows where it is in its block. A part of the stream only counts if the
+reader of the previous part ended exactly on its first bit, at the end of a
+block. Everything unusual goes to the Python loop, which defines the behavior.
+
 The data comes from outside: images are limited in pixels and in time, a file
 too short to hold the image it declares is refused, an error in the
 entropy-coded data leaves the rest of its segment in gray.
@@ -47,6 +54,38 @@ MARKER_SOF_UNSUPPORTED = {
     0xCE: 'arithmetic', 0xCF: 'arithmetic'
 }
 MARKER_SOS = 0xDA
+
+# The longest block: a DC code of 16 bits with 16 additional bits and 63 AC codes
+# of 16 bits with 15 additional bits.
+BLOCK_BITS_MAXIMUM = 32 + 63 * 31
+# In the table of the values: the next 16 bits do not hold it whole.
+VALUE_LONG = 1 << 20
+# In the table of the steps: this symbol also holds a value of the block.
+STEP_WITH_VALUE = 128
+
+# Smaller segments go to the Python loop: arrays cost more than they save
+# (measured: 0.15 s instead of 0.12 s for 110 KB, 0.27 s instead of 0.39 s for
+# 210 KB).
+READERS_BYTES_MINIMUM = 131072
+# According to the bits per block of the stream: up to that many, the symbols
+# that a reader reads to resynchronize before its part begins, then the shift
+# that gives the spacing of the readers and the smallest spacing. A reader must
+# find its place in a block as well as the boundaries of the codes, and only the
+# end of a block tells it: the fuller the blocks, the longer it takes. Measured
+# on a mammogram of 14 megapixels: at quality 90 (270 bits per block), 44% of the
+# readers miss the next one after 64 symbols, 15% after 256; at quality 95 (337),
+# 4% after 1024; at quality 100 (444), 12% after 4096. The smallest spacing keeps
+# this reading below about half of the stream, for what ends up with the loop.
+READERS_SETTINGS = (
+    (300, 256, 14, 512), (400, 1024, 13, 12288),
+    (float('inf'), 4096, 13, 49152)
+)
+# Share of the readers that may fail to resynchronize, and the attempts to
+# repair them, before the Python loop takes over.
+READERS_FAILURES_DIVISOR = 4
+READERS_ROUNDS_MAXIMUM = 16
+# Steps of the readers between two checks of the time.
+READERS_STEPS_CHECK = 1024
 
 REGEX_END_OF_SCAN = re.compile(pattern=b'\xff[^\x00\xd0-\xd7\xff]')
 REGEX_RESTART = re.compile(pattern=b'\xff\xff*[\xd0-\xd7]')
@@ -333,6 +372,338 @@ def _scan_plan(frame, segment, tables_huffman):
     return plan, mcus_wide, mcus_high
 
 
+def get_differences(sizes, values):
+    """Below half of its range, the value of the additional bits is negative."""
+    import numpy
+
+    return numpy.where(
+        values < ((1 << sizes) >> 1), values - ((1 << sizes) - 1), values
+    )
+
+
+def get_words(data):
+    """
+    The 24 bits that start at each byte of the data. After the data come zeros,
+    as in the Python loops for a last code cut in two.
+    """
+    import numpy
+
+    values = numpy.frombuffer(data + bytes(8), dtype=numpy.uint8)
+    # In place: the data can be large and this is four bytes per byte already.
+    words = values[:-2].astype(numpy.uint32)
+    words <<= 8
+    words |= values[1:-1]
+    words <<= 8
+    words |= values[2:]
+    return words
+
+
+def plan_readers(advance_readers, count, size_bits, starts):
+    """
+    Where each reader used starts and how many items it reads, or None when the
+    stream is not one that the readers can read. The function moves the readers
+    to their stops and counts the items they go over.
+    """
+    import numpy
+
+    stops = numpy.append(starts[1:], size_bits)
+    positions = starts.copy()
+    alive = numpy.ones(starts.size, dtype=bool)
+    invalid = numpy.zeros(starts.size, dtype=bool)
+    # Where a reader stands inside an item: at 0, between two items.
+    states = numpy.zeros(starts.size, dtype=numpy.int64)
+    counts = numpy.zeros(starts.size, dtype=numpy.int64)
+
+    for attempt in range(READERS_ROUNDS_MAXIMUM):
+        advance_readers(
+            active=numpy.flatnonzero(alive & ~invalid & (positions < stops)),
+            counts=counts, invalid=invalid, positions=positions, states=states,
+            stops=stops
+        )
+
+        # A reader that passed the start of the next one, or reached it inside
+        # an item: the next one did not resynchronize in time, this one
+        # continues up to its stop.
+        missed = (positions > stops) | ((positions == stops) & (states != 0))
+        failed = numpy.flatnonzero(alive & missed & (stops < size_bits))
+        if not failed.size:
+            break
+        if not attempt and failed.size > starts.size // READERS_FAILURES_DIVISOR:
+            return None
+
+        for reader in failed.tolist():
+            following = reader + 1
+            while alive[reader] and following < starts.size and (
+                positions[reader] > stops[reader] or (
+                    positions[reader] == stops[reader] and states[reader]
+                )
+            ):
+                if alive[following]:
+                    alive[following] = False
+                    stops[reader] = stops[following]
+                following += 1
+    else:
+        return None
+
+    readers = numpy.flatnonzero(alive)
+    totals = numpy.cumsum(counts[readers])
+    needed = int(numpy.searchsorted(totals, count))
+    if needed >= readers.size:
+        return None
+
+    # Each reader used must have ended exactly where the next one starts.
+    used = readers[:needed]
+    following = starts[readers[1:needed + 1]]
+    if (invalid[used] | (positions[used] != following)).any():
+        return None
+
+    readers = readers[:needed + 1]
+    counts = counts[readers]
+    counts[-1] -= int(totals[needed]) - count
+    return starts[readers], counts
+
+
+class ScanTables:
+    """
+    From the Huffman tables of a component, per state of a reader (first half:
+    in the AC coefficients, second half: at the DC one of a block) and value of
+    the next 16 bits: the length of the code, the size of its additional bits,
+    the bits that the whole symbol takes (0 for an invalid code), the coefficients
+    that it moves over and the value that it holds.
+    """
+    def __init__(self, table_ac, table_dc):
+        import numpy
+
+        half = len(table_ac)
+        entries = numpy.array(table_ac + table_dc, dtype=numpy.int32)
+        symbols = entries >> 8
+        self.lengths = entries & 255
+
+        self.sizes = symbols & 15
+        self.sizes[half:] = symbols[half:]
+
+        advance = self.lengths + self.sizes
+        advance[half:][symbols[half:] > 16] = 0
+        self.advance = advance.astype(numpy.uint8)
+
+        # An AC symbol of size 0 is 16 zeros (ZRL) or the end of the block.
+        steps = numpy.where(
+            self.sizes > 0, ((symbols >> 4) + 1) | STEP_WITH_VALUE,
+            numpy.where(symbols == 0xF0, 16, 64)
+        )
+        steps[half:] = 1
+        self.steps = steps.astype(numpy.uint8)
+
+        windows = numpy.tile(numpy.arange(half, dtype=numpy.int32), 2)
+        whole = advance <= 16
+        sizes = numpy.where(whole, self.sizes, 0)
+        values = (windows >> (16 - advance.clip(max=16))) & ((1 << sizes) - 1)
+        self.values = get_differences(sizes=sizes, values=values)
+        self.values[~whole] = VALUE_LONG
+
+
+def _get_reader_starts(count, size_bits, tables, words):
+    """Places in the stream that are likely to be the start of a block."""
+    import numpy
+
+    for bits_per_block, synchronization, shift, spacing in READERS_SETTINGS:
+        if size_bits / count <= bits_per_block:
+            break
+
+    spacing = max(spacing, size_bits >> shift)
+    seeds = numpy.arange(spacing, size_bits, spacing, dtype=numpy.int64)
+    states = numpy.ones(seeds.size, dtype=numpy.int64)
+
+    def move(selection):
+        current = seeds[selection]
+        index = (
+            (words[current >> 3] >> (8 - (current & 7))) & 65535
+        ) + (states[selection] == 0) * 65536
+        # Not on the right codes yet, a reader can meet invalid ones: one bit
+        # further is as good a place as any other.
+        seeds[selection] = numpy.minimum(
+            current + numpy.maximum(tables.advance[index], 1), size_bits
+        )
+        result = states[selection] + (tables.steps[index] & 127)
+        result[result >= 64] = 0
+        states[selection] = result
+
+    for _ in range(synchronization):
+        move(selection=Ellipsis)
+    # Then up to the end of the block, 63 symbols at the most.
+    for _ in range(64):
+        pending = numpy.flatnonzero(states)
+        if not pending.size:
+            break
+        move(selection=pending)
+
+    # The first bit of the stream is the only place known to be right.
+    return numpy.unique(
+        numpy.concatenate(
+            (numpy.zeros(1, dtype=numpy.int64), seeds[seeds < size_bits])
+        )
+    )
+
+
+def _count_blocks(
+    active, counts, deadline, invalid, positions, states, stops, tables, words
+):
+    """
+    Move the active readers from their position to their stop, or to an invalid
+    code, and count the blocks they finish.
+    """
+    current = positions[active]
+    stop = stops[active]
+    state = states[active]
+    step = 0
+
+    while current.size:
+        step += 1
+        if not step % READERS_STEPS_CHECK:
+            stop_if_late(deadline=deadline)
+
+        index = (
+            (words[current >> 3] >> (8 - (current & 7))) & 65535
+        ) + (state == 0) * 65536
+        jumps = tables.advance[index]
+        moves = tables.steps[index]
+        current += jumps
+        state += moves & 127
+        running = current < stop
+        blocked = jumps == 0
+
+        ended = state >= 64
+        if ended.any():
+            # A value after the last coefficient of a block.
+            blocked |= ended & (state > 64) & (moves >= STEP_WITH_VALUE)
+            counts[active[ended & ~blocked]] += 1
+            state[ended] = 0
+
+        if blocked.any():
+            invalid[active[blocked]] = True
+            running &= ~blocked
+
+        if not running.all():
+            finished = ~running
+            positions[active[finished]] = current[finished]
+            states[active[finished]] = state[finished]
+            active = active[running]
+            current = current[running]
+            stop = stop[running]
+            state = state[running]
+
+
+def _write_blocks(counts, deadline, offsets, output, starts, tables, words):
+    """
+    Write the AC coefficients that the readers go over at their place and return
+    the differences of the DC coefficients of the blocks.
+    """
+    import numpy
+
+    zigzag = numpy.array(ZIGZAG, dtype=numpy.int64)
+    differences = numpy.zeros(int(counts.sum()), dtype=numpy.int32)
+
+    current = starts.copy()
+    ends = numpy.cumsum(counts)
+    block = ends - counts
+    bases = offsets[block]
+    state = numpy.zeros(starts.size, dtype=numpy.int64)
+    step = 0
+
+    while current.size:
+        step += 1
+        if not step % READERS_STEPS_CHECK:
+            stop_if_late(deadline=deadline)
+
+        at_start = state == 0
+        index = (
+            (words[current >> 3] >> (8 - (current & 7))) & 65535
+        ) + at_start * 65536
+        values = tables.values[index]
+
+        long_values = numpy.flatnonzero(values == VALUE_LONG)
+        if long_values.size:
+            found = index[long_values]
+            sizes = tables.sizes[found].astype(numpy.int64)
+            at = current[long_values] + tables.lengths[found]
+            values[long_values] = get_differences(
+                sizes=sizes, values=(
+                    (words[at >> 3] >> (8 - (at & 7))) & 65535
+                ) >> (16 - sizes)
+            )
+
+        moves = tables.steps[index]
+        current += tables.advance[index]
+        state += moves & 127
+
+        differences[block[at_start]] = values[at_start]
+        with_value = moves >= STEP_WITH_VALUE
+        output[
+            bases[with_value] + zigzag[state[with_value] - 1]
+        ] = values[with_value]
+
+        ended = state >= 64
+        if ended.any():
+            state[ended] = 0
+            block[ended] += 1
+            running = block != ends
+            bases[ended] = offsets[block[ended]]
+            if not running.all():
+                bases = bases[running]
+                block = block[running]
+                current = current[running]
+                ends = ends[running]
+                state = state[running]
+
+    return differences
+
+
+def _read_segment_with_readers(
+    component, count, data, deadline, first, mcus_wide, tables
+):
+    """
+    Write the coefficients of the blocks of a segment. Return False, with the
+    coefficients as they were, for the Python loop to read the segment.
+    """
+    import numpy
+
+    # No block can start after that, whatever follows in the file.
+    size_bits = min(len(data) * 8, count * BLOCK_BITS_MAXIMUM)
+    words = get_words(data=data[:size_bits // 8 + 8])
+
+    def advance_readers(**kwargs):
+        _count_blocks(deadline=deadline, tables=tables, words=words, **kwargs)
+
+    plan = plan_readers(
+        advance_readers=advance_readers, count=count, size_bits=size_bits,
+        starts=_get_reader_starts(
+            count=count, size_bits=size_bits, tables=tables, words=words
+        )
+    )
+    if plan is None:
+        return False
+
+    # The place of each block in the coefficients, and after the last one.
+    mcus = numpy.arange(first, first + count + 1, dtype=numpy.int64)
+    offsets = 64 * (
+        (mcus // mcus_wide) * component.blocks_wide + mcus % mcus_wide
+    )
+    output = numpy.frombuffer(component.coefficients, dtype=numpy.intc)
+    values = numpy.cumsum(
+        _write_blocks(
+            counts=plan[1], deadline=deadline, offsets=offsets, output=output,
+            starts=plan[0], tables=tables, words=words
+        ), dtype=numpy.int64
+    )
+    # The Python loop stops at the block where the array refuses the value.
+    if numpy.abs(values).max() > 0x7FFFFFFF:
+        output[offsets[:count, None] + numpy.arange(64)] = 0
+        return False
+
+    output[offsets[:count]] = values
+    return True
+
+
 def _decode_scan(plan, mcus_wide, mcus_high, segments, restart_interval, deadline):
     """Fill the coefficients of the components; return the MCU decoded."""
     mcus = mcus_wide * mcus_high
@@ -341,6 +712,8 @@ def _decode_scan(plan, mcus_wide, mcus_high, segments, restart_interval, deadlin
     damaged = 0
     plan_size = len(plan)
     zigzag = ZIGZAG
+
+    scan_tables = None
 
     for segment in segments:
         if mcu >= mcus:
@@ -353,6 +726,20 @@ def _decode_scan(plan, mcus_wide, mcus_high, segments, restart_interval, deadlin
         bits = 0
         predictions = [0] * plan_size
         limit = min(mcus, mcu + restart_interval) if restart_interval else mcus
+
+        if plan_size == 1 and len(data) >= READERS_BYTES_MINIMUM:
+            if scan_tables is None:
+                scan_tables = ScanTables(
+                    table_ac=plan[0][2], table_dc=plan[0][1]
+                )
+            if _read_segment_with_readers(
+                component=plan[0][0], count=limit - mcu, data=data,
+                deadline=deadline, first=mcu, mcus_wide=mcus_wide,
+                tables=scan_tables
+            ):
+                decoded += limit - mcu
+                mcu = limit
+                continue
 
         try:
             while mcu < limit:
@@ -493,15 +880,15 @@ def _inverse_dct(blocks, precision):
     # intermediate values to stay in 32 bits as in the original method.
     pass_bits = 1 if precision == 12 else 2
 
-    columns = _transform(
-        *(blocks[:, index, :] for index in range(8)),
-        shift=CONSTANT_BITS - pass_bits
+    columns = numpy.stack(
+        _transform(
+            *(blocks[:, index, :] for index in range(8)),
+            shift=CONSTANT_BITS - pass_bits
+        ), axis=1
     )
     rows = _transform(
-        *(
-            numpy.stack([column[:, index] for column in columns], axis=1)
-            for index in range(8)
-        ), shift=CONSTANT_BITS + pass_bits + 3
+        *(columns[:, :, index] for index in range(8)),
+        shift=CONSTANT_BITS + pass_bits + 3
     )
     samples = numpy.stack(rows, axis=2) + (1 << (precision - 1))
     return numpy.clip(samples, 0, (1 << precision) - 1)

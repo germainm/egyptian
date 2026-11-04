@@ -4,8 +4,12 @@ values come from libjpeg-turbo 3.1.3, which made the images of these tests:
 this project does not depend on it.
 """
 import base64
+from array import array
+import contextlib
+import functools
 import hashlib
 import importlib.util
+import time
 import io
 import unittest
 from unittest import mock
@@ -363,6 +367,407 @@ class DecoderTestCase(SimpleTestCase):
                 jpeg_extended.JPEGDecodeError, 'not decoded'
             ):
                 jpeg_extended.decode_jpeg(data=JPEG_12_BITS)
+
+
+def make_sequential_jpeg(
+    blocks, rows, columns, dc_sizes=16, precision=12, restart_interval=0,
+    trailing=b''
+):
+    """
+    A sequential JPEG file of one component from its blocks of coefficients,
+    each one a DC difference and (zeros before, value) pairs, for what the
+    fixtures are too small to show. Its files give the samples of libjpeg-turbo
+    as long as the values stay within what 12-bit samples can give.
+    """
+    # Codes of many lengths, as in a real file: the shortest for what is common.
+    symbols_ac = [0x00, 0xF0] + [
+        (run << 4) | size for size in range(1, 16) for run in range(16)
+    ]
+    lengths_ac = (
+        0, 1, 2, 2, 2, 3, 3, 4, 6, 10, 16, 24, 30, 40, 48, 51
+    )
+    symbols_dc = list(range(dc_sizes))
+    lengths_dc = (0, 0, 0, 0, dc_sizes) + (0,) * 11
+
+    def get_codes(lengths, symbols):
+        codes = {}
+        code = 0
+        index = 0
+        for length, count in enumerate(lengths, start=1):
+            for _ in range(count):
+                codes[symbols[index]] = (code, length)
+                code += 1
+                index += 1
+            code <<= 1
+        return codes
+
+    codes_ac = get_codes(lengths=lengths_ac, symbols=symbols_ac)
+    codes_dc = get_codes(lengths=lengths_dc, symbols=symbols_dc)
+
+    def segment(marker, content):
+        return (
+            b'\xff' + bytes((marker,)) + (len(content) + 2).to_bytes(2, 'big') +
+            content
+        )
+
+    output = bytearray(b'\xff\xd8')
+    output += segment(0xDB, b'\x00' + bytes([1] * 64))
+    output += segment(
+        0xC1, bytes((precision,)) + rows.to_bytes(2, 'big') +
+        columns.to_bytes(2, 'big') + b'\x01\x01\x11\x00'
+    )
+    output += segment(0xC4, b'\x00' + bytes(lengths_dc) + bytes(symbols_dc))
+    output += segment(0xC4, b'\x10' + bytes(lengths_ac) + bytes(symbols_ac))
+    if restart_interval:
+        output += segment(0xDD, restart_interval.to_bytes(2, 'big'))
+    output += segment(0xDA, b'\x01\x01\x00\x00\x3f\x00')
+
+    accumulator = 0
+    bits = 0
+
+    def write(value, size):
+        nonlocal accumulator, bits
+        accumulator = (accumulator << size) | value
+        bits += size
+        while bits >= 8:
+            byte = (accumulator >> (bits - 8)) & 255
+            output.append(byte)
+            if byte == 255:
+                output.append(0)
+            bits -= 8
+        accumulator &= (1 << bits) - 1
+
+    def write_value(value):
+        size = abs(value).bit_length()
+        if size:
+            write(value if value > 0 else value + (1 << size) - 1, size)
+        return size
+
+    for index, (difference, pairs) in enumerate(blocks):
+        if restart_interval and index and not index % restart_interval:
+            if bits:
+                write((1 << (8 - bits)) - 1, 8 - bits)
+            output += bytes((0xFF, 0xD0 + (index // restart_interval - 1) % 8))
+
+        size = abs(difference).bit_length()
+        write(*codes_dc[size])
+        write_value(difference)
+
+        coefficient = 1
+        for zeros, value in pairs:
+            while zeros > 15:
+                write(*codes_ac[0xF0])
+                zeros -= 16
+                coefficient += 16
+            size = abs(value).bit_length()
+            write(*codes_ac[(zeros << 4) | size])
+            write_value(value)
+            coefficient += zeros + 1
+        if coefficient < 64:
+            write(*codes_ac[0x00])
+
+    if bits:
+        write((1 << (8 - bits)) - 1, 8 - bits)
+    return bytes(output) + trailing + b'\xff\xd9'
+
+
+@functools.lru_cache(maxsize=4)
+def make_blocks(count, seed=5):
+    """Blocks of a real image: flat parts, with few or many coefficients."""
+    import random
+
+    generator = random.Random(seed)
+    blocks = []
+    for index in range(count):
+        # Each sixth of the image holds another kind of block.
+        kind = index * 6 // count
+        pairs = []
+        coefficient = 1
+        length = {0: 0, 1: 2, 2: 8, 3: 0, 4: 30, 5: 5}[kind]
+        for _ in range(length):
+            zeros = generator.randrange(0, 4 if kind != 5 else 24)
+            if coefficient + zeros > 63:
+                break
+            size = generator.randrange(1, 15 if kind == 4 else 7)
+            value = generator.randrange(1 << (size - 1), 1 << size)
+            pairs.append((zeros, value if generator.random() < .5 else -value))
+            coefficient += zeros + 1
+        blocks.append(
+            (generator.randrange(-40, 41) if kind else 0, pairs)
+        )
+    return blocks
+
+
+@functools.lru_cache(maxsize=4)
+def make_file(blocks_wide=64, blocks_high=64, **kwargs):
+    return make_sequential_jpeg(
+        blocks=make_blocks(count=blocks_wide * blocks_high),
+        columns=blocks_wide * 8, rows=blocks_high * 8, **kwargs
+    )
+
+
+@contextlib.contextmanager
+def readers_results():
+    """The results of the arrays of readers, each one for a segment."""
+    original = jpeg_extended._read_segment_with_readers
+    results = []
+
+    def wrapper(**kwargs):
+        results.append(original(**kwargs))
+        return results[-1]
+
+    with mock.patch.object(
+        jpeg_extended, '_read_segment_with_readers', wrapper
+    ), mock.patch.object(jpeg_extended, 'READERS_BYTES_MINIMUM', new=1024):
+        yield results
+
+
+class ReadersTestCase(SimpleTestCase):
+    """
+    The arrays of readers against the Python loop, which defines the behavior.
+    """
+    def assert_same(self, first, second):
+        # Not assertEqual: on lists this long, its message takes minutes.
+        import numpy
+
+        self.assertTrue(numpy.array_equal(first, second), 'Different samples.')
+
+    def decode_both(self, data):
+        with mock.patch.object(
+            jpeg_extended, 'READERS_BYTES_MINIMUM', new=1 << 40
+        ):
+            expected = jpeg_extended.decode_jpeg(data=data)
+        with readers_results() as results:
+            samples, precision = jpeg_extended.decode_jpeg(data=data)
+        self.assert_same(samples, expected[0])
+        self.assertEqual(precision, expected[1])
+        return samples, results
+
+    def test_readers_are_used(self):
+        samples, results = self.decode_both(data=make_file())
+        self.assertEqual(results, [True])
+
+    def test_8_bits(self):
+        samples, results = self.decode_both(data=make_file(precision=8))
+        self.assertEqual(results, [True])
+
+    def test_restart_intervals(self):
+        samples, results = self.decode_both(
+            data=make_file(blocks_high=128, restart_interval=64 * 64)
+        )
+        self.assertEqual(results, [True, True])
+
+    def test_small_segments_read_by_the_loop(self):
+        samples, results = self.decode_both(data=make_file(restart_interval=8))
+        self.assertEqual(results, [])
+
+    def test_fixtures_of_libjpeg_turbo(self):
+        # Too small for the readers to succeed each time: the result must not
+        # depend on it.
+        with mock.patch.multiple(
+            jpeg_extended, READERS_BYTES_MINIMUM=1,
+            READERS_SETTINGS=((float('inf'), 16, 14, 64),)
+        ):
+            samples, precision = jpeg_extended.decode_jpeg(data=JPEG_12_BITS)
+        self.assertEqual(sha256(samples[:, :, 0]), JPEG_12_BITS_SHA256)
+
+    def test_scans_of_one_component_of_several(self):
+        # Interleaved: for the Python loop, even when it is large.
+        source = Image.new('RGB', (512, 512))
+        source.putdata(
+            [
+                (index % 251, index % 241, index % 239)
+                for index in range(512 * 512)
+            ]
+        )
+        buffer = io.BytesIO()
+        source.save(buffer, 'JPEG', quality=95, subsampling=0)
+        samples, results = self.decode_both(data=buffer.getvalue())
+        self.assertEqual(results, [])
+
+    def test_truncated_streams(self):
+        data = make_file()
+        start = data.index(b'\xff\xda') + 10
+        for share in (50, 90, 99, 100):
+            with self.subTest(share=share):
+                self.decode_both(
+                    data=data[:start + (len(data) - 2 - start) * share // 100]
+                )
+        # The last block cut in two.
+        for missing in range(1, 8):
+            with self.subTest(missing=missing):
+                self.decode_both(data=data[:-2 - missing])
+
+    def test_invalid_codes(self):
+        data = make_file()
+        start = data.index(b'\xff\xda') + 10
+        for position in (start + 1, (start + len(data)) // 2, len(data) - 20):
+            with self.subTest(position=position):
+                damaged = bytearray(data)
+                # Sixteen bits of ones: the tables have no such code.
+                damaged[position:position + 6] = b'\xff\x00\xff\x00\xff\x00'
+                samples, results = self.decode_both(data=bytes(damaged))
+                self.assertEqual(results, [False])
+
+    def test_invalid_code_with_enough_data_after_it(self):
+        # The count of blocks does not reveal the damage: more data comes.
+        data = make_file()
+        start = data.index(b'\xff\xda') + 10
+        scan = bytearray(data[start:-2])
+        scan[len(scan) // 2:len(scan) // 2 + 6] = b'\xff\x00\xff\x00\xff\x00'
+        samples, results = self.decode_both(
+            data=data[:start] + bytes(scan) + data[start:-2] + data[-2:]
+        )
+        self.assertEqual(results, [False])
+
+    def test_value_after_the_last_coefficient(self):
+        # 63 zeros, then a value: the loop stops there.
+        blocks = list(make_blocks(count=64 * 64))
+        blocks[len(blocks) // 2] = (0, [(63, 1)])
+        samples, results = self.decode_both(
+            data=make_sequential_jpeg(blocks=blocks, columns=512, rows=512)
+        )
+        self.assertEqual(results, [False])
+
+    def test_block_filled_to_its_last_coefficient(self):
+        blocks = list(make_blocks(count=64 * 64))
+        blocks[100] = (1, [(0, 3)] * 63)
+        blocks[200] = (1, [(62, 3)])
+        blocks[300] = (1, [(32, 1), (20, 1)])
+        samples, results = self.decode_both(
+            data=make_sequential_jpeg(blocks=blocks, columns=512, rows=512)
+        )
+        self.assertEqual(results, [True])
+
+    def test_data_after_the_image(self):
+        samples, results = self.decode_both(data=make_file(trailing=bytes(1000)))
+        self.assertEqual(results, [True])
+
+    def test_reader_that_does_not_resynchronize_in_time(self):
+        # Too few symbols: a part is taken over by the reader before it, up to
+        # one that fell on the right codes.
+        with mock.patch.multiple(
+            jpeg_extended, READERS_FAILURES_DIVISOR=1,
+            READERS_ROUNDS_MAXIMUM=256,
+            READERS_SETTINGS=((float('inf'), 2, 14, 512),)
+        ):
+            samples, results = self.decode_both(data=make_file())
+        self.assertEqual(results, [True])
+
+    def test_too_many_readers_that_do_not_resynchronize(self):
+        with mock.patch.multiple(
+            jpeg_extended, READERS_FAILURES_DIVISOR=64,
+            READERS_SETTINGS=((float('inf'), 2, 14, 512),)
+        ):
+            samples, results = self.decode_both(data=make_file())
+        self.assertEqual(results, [False])
+
+    def test_readers_at_the_end_of_the_stream(self):
+        # So many readers that some leave the data while they synchronize.
+        with mock.patch.multiple(
+            jpeg_extended, READERS_SETTINGS=((float('inf'), 2000, 30, 8),)
+        ):
+            samples, results = self.decode_both(data=make_file())
+        self.assertEqual(results, [True])
+
+    def test_dc_beyond_the_range_of_the_array(self):
+        # The loop stops at the block where the array refuses the value.
+        data = make_sequential_jpeg(
+            blocks=[
+                (65535, pairs) for difference, pairs in make_blocks(
+                    count=182 * 182
+                )
+            ], columns=182 * 8, dc_sizes=17, rows=182 * 8
+        )
+        # The readers must go as far as the values: the flat parts of this
+        # image are periodic, where they do not resynchronize.
+        with mock.patch.multiple(
+            jpeg_extended, READERS_FAILURES_DIVISOR=1,
+            READERS_ROUNDS_MAXIMUM=1024
+        ), self.assertLogs(jpeg_extended.logger, level='WARNING'):
+            samples, results = self.decode_both(data=data)
+        self.assertEqual(results, [False])
+
+    def test_settings_according_to_the_bits_per_block(self):
+        import numpy
+
+        tables = jpeg_extended.ScanTables(
+            table_ac=[0] * 65536, table_dc=[0] * 65536
+        )
+        words = jpeg_extended.get_words(data=bytes(4096))
+        for count, spacing in ((32768, 8), (1000, 16), (10, 1024)):
+            with self.subTest(count=count), mock.patch.object(
+                jpeg_extended, 'READERS_SETTINGS', new=(
+                    (5, 0, 12, 1), (100, 0, 11, 1), (float('inf'), 0, 11, 1024)
+                )
+            ):
+                starts = jpeg_extended._get_reader_starts(
+                    count=count, size_bits=32768, tables=tables, words=words
+                )
+                # After the first one: the others moved by one invalid code.
+                self.assertEqual(int(numpy.diff(starts)[1]), spacing)
+
+    def test_dc_size_beyond_the_limit(self):
+        blocks = list(make_blocks(count=64 * 64))
+        blocks[len(blocks) // 2] = (70000, [])
+        samples, results = self.decode_both(
+            data=make_sequential_jpeg(
+                blocks=blocks, columns=512, dc_sizes=18, rows=512
+            )
+        )
+        self.assertEqual(results, [False])
+
+    def test_fewer_blocks_in_a_row_of_the_scan_than_of_the_component(self):
+        # A scan of one component of several: its rows stop at the last block
+        # that the image needs, those of the MCU of the frame go further.
+        import numpy
+
+        data = make_file()
+        start = data.index(b'\xff\xda') + 10
+        tables = {}
+        position = 2
+        while position < start - 10:
+            size = int.from_bytes(data[position + 2:position + 4], 'big')
+            if data[position + 1] == 0xC4:
+                jpeg_extended.read_huffman_tables(
+                    data[position + 4:position + 2 + size], tables
+                )
+            position += 2 + size
+
+        def read(minimum):
+            component = jpeg_extended.Component(
+                horizontal=1, identifier=1, quantization=0, vertical=1
+            )
+            component.blocks_wide = 66
+            component.blocks_high = 64
+            component.coefficients = array('i', bytes(4 * 64 * 66 * 64))
+            with mock.patch.object(
+                jpeg_extended, 'READERS_BYTES_MINIMUM', new=minimum
+            ):
+                jpeg_extended._decode_scan(
+                    deadline=time.monotonic() + 60, mcus_high=64, mcus_wide=64,
+                    plan=[
+                        (
+                            component, tables[0], tables[16], 1, 1, ((0, 0),)
+                        )
+                    ], restart_interval=0, segments=(data[start:-2],)
+                )
+            return numpy.frombuffer(component.coefficients, dtype=numpy.intc)
+
+        self.assert_same(read(minimum=1024), read(minimum=1 << 40))
+
+    def test_blocks_of_a_scan_of_one_component_of_several(self):
+        # Not interleaved: fewer blocks in a row than in the array.
+        import numpy
+
+        columns = 8 * 64 + 1
+        data = make_sequential_jpeg(
+            blocks=make_blocks(count=65 * 64), columns=columns, rows=512
+        )
+        samples, results = self.decode_both(data=data)
+        self.assertEqual(results, [True])
+        self.assertEqual(samples.shape, (512, columns, 1))
+        self.assertEqual(numpy.asarray(samples).dtype, numpy.uint16)
 
 
 def make_dicom(

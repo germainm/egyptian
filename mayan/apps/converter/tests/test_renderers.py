@@ -13,6 +13,7 @@ import io
 import math
 import shutil
 import struct
+import subprocess
 import tempfile
 import threading
 import time
@@ -28,6 +29,10 @@ from django.test import SimpleTestCase
 from ..backends.python import Python
 from ..classes import image_flatten_transparency
 from ..exceptions import PageCountError
+from mayan.apps.storage.tests.test_outlook import (
+    make_compound_file, make_message, text, unicode_stream
+)
+
 from ..renderers import dicom, gpx
 
 GPX = b'''<?xml version="1.0" encoding="UTF-8"?>
@@ -438,6 +443,72 @@ class MarkdownTestCase(SimpleTestCase):
         text = '\n\n'.join('Paragraphe {}'.format(index) for index in range(300))
         converter = Python(file_object=io.BytesIO(text.encode()), mime_type='text/markdown')
         self.assertGreater(converter.get_page_count(), 1)
+
+
+@unittest.skipUnless(
+    WEASYPRINT and shutil.which('pdftotext'), 'WeasyPrint or pdftotext not installed'
+)
+class OutlookMessageTestCase(SimpleTestCase):
+    def get_text(self, file_object):
+        converter = Python(
+            file_object=file_object, mime_type='application/vnd.ms-outlook'
+        )
+        with converter.to_pdf() as pdf_file_object:
+            return subprocess.run(
+                ('pdftotext', pdf_file_object.name, '-'), capture_output=True,
+                check=True
+            ).stdout.decode()
+
+    def test_page_with_the_headers(self):
+        text = self.get_text(file_object=make_message())
+        for expected in (
+            'alice@example.com', 'bob@example.com', 'carol@example.com',
+            'dan@example.com', 'Facture été', 'Le corps', 'du message.',
+            'facture.pdf', 'COURT.TXT'
+        ):
+            self.assertIn(expected, text)
+        # A blind copy is not in the headers of a message.
+        self.assertNotIn('eve@example.com', text)
+
+    def test_images_named_by_the_html_body(self):
+        buffer = io.BytesIO()
+        Image.new('RGB', (40, 40), (0, 160, 0)).save(buffer, 'PNG')
+        converter = Python(
+            file_object=make_message(
+                **{
+                    '__substg1.0_10130102': b'<p>HTML</p><img src="cid:image@x">',
+                    '__attach_version1.0_#00000001': {
+                        unicode_stream(0x3707): text('image.png'),
+                        unicode_stream(0x3712): text('image@x'),
+                        '__substg1.0_37010102': buffer.getvalue()
+                    }
+                }
+            ), mime_type='application/vnd.ms-outlook'
+        )
+        with converter.to_pdf() as pdf_file_object:
+            pdf = pdf_file_object.read()
+        image = converter._pdf_bytes_to_image(pdf, page_number=0).convert('RGB')
+        green = sum(
+            1 for pixel in image.getdata()
+            if pixel[1] > 120 and pixel[0] < 80 and pixel[2] < 80
+        )
+        self.assertGreater(green, 100)
+
+    def test_other_compound_file_keeps_its_path(self):
+        file_object = io.BytesIO(make_compound_file({'WordDocument': b'x' * 100}))
+        converter = Python(
+            file_object=file_object, mime_type='application/x-ole-storage'
+        )
+        self.assertIsNone(converter._get_msg_as_eml())
+        self.assertEqual(file_object.tell(), 0)
+
+    def test_file_left_at_its_start(self):
+        file_object = make_message()
+        converter = Python(
+            file_object=file_object, mime_type='application/vnd.ms-outlook'
+        )
+        self.assertTrue(converter._get_msg_as_eml())
+        self.assertEqual(file_object.tell(), 0)
 
 
 class TransparencyTestCase(SimpleTestCase):

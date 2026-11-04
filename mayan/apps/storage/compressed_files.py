@@ -1,6 +1,7 @@
 import email
 from io import BytesIO
 import logging
+import os
 import shutil
 import tarfile
 import zipfile
@@ -33,6 +34,8 @@ from .settings import (
 
 logger = logging.getLogger(name=__name__)
 
+MEMBER_NAME_MESSAGE_BODY = 'message.txt'
+
 
 class Archive:
     _registry = {}
@@ -48,6 +51,21 @@ class Archive:
             return None
         else:
             return size
+
+    @staticmethod
+    def _get_unique_name(name, taken):
+        """
+        A name that no other member has: a message can attach two files of
+        the same name, and members are found by their name.
+        """
+        result = name
+        stem, extension = os.path.splitext(name)
+        counter = 1
+        while result in taken:
+            counter += 1
+            result = '{} ({}){}'.format(stem, counter, extension)
+        taken.add(result)
+        return result
 
     @classmethod
     def register(cls, mime_types, archive_classes):
@@ -195,7 +213,12 @@ class EMLArchive(Archive):
         )
 
     def get_parts(self):
-        yield from self._get_parts(message=self._archive)
+        taken = set()
+        for part in self._get_parts(message=self._archive):
+            part['label'] = self._get_unique_name(
+                name=part['label'], taken=taken
+            )
+            yield part
 
     def member_contents(self, filename):
         for part in self.get_parts():
@@ -226,55 +249,45 @@ class EMLArchive(Archive):
 
 
 class MsgArchive(Archive):
+    def _get_member_content(self, filename):
+        attachment = self._attachments.get(filename)
+        if attachment is not None:
+            content = force_bytes(s=attachment.data)
+        elif filename == MEMBER_NAME_MESSAGE_BODY:
+            content = force_bytes(s=self._archive.body)
+        else:
+            return None
+
+        self._check_member_size(filename=filename, member_size=len(content))
+        return content
+
     def _open(self, file_object):
         self._check_input_size(file_object=file_object)
         self._archive = OutlookMessage(file_object=file_object)
 
-    def member_contents(self, filename):
-        if filename == 'message.txt':
-            content = force_bytes(s=self._archive.body)
-            self._check_member_size(
-                filename=filename, member_size=len(content)
-            )
-            return content
+        taken = set()
+        if self._archive.body:
+            taken.add(MEMBER_NAME_MESSAGE_BODY)
+        self._attachments = {
+            self._get_unique_name(name=attachment.filename, taken=taken):
+            attachment for attachment in self._archive.attachments
+        }
 
-        for member in self._archive.attachments:
-            if member.filename == filename:
-                content = force_bytes(s=member.data)
-                self._check_member_size(
-                    filename=filename, member_size=len(content)
-                )
-                return content
+    def member_contents(self, filename):
+        return self._get_member_content(filename=filename)
 
     def members(self):
-        results = []
-        for attachments in self._archive.attachments:
-            results.append(attachments.filename)
+        results = list(self._attachments)
 
         if self._archive.body:
-            results.append('message.txt')
+            results.append(MEMBER_NAME_MESSAGE_BODY)
 
         return results
 
     def open_member(self, filename):
-        if filename == 'message.txt':
-            content = force_bytes(s=self._archive.body)
-            self._check_member_size(
-                filename=filename, member_size=len(content)
-            )
-            return File(
-                file=BytesIO(initial_bytes=content), name=filename
-            )
-
-        for member in self._archive.attachments:
-            if member.filename == filename:
-                content = force_bytes(s=member.data)
-                self._check_member_size(
-                    filename=filename, member_size=len(content)
-                )
-                return File(
-                    file=BytesIO(initial_bytes=content), name=filename
-                )
+        content = self._get_member_content(filename=filename)
+        if content is not None:
+            return File(file=BytesIO(initial_bytes=content), name=filename)
 
 
 class PDFArchive(Archive):

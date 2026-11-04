@@ -16,6 +16,8 @@ from django.apps import apps
 from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.storage.literals import MSG_MIME_TYPES
+from mayan.apps.storage.outlook import OutlookMessage, OutlookMessageError
 from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from ..classes import ConverterBase
@@ -487,6 +489,19 @@ class Python(ConverterBase):
             temporary_file_object.seek(0)
             return temporary_file_object
 
+        # An Outlook message gets the pages of an email: its headers and the
+        # names of its attachments, not only its text. Other OLE compound
+        # files have these MIME types too.
+        if self.mime_type in MSG_MIME_TYPES:
+            email_data = self._get_msg_as_eml()
+            if email_data is not None:
+                temporary_file_object = NamedTemporaryFile()
+                temporary_file_object.write(
+                    self._eml_to_pdf_bytes(data=email_data)
+                )
+                temporary_file_object.seek(0)
+                return temporary_file_object
+
         return super().to_pdf()
 
     def get_pillow_page_count(self):
@@ -811,15 +826,33 @@ class Python(ConverterBase):
             size /= 1024
         return '{} ({:.0f} {})'.format(name, size, unit)
 
-    def _eml_to_pdf_bytes(self):
+    def _get_msg_as_eml(self):
+        try:
+            message = OutlookMessage(file_object=self.file_object)
+        except OutlookMessageError as exception:
+            logger.debug('Not an Outlook message; %s', exception)
+            return None
+        else:
+            try:
+                return message.as_bytes()
+            finally:
+                message.close()
+        finally:
+            self.file_object.seek(0)
+
+    def _eml_to_pdf_bytes(self, data=None):
         import email as email_lib
         import email.policy
         import weasyprint
-        self.file_object.seek(0)
-        msg = email_lib.message_from_binary_file(
-            self.file_object, policy=email_lib.policy.default
+
+        if data is None:
+            self.file_object.seek(0)
+            data = self.file_object.read()
+            self.file_object.seek(0)
+
+        msg = email_lib.message_from_bytes(
+            data, policy=email_lib.policy.default
         )
-        self.file_object.seek(0)
 
         subject = msg.get('Subject', '(no subject)')
         from_addr = msg.get('From', '')

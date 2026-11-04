@@ -22,9 +22,12 @@ commercial extensions built and used in production.
   Its values were compared with those of libjpeg-turbo 3.1.3: identical on 168 monochrome images
   of all sizes and qualities, on 8,400 color images of 8 and 12 bits with all the chroma
   samplings, from 1 to 301 pixels wide, the components with fewer samples being enlarged by the
-  same filter, and on the 43 JPEG images of the test data of pydicom and pylibjpeg. On the test
-  server, a 512 × 512 image takes about 0.15 s and an image of 12.6
-  megapixels about 6 s. Images over 64 million samples or 2 minutes of decoding, and files too
+  same filter, and on the 43 JPEG images of the test data of pydicom and pylibjpeg. Large images
+  of one component are read with numpy, as lossless JPEG below: on the test server, a mammogram of
+  14 megapixels takes 1.8 s at quality 90 (6.3 s with a Python loop) and 4.2 s at quality 100
+  (8.1 s). The loop remains for the other images and for the streams too dense for the readers,
+  such as pure noise at the highest quality, 12% slower than the loop alone; both give the same
+  result on 842 files, 360 of them damaged. Images over 64 million samples or 2 minutes of decoding, and files too
   short for the size they declare, get the page of attributes with the reason.
 - **No more `python-gdcm`.** This package is under the Apache-2.0 license and bundles OpenSSL
   1.1.1k. JPEG-LS is now read by `pyjpegls` (MIT, with CharLS under a BSD license), JPEG 2000 by
@@ -54,6 +57,17 @@ commercial extensions built and used in production.
   read. The sender has an address when the file holds one, recipients taken from the Internet
   headers keep their separators, and an address missing no longer gives `<None>`. One test file
   has a subject in the wrong encoding: it announces no code page but the one of its HTML body.
+- **The pages of Outlook files are those of an email.** They only held the text of the message,
+  through LibreOffice. They now show the sender, the recipients, the date, the subject and the
+  names of the attachments, then the body, in HTML with its images when the file has one. The 41
+  sample files of Apache POI take 6.6 s together; one of them, with thousands of recipients, gets
+  26 pages to list them. Messages already stored keep the pages they have.
+- **Attachments of the same name.** When an email or an Outlook message is split into documents,
+  two attachments of the same name gave the first one twice, and an attachment named
+  `message.txt` gave the text of an Outlook message. They are now `facture.pdf`,
+  `facture (2).pdf`.
+- **Text of office files: one conversion per file.** LibreOffice converted the whole file for each
+  page: 4.5 s for a document of 4 pages, now 1.2 s, for the same text.
 - **The text of emails is extracted.** It only came from the OCR of the page images. It is now
   read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
   headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
@@ -319,7 +333,7 @@ To regenerate the files of the image after a change to the workers, the queues o
 ## Tests
 
 The renderers of the formats added to the converter and the refinement of the MIME types have
-unit tests (158): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+unit tests (198): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
 encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit and
 lossless JPEG, audio files, emails and Markdown files without remote resources, the text of the emails,
 the Outlook `.msg` files, transparency, and the content-based MIME types. They need no database and no network: their

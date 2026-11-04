@@ -15,7 +15,7 @@ from unittest import mock
 
 from django.test import SimpleTestCase
 
-from ..renderers import dicom, jpeg_lossless
+from ..renderers import dicom, jpeg_extended, jpeg_lossless
 from .test_jpeg_extended import JPEG_12_BITS, make_dicom, make_jpeg
 
 PYDICOM = importlib.util.find_spec('pydicom') is not None
@@ -569,9 +569,10 @@ class ReadersTestCase(SimpleTestCase):
         # Too few differences to resynchronize: a part is taken over by the
         # reader before it, up to one that fell on the right codes.
         data = make_lossless_jpeg(source=self.source)
-        with mock.patch.multiple(
-            jpeg_lossless, READERS_FAILURES_DIVISOR=1,
-            READERS_SYNCHRONIZATION=8
+        with mock.patch.object(
+            jpeg_lossless, 'READERS_SYNCHRONIZATION', new=8
+        ), mock.patch.object(
+            jpeg_extended, 'READERS_FAILURES_DIVISOR', new=1
         ):
             samples, results = self.decode_both(data=data)
         self.assertEqual(results, [True])

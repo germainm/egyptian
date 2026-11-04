@@ -206,28 +206,17 @@ class PopplerParser(Parser):
 
 
 class OfficePopplerParser(PopplerParser):
-    def execute(self, file_object, page_number):
-        converter = ConverterBase.get_converter_class()(
-            file_object=file_object
-        )
-        with converter.to_pdf() as pdf_file_object:
-            return super().execute(
-                file_object=pdf_file_object, page_number=page_number
-            )
-
-
-class EmailParser(PopplerParser):
     """
-    Text of the pages of an email, read from the PDF file that gives their
-    images: headers, names of the attachments, body. The email is rendered
-    once for all its pages.
+    Text of the pages of a file that the converter turns into a PDF file: an
+    instance reads one file, converted once for all its pages.
     """
+    mime_type = None
     pdf_content = None
 
     def execute(self, file_object, page_number):
         if self.pdf_content is None:
             converter = ConverterBase.get_converter_class()(
-                file_object=file_object, mime_type=CONVERTER_EML_MIME_TYPE
+                file_object=file_object, mime_type=self.mime_type
             )
             with converter.to_pdf() as pdf_file_object:
                 self.pdf_content = pdf_file_object.read()
@@ -236,6 +225,14 @@ class EmailParser(PopplerParser):
             file_object=io.BytesIO(initial_bytes=self.pdf_content),
             page_number=page_number
         )
+
+
+class EmailParser(OfficePopplerParser):
+    """
+    Text of the pages of an email, read from the PDF file that gives their
+    images: headers, names of the attachments, body.
+    """
+    mime_type = CONVERTER_EML_MIME_TYPE
 
 
 class ArchiveParser(Parser):

@@ -37,7 +37,8 @@ import time
 from .jpeg_extended import (
     DamagedSegment, JPEGDecodeError, MARKER_DHT, MARKER_DNL, MARKER_DRI,
     MARKER_SOF_SEQUENTIAL, MARKER_SOF_UNSUPPORTED, MARKER_SOS, PIXELS_MAXIMUM,
-    PLUGIN_LABEL, TIME_MAXIMUM, get_frame_bytes, read_huffman_tables,
+    PLUGIN_LABEL, READERS_STEPS_CHECK, TIME_MAXIMUM, get_differences,
+    get_frame_bytes, get_words, plan_readers, read_huffman_tables,
     read_segments, split_scan, stop_if_late
 )
 
@@ -60,12 +61,6 @@ READERS_SPACING_MINIMUM = 2048
 READERS_SPACING_SHIFT = 14
 # Differences that a reader reads to resynchronize before its part begins.
 READERS_SYNCHRONIZATION = 64
-# Share of the readers that may fail to resynchronize, and the attempts to
-# repair them, before the Python loop takes over.
-READERS_FAILURES_DIVISOR = 4
-READERS_ROUNDS_MAXIMUM = 16
-# Steps of the readers between two checks of the time.
-READERS_STEPS_CHECK = 1024
 
 UID_JPEG_LOSSLESS = '1.2.840.10008.1.2.4.57'
 UID_JPEG_LOSSLESS_SV1 = '1.2.840.10008.1.2.4.70'
@@ -137,35 +132,9 @@ class ReaderTables:
         values = (windows >> (16 - advance.clip(max=16))) & (
             (1 << additional) - 1
         )
-        self.values = _get_differences(sizes=additional, values=values)
+        self.values = get_differences(sizes=additional, values=values)
         self.values[self.sizes == SIZE_MAXIMUM] = 32768
         self.values[~whole] = DIFFERENCE_LONG
-
-
-def _get_differences(sizes, values):
-    """Below half of its range, the value of the additional bits is negative."""
-    import numpy
-
-    return numpy.where(
-        values < ((1 << sizes) >> 1), values - ((1 << sizes) - 1), values
-    )
-
-
-def _get_words(data):
-    """
-    The 24 bits that start at each byte of the data. After the data come zeros,
-    as in the Python loop for a last code cut in two.
-    """
-    import numpy
-
-    values = numpy.frombuffer(data + bytes(8), dtype=numpy.uint8)
-    # In place: the data can be large and this is four bytes per byte already.
-    words = values[:-2].astype(numpy.uint32)
-    words <<= 8
-    words |= values[1:-1]
-    words <<= 8
-    words |= values[2:]
-    return words
 
 
 def _count_with_readers(
@@ -225,63 +194,20 @@ def _plan_readers(advance, count, deadline, size_bits, words):
             ), size_bits
         )
 
+    def advance_readers(states, **kwargs):
+        _count_with_readers(
+            advance=advance, deadline=deadline, words=words, **kwargs
+        )
+
     # The first bit of the stream is the only place known to be right.
-    starts = numpy.unique(
-        numpy.concatenate(
-            (numpy.zeros(1, dtype=numpy.int64), seeds[seeds < size_bits])
+    return plan_readers(
+        advance_readers=advance_readers, count=count, size_bits=size_bits,
+        starts=numpy.unique(
+            numpy.concatenate(
+                (numpy.zeros(1, dtype=numpy.int64), seeds[seeds < size_bits])
+            )
         )
     )
-    stops = numpy.append(starts[1:], size_bits)
-    positions = starts.copy()
-    alive = numpy.ones(starts.size, dtype=bool)
-    invalid = numpy.zeros(starts.size, dtype=bool)
-    counts = numpy.zeros(starts.size, dtype=numpy.int64)
-
-    for attempt in range(READERS_ROUNDS_MAXIMUM):
-        _count_with_readers(
-            active=numpy.flatnonzero(alive & ~invalid & (positions < stops)),
-            advance=advance, counts=counts, deadline=deadline, invalid=invalid,
-            positions=positions, stops=stops, words=words
-        )
-
-        # A reader that jumped over the start of the next one: the next one did
-        # not resynchronize in time, this one continues up to its stop.
-        failed = numpy.flatnonzero(
-            alive & (positions > stops) & (stops < size_bits)
-        )
-        if not failed.size:
-            break
-        if not attempt and failed.size > starts.size // READERS_FAILURES_DIVISOR:
-            return None
-
-        for reader in failed.tolist():
-            following = reader + 1
-            while alive[reader] and following < starts.size and (
-                positions[reader] > stops[reader]
-            ):
-                if alive[following]:
-                    alive[following] = False
-                    stops[reader] = stops[following]
-                following += 1
-    else:
-        return None
-
-    readers = numpy.flatnonzero(alive)
-    totals = numpy.cumsum(counts[readers])
-    needed = int(numpy.searchsorted(totals, count))
-    if needed >= readers.size:
-        return None
-
-    # Each reader used must have ended exactly where the next one starts.
-    used = readers[:needed]
-    following = starts[readers[1:needed + 1]]
-    if (positions[used] != following).any():
-        return None
-
-    readers = readers[:needed + 1]
-    counts = counts[readers]
-    counts[-1] -= int(totals[needed]) - count
-    return starts[readers], counts
 
 
 def _write_with_readers(counts, deadline, output, starts, tables, words):
@@ -307,7 +233,7 @@ def _write_with_readers(counts, deadline, output, starts, tables, words):
             found = windows[long_values]
             sizes = tables.sizes[found].astype(numpy.int64)
             at = current[long_values] + tables.lengths[found]
-            values[long_values] = _get_differences(
+            values[long_values] = get_differences(
                 sizes=sizes, values=(
                     (words[at >> 3] >> (8 - (at & 7))) & SAMPLE_MASK
                 ) >> (16 - sizes)
@@ -333,7 +259,7 @@ def _read_segment_with_readers(count, data, deadline, output, tables):
     """
     # No difference can start after that, whatever follows in the file.
     size_bits = min(len(data) * 8, count * DIFFERENCE_BITS_MAXIMUM)
-    words = _get_words(data=data[:size_bits // 8 + 8])
+    words = get_words(data=data[:size_bits // 8 + 8])
     plan = _plan_readers(
         advance=tables.advance, count=count, deadline=deadline,
         size_bits=size_bits, words=words

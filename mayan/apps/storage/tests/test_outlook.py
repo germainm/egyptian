@@ -3,14 +3,18 @@ Reader of the Outlook .msg files. The files are made here, from the public
 specification of their format: their results were compared once with those of
 Apache POI test files and of the package that this reader replaces.
 """
+from datetime import datetime, timezone
 import email
+from email.message import EmailMessage
 import email.policy
+import email.utils
 import io
 import struct
+from unittest import mock
 
 from django.test import SimpleTestCase
 
-from ..compressed_files import MsgArchive
+from ..compressed_files import Archive, EMLArchive, MsgArchive
 from ..outlook import OutlookMessage, OutlookMessageError
 
 END_OF_CHAIN = 0xFFFFFFFE
@@ -20,6 +24,13 @@ NO_STREAM = 0xFFFFFFFF
 MINI_CUTOFF = 4096
 MINI_SIZE = 64
 SECTOR_SIZE = 512
+# 2026-11-04 12:00:00 UTC, in hundreds of nanoseconds since 1601.
+FILE_TIME_2026 = int(
+    (
+        datetime(2026, 11, 4, 12, tzinfo=timezone.utc) -
+        datetime(1601, 1, 1, tzinfo=timezone.utc)
+    ).total_seconds()
+) * 10000000
 
 
 def make_compound_file(tree):
@@ -144,6 +155,14 @@ def properties(values, header_size=32):
     """The table of the fixed-size properties, {identifier: integer}."""
     return bytes(header_size) + b''.join(
         struct.pack('<HHIIxxxx', 3, identifier, 6, value)
+        for identifier, value in values.items()
+    )
+
+
+def properties64(values, header_size=32):
+    """The same table, with values of eight bytes: dates."""
+    return bytes(header_size) + b''.join(
+        struct.pack('<HHIQ', 0x40, identifier, 6, value)
         for identifier, value in values.items()
     )
 
@@ -335,7 +354,7 @@ class OutlookMessageTestCase(SimpleTestCase):
             [
                 (item.get_filename(), item.get_content())
                 for item in result.iter_attachments()
-            ], [('annexe.txt', b'annexe')]
+            ], [('annexe.txt', 'annexe')]
         )
 
     def test_attached_messages_too_deep(self):
@@ -359,6 +378,191 @@ class OutlookMessageTestCase(SimpleTestCase):
             attachment = attachment.embedded_message.attachments[0]
         self.assertEqual(depth, 8)
         self.assertEqual(attachment.data, b'')
+
+    def test_date(self):
+        value = FILE_TIME_2026
+        for identifier in (0x0039, 0x0E06):
+            with self.subTest(identifier=identifier):
+                message = OutlookMessage(
+                    file_object=make_message(
+                        **{
+                            '__properties_version1.0': properties64(
+                                {identifier: value, 0x3FFD: 1252}
+                            )
+                        }
+                    )
+                )
+                self.assertEqual(
+                    email.utils.parsedate_to_datetime(message.date).isoformat(),
+                    '2026-11-04T12:00:00+00:00'
+                )
+
+    def test_date_of_the_internet_headers_comes_first(self):
+        message = OutlookMessage(
+            file_object=make_message(
+                **{
+                    unicode_stream(0x007D): text(
+                        'Date: Tue, 3 Nov 2026 08:00:00 -0500\r\n\r\n'
+                    ), '__properties_version1.0': properties64(
+                        {0x0039: FILE_TIME_2026}
+                    )
+                }
+            )
+        )
+        self.assertEqual(message.date, 'Tue, 3 Nov 2026 08:00:00 -0500')
+
+    def test_date_out_of_range(self):
+        message = OutlookMessage(
+            file_object=make_message(
+                **{'__properties_version1.0': properties64({0x0039: 2 ** 64 - 1})}
+            )
+        )
+        self.assertIsNone(message.date)
+
+    def test_html_body(self):
+        cases = (
+            # The code page of its Internet form, as binary data.
+            (
+                '__substg1.0_10130102', {0x3FDE: 1251}, 'я'.encode('cp1251'), 'я'
+            ),
+            # Announced wrongly.
+            ('__substg1.0_10130102', {0x3FDE: 20127}, 'é'.encode(), 'é'),
+            ('__substg1.0_10130102', {0x3FDE: 65001}, 'é'.encode('cp1252'), 'é'),
+            # Or as a string.
+            (unicode_stream(0x1013), {}, text('é'), 'é')
+        )
+        for name, code_pages, data, expected in cases:
+            with self.subTest(name=name, code_pages=code_pages):
+                message = OutlookMessage(
+                    file_object=make_message(
+                        **{
+                            '__properties_version1.0': properties(code_pages),
+                            name: b'<p>' + data if name.endswith('0102') else text('<p>') + data
+                        }
+                    )
+                )
+                self.assertEqual(message.body_html, '<p>' + expected)
+
+    def test_as_bytes(self):
+        message = OutlookMessage(
+            file_object=make_message(
+                **{
+                    '__substg1.0_10130102': b'<p><img src="cid:image@x"></p>',
+                    '__attach_version1.0_#00000001': {
+                        unicode_stream(0x3707): text('image.png'),
+                        unicode_stream(0x3712): text('image@x'),
+                        '__substg1.0_37010102': b'png'
+                    }
+                }
+            )
+        )
+        result = email.message_from_bytes(
+            message.as_bytes(), policy=email.policy.default
+        )
+        self.assertEqual(result['Subject'], 'Facture été')
+        self.assertEqual(result['From'], 'Alice <alice@example.com>')
+        self.assertEqual(
+            result['To'], 'Bob <bob@example.com>, Carol <carol@example.com>'
+        )
+        self.assertEqual(result['Cc'], 'Dan <dan@example.com>')
+        self.assertEqual(
+            result.get_body(preferencelist=('html',)).get_content().strip(),
+            '<p><img src="cid:image@x"></p>'
+        )
+        self.assertEqual(
+            result.get_body(preferencelist=('plain',)).get_content().strip(),
+            'Le corps\r\ndu message.'
+        )
+        parts = list(result.iter_attachments())
+        self.assertEqual(
+            [
+                (item.get_filename(), item.get_content_type())
+                for item in parts
+            ], [('facture.pdf', 'application/pdf'), ('image.png', 'image/png')]
+        )
+        self.assertEqual(parts[1]['Content-ID'], '<image@x>')
+        self.assertEqual(parts[1].get_content(), b'png')
+
+    def test_names_in_the_headers_of_an_eml_file(self):
+        message = OutlookMessage(
+            file_object=make_message(
+                **{
+                    unicode_stream(0x0C1A): text('Cramer, Nick'),
+                    unicode_stream(0x0C1F): text('/O=FIRST/CN=NICK'),
+                    unicode_stream(0x5D01): text(''),
+                    '__recip_version1.0_#00000000': recipient(
+                        'Bohn, Shawn (張)', 'shawn@example.com', 1
+                    ),
+                    '__recip_version1.0_#00000001': {
+                        '__properties_version1.0': properties(
+                            {0x0C15: 1}, header_size=8
+                        ), unicode_stream(0x3001): text('Sans Adresse')
+                    }
+                }
+            )
+        )
+        result = email.message_from_bytes(
+            message.as_bytes(), policy=email.policy.default
+        )
+        self.assertIn('Cramer, Nick', result['From'])
+        self.assertEqual(result['To'].addresses[0].addr_spec, 'shawn@example.com')
+        self.assertEqual(result['To'].addresses[0].display_name, 'Bohn, Shawn (張)')
+        self.assertIn('Sans Adresse', result['To'])
+        # In the driver, as the messages show them.
+        self.assertEqual(
+            message.to, 'Bohn, Shawn (張) <shawn@example.com>; Sans Adresse'
+        )
+
+        message = OutlookMessage(
+            file_object=make_message(
+                **{
+                    unicode_stream(0x0C1A): text('Chang (張), Tests'),
+                    unicode_stream(0x5D01): text('')
+                }
+            )
+        )
+        result = email.message_from_bytes(
+            message.as_bytes(), policy=email.policy.default
+        )
+        self.assertNotIn('\\', str(result['From']))
+        self.assertIn('Chang (張), Tests', str(result['From']))
+
+    def test_declared_type_of_an_attachment(self):
+        for declared, filename, expected in (
+            ('image/x-truc', 'a.png', 'image/x-truc'),
+            ('pas un type', 'a.png', 'image/png'),
+            ('message/rfc822', 'a.eml', 'application/octet-stream'),
+            ('', 'sans-extension', 'application/octet-stream')
+        ):
+            with self.subTest(declared=declared, filename=filename):
+                message = OutlookMessage(
+                    file_object=make_message(
+                        **{
+                            '__attach_version1.0_#00000000': {
+                                unicode_stream(0x370E): text(declared),
+                                unicode_stream(0x3707): text(filename),
+                                '__substg1.0_37010102': b'x'
+                            }
+                        }
+                    )
+                )
+                self.assertEqual(message.attachments[0].mime_type, expected)
+
+    def test_attachments_larger_than_the_file_together(self):
+        # A chain of sectors gives the same content to all the attachments.
+        tree = {
+            '__attach_version1.0_#{:08X}'.format(index): {
+                unicode_stream(0x3707): text('{}.bin'.format(index)),
+                '__substg1.0_37010102': bytes(9000)
+            } for index in range(5)
+        }
+        message = OutlookMessage(file_object=make_message(**tree))
+        with mock.patch.object(message, 'file_size', new=20000):
+            with self.assertLogs('mayan.apps.storage.outlook', level='WARNING'):
+                result = email.message_from_bytes(
+                    message.as_bytes(), policy=email.policy.default
+                )
+        self.assertEqual(len(list(result.iter_attachments())), 2)
 
     def test_not_a_message(self):
         for name, data in (
@@ -399,6 +603,43 @@ class OutlookMessageTestCase(SimpleTestCase):
                 attachment.filename, attachment.data
 
 
+class ArchiveNamesTestCase(SimpleTestCase):
+    def test_unique_names(self):
+        taken = set()
+        self.assertEqual(
+            [
+                Archive._get_unique_name(name=name, taken=taken) for name in (
+                    'a.pdf', 'a.pdf', 'a.pdf', 'a (2).pdf', 'b', 'b', '.cache'
+                )
+            ], ['a.pdf', 'a (2).pdf', 'a (3).pdf', 'a (2) (2).pdf', 'b', 'b (2)', '.cache']
+        )
+
+    def test_attachments_of_the_same_name_in_an_email(self):
+        message = EmailMessage()
+        message['Subject'] = 'Sujet'
+        message.set_content('Corps')
+        message.add_attachment(
+            b'premier', maintype='application', subtype='pdf',
+            filename='facture.pdf'
+        )
+        message.add_attachment(
+            b'second', maintype='application', subtype='pdf',
+            filename='facture.pdf'
+        )
+        archive = EMLArchive()
+        archive._open(file_object=io.BytesIO(message.as_bytes()))
+
+        self.assertEqual(
+            archive.members(), ['body', 'facture.pdf', 'facture (2).pdf']
+        )
+        self.assertEqual(
+            archive.member_contents(filename='facture.pdf'), b'premier'
+        )
+        self.assertEqual(
+            archive.open_member(filename='facture (2).pdf').read(), b'second'
+        )
+
+
 class MsgArchiveTestCase(SimpleTestCase):
     def get_archive(self, **kwargs):
         archive = MsgArchive()
@@ -425,6 +666,80 @@ class MsgArchiveTestCase(SimpleTestCase):
             archive.open_member(filename='COURT.TXT').read(), b'petit'
         )
         archive.close()
+
+    def test_attachments_of_the_same_name(self):
+        def attachment(data):
+            return {
+                unicode_stream(0x3707): text('facture.pdf'),
+                '__substg1.0_37010102': data
+            }
+
+        archive = self.get_archive(
+            **{
+                '__attach_version1.0_#00000000': attachment(b'premier'),
+                '__attach_version1.0_#00000001': attachment(b'second'),
+                '__attach_version1.0_#00000002': attachment(b'dernier')
+            }
+        )
+        self.assertEqual(
+            archive.members(), [
+                'facture.pdf', 'facture (2).pdf', 'facture (3).pdf',
+                'message.txt'
+            ]
+        )
+        self.assertEqual(
+            [
+                member.read() for member in archive.get_members()
+            ], [b'premier', b'second', b'dernier', 'Le corps\r\ndu message.'.encode()]
+        )
+        self.assertEqual(
+            archive.open_member(filename='facture (3).pdf').read(), b'dernier'
+        )
+
+    def test_attachment_with_the_name_of_the_text(self):
+        archive = self.get_archive(
+            **{
+                '__attach_version1.0_#00000000': {
+                    unicode_stream(0x3707): text('message.txt'),
+                    '__substg1.0_37010102': b'piece'
+                }
+            }
+        )
+        self.assertEqual(
+            archive.members(), ['message (2).txt', 'COURT.TXT', 'message.txt']
+        )
+        self.assertEqual(
+            archive.member_contents(filename='message (2).txt'), b'piece'
+        )
+        self.assertEqual(
+            archive.member_contents(filename='message.txt'),
+            'Le corps\r\ndu message.'.encode()
+        )
+
+    def test_attachment_with_the_name_of_the_text_without_a_text(self):
+        archive = MsgArchive()
+        archive._open(
+            file_object=io.BytesIO(
+                make_compound_file(
+                    {
+                        '__properties_version1.0': properties({}),
+                        '__attach_version1.0_#00000000': {
+                            unicode_stream(0x3707): text('message.txt'),
+                            '__substg1.0_37010102': b'piece'
+                        }
+                    }
+                )
+            )
+        )
+        self.assertEqual(archive.members(), ['message.txt'])
+        self.assertEqual(
+            archive.member_contents(filename='message.txt'), b'piece'
+        )
+
+    def test_unknown_member(self):
+        archive = self.get_archive()
+        self.assertIsNone(archive.member_contents(filename='absent'))
+        self.assertIsNone(archive.open_member(filename='absent'))
 
     def test_without_body(self):
         archive = MsgArchive()

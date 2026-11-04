@@ -12,13 +12,17 @@ The data comes from outside: a stream cannot be larger than the file, even when
 its declared size and its chain of sectors say so, and the number of recipients
 and attachments and the depth of the attached messages are limited.
 """
-from email.header import decode_header, make_header
-from email.mime.application import MIMEApplication
+from datetime import datetime, timedelta, timezone
+from email import encoders
+from email.header import Header, decode_header, make_header
+from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.parser import HeaderParser
+from email.utils import format_datetime, formataddr
 from functools import cached_property
 import logging
+import mimetypes
 import re
 
 import olefile
@@ -58,15 +62,20 @@ TYPE_OBJECT = '000D'
 TYPE_STRING = '001E'
 TYPE_UNICODE = '001F'
 
+PROPERTY_ATTACHMENT_CONTENT_ID = 0x3712
 PROPERTY_ATTACHMENT_DATA = 0x3701
 PROPERTY_ATTACHMENT_FILENAME = 0x3704
 PROPERTY_ATTACHMENT_FILENAME_LONG = 0x3707
+PROPERTY_ATTACHMENT_MIME_TYPE = 0x370E
 PROPERTY_BODY = 0x1000
+PROPERTY_BODY_HTML = 0x1013
+PROPERTY_CLIENT_SUBMIT_TIME = 0x0039
 PROPERTY_CODE_PAGE_INTERNET = 0x3FDE
 PROPERTY_CODE_PAGE_MESSAGE = 0x3FFD
 PROPERTY_DISPLAY_NAME = 0x3001
 PROPERTY_EMAIL_ADDRESS = 0x3003
 PROPERTY_HEADERS = 0x007D
+PROPERTY_MESSAGE_DELIVERY_TIME = 0x0E06
 PROPERTY_RECIPIENT_TYPE = 0x0C15
 PROPERTY_SENDER_ADDRESS = 0x0C1F
 PROPERTY_SENDER_NAME = 0x0C1A
@@ -80,6 +89,7 @@ RECIPIENT_CC = 2
 REGEX_FILENAME = re.compile(pattern=r'[\x00-\x1f/\\:*?"<>|]')
 REGEX_FIRST_LINE_NOT_HEADER = re.compile(pattern=r'\A[^:\r\n]*\r?\n')
 REGEX_LINE_BREAKS = re.compile(pattern=r'\s*[\r\n]+\s*')
+REGEX_MIME_TYPE = re.compile(pattern=r'[\w.+-]+/[\w.+-]+')
 # Exchange addresses of the form /O=.../CN=... are not the ones to show.
 REGEX_SMTP_ADDRESS = re.compile(pattern=r'[^@\s/]+@[^@\s]+')
 
@@ -88,12 +98,28 @@ class OutlookMessageError(ValueError):
     """The file is not a .msg file."""
 
 
+def _get_internet_address(address):
+    if address and REGEX_SMTP_ADDRESS.fullmatch(address):
+        return address
+
+
 def _format_address(name, address):
-    if address and not REGEX_SMTP_ADDRESS.fullmatch(address):
-        address = None
+    address = _get_internet_address(address=address)
     if name and address:
         return '{} <{}>'.format(name, address)
     return name or address or None
+
+
+def _format_mailbox(name, address):
+    """
+    The same for a header of a message, which has its own syntax: a comma in a
+    name would otherwise start another address.
+    """
+    address = _get_internet_address(address=address)
+    if address:
+        return formataddr((name or '', address))
+    if name:
+        return Header(name, 'utf-8').encode()
 
 
 class OutlookItem:
@@ -129,12 +155,24 @@ class OutlookItem:
         result = {}
         for offset in range(self.header_size, len(data) - 15, 16):
             result[int.from_bytes(data[offset + 2:offset + 4], 'little')] = (
-                int.from_bytes(data[offset + 8:offset + 12], 'little')
+                int.from_bytes(data[offset + 8:offset + 16], 'little')
             )
         return result
 
     def get_integer(self, identifier):
-        return self._fixed_properties.get(identifier)
+        value = self._fixed_properties.get(identifier)
+        return None if value is None else value & 0xFFFFFFFF
+
+    def get_time(self, identifier):
+        """A date of the file: hundreds of nanoseconds since 1601."""
+        value = self._fixed_properties.get(identifier)
+        if value:
+            try:
+                return datetime(1601, 1, 1, tzinfo=timezone.utc) + timedelta(
+                    microseconds=value // 10
+                )
+            except OverflowError:
+                logger.debug('Date out of range: %s', value)
 
     def get_binary(self, identifier):
         return self._read_stream(
@@ -172,12 +210,22 @@ class OutlookItem:
 
 class OutlookRecipient(OutlookItem):
     @property
-    def address(self):
-        return _format_address(
-            name=self.get_string(identifier=PROPERTY_DISPLAY_NAME),
-            address=self.get_string(identifier=PROPERTY_SMTP_ADDRESS) or
+    def _address(self):
+        return self.get_string(identifier=PROPERTY_SMTP_ADDRESS) or (
             self.get_string(identifier=PROPERTY_EMAIL_ADDRESS)
         )
+
+    @property
+    def _name(self):
+        return self.get_string(identifier=PROPERTY_DISPLAY_NAME)
+
+    @property
+    def address(self):
+        return _format_address(name=self._name, address=self._address)
+
+    @property
+    def mailbox(self):
+        return _format_mailbox(name=self._name, address=self._address)
 
     @property
     def kind(self):
@@ -227,6 +275,36 @@ class OutlookAttachment(OutlookItem):
             return self.embedded_message.as_bytes()
         return self.get_binary(identifier=PROPERTY_ATTACHMENT_DATA) or b''
 
+    @cached_property
+    def mime_type(self):
+        """As declared by the file, otherwise as told by the file name."""
+        if self.embedded_message:
+            return 'application/octet-stream'
+
+        value = self.get_string(identifier=PROPERTY_ATTACHMENT_MIME_TYPE) or ''
+        if not REGEX_MIME_TYPE.fullmatch(value):
+            value = mimetypes.guess_type(self.filename)[0] or ''
+        if not value or value.split('/')[0] in ('message', 'multipart'):
+            return 'application/octet-stream'
+        return value
+
+    @property
+    def part(self):
+        """The attachment as a part of an .eml file."""
+        result = MIMEBase(*self.mime_type.split('/'))
+        result.set_payload(self.data)
+        encoders.encode_base64(result)
+        result.add_header(
+            'Content-Disposition', 'attachment',
+            filename=('utf-8', '', self.filename)
+        )
+        content_id = self.get_string(identifier=PROPERTY_ATTACHMENT_CONTENT_ID)
+        if content_id:
+            result['Content-ID'] = '<{}>'.format(
+                REGEX_LINE_BREAKS.sub('', content_id).strip('<> ')
+            )
+        return result
+
 
 class OutlookMessageBase(OutlookItem):
     def __init__(self, compound_file, depth, file_size, path):
@@ -270,6 +348,12 @@ class OutlookMessageBase(OutlookItem):
             if item.kind == kind and item.address
         ) or None
 
+    def _get_mailboxes(self, kind):
+        return ', '.join(
+            item.mailbox for item in self.recipients
+            if item.kind == kind and item.mailbox
+        ) or None
+
     @cached_property
     def recipients(self):
         return [
@@ -300,17 +384,52 @@ class OutlookMessageBase(OutlookItem):
         return self.get_string(identifier=PROPERTY_BODY) or ''
 
     @cached_property
+    def body_html(self):
+        """The HTML version of the text, in the messages that have one."""
+        data = self.get_binary(identifier=PROPERTY_BODY_HTML)
+        if data is None:
+            return self.get_string(identifier=PROPERTY_BODY_HTML) or ''
+
+        code_page = self.get_integer(identifier=PROPERTY_CODE_PAGE_INTERNET)
+        for encoding in (
+            ENCODINGS.get(code_page, 'cp{}'.format(code_page)), 'utf-8'
+        ):
+            try:
+                return data.decode(encoding).rstrip('\x00')
+            except (LookupError, UnicodeDecodeError):
+                """The code page of the file is often not the right one."""
+        return data.decode(ENCODING_DEFAULT, 'replace').rstrip('\x00')
+
+    @cached_property
     def cc(self):
         return self._get_header(name='Cc') or self._get_recipients(
             kind=RECIPIENT_CC
         )
 
     @cached_property
+    def date(self):
+        value = self._get_header(name='Date')
+        if value:
+            return value
+        value = self.get_time(
+            identifier=PROPERTY_CLIENT_SUBMIT_TIME
+        ) or self.get_time(identifier=PROPERTY_MESSAGE_DELIVERY_TIME)
+        return format_datetime(value) if value else None
+
+    @property
+    def _sender_name(self):
+        return self.get_string(identifier=PROPERTY_SENDER_NAME)
+
+    @property
+    def _sender_address(self):
+        return self.get_string(identifier=PROPERTY_SENDER_SMTP_ADDRESS) or (
+            self.get_string(identifier=PROPERTY_SENDER_ADDRESS)
+        )
+
+    @cached_property
     def sender(self):
         return self._get_header(name='From') or _format_address(
-            name=self.get_string(identifier=PROPERTY_SENDER_NAME),
-            address=self.get_string(identifier=PROPERTY_SENDER_SMTP_ADDRESS) or
-            self.get_string(identifier=PROPERTY_SENDER_ADDRESS)
+            name=self._sender_name, address=self._sender_address
         )
 
     @cached_property
@@ -327,12 +446,31 @@ class OutlookMessageBase(OutlookItem):
         """The message in the format of the .eml files."""
         result = MIMEMultipart()
         for name, value in (
-            ('Subject', self.subject), ('From', self.sender), ('To', self.to),
-            ('Cc', self.cc)
+            ('Subject', self.subject), (
+                'From', self._get_header(name='From') or _format_mailbox(
+                    name=self._sender_name, address=self._sender_address
+                )
+            ), (
+                'To', self._get_header(name='To') or self._get_mailboxes(
+                    kind=RECIPIENT_TO
+                )
+            ), (
+                'Cc', self._get_header(name='Cc') or self._get_mailboxes(
+                    kind=RECIPIENT_CC
+                )
+            ), ('Date', self.date)
         ):
             if value:
                 result[name] = REGEX_LINE_BREAKS.sub(' ', value)
-        result.attach(MIMEText(self.body, 'plain', 'utf-8'))
+
+        text = MIMEText(self.body, 'plain', 'utf-8')
+        if self.body_html:
+            alternatives = MIMEMultipart('alternative')
+            alternatives.attach(text)
+            alternatives.attach(MIMEText(self.body_html, 'html', 'utf-8'))
+            result.attach(alternatives)
+        else:
+            result.attach(text)
 
         # A chain of sectors can give the same content to any number of
         # attachments: together, they are not larger than the file either.
@@ -343,12 +481,7 @@ class OutlookMessageBase(OutlookItem):
             if budget < 0:
                 logger.warning('Attachments larger than their file.')
                 break
-            part = MIMEApplication(data)
-            part.add_header(
-                'Content-Disposition', 'attachment',
-                filename=('utf-8', '', attachment.filename)
-            )
-            result.attach(part)
+            result.attach(attachment.part)
 
         return result.as_bytes()
 
