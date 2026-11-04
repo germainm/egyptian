@@ -1,3 +1,4 @@
+import base64
 import html
 import io
 import logging
@@ -5,6 +6,7 @@ import math
 import re
 import shutil
 import struct
+from urllib.parse import unquote
 
 from PIL import Image
 import pypdf
@@ -42,6 +44,7 @@ from ..settings import (
 
 logger = logging.getLogger(name=__name__)
 
+REGEX_EMAIL_CID = re.compile(pattern=r'''\bcid:([^"'\s)>]+)''', flags=re.IGNORECASE)
 SVGZ_MAXIMUM_SIZE = 64 * 1024 * 1024
 
 
@@ -184,9 +187,9 @@ def get_map_tile_settings():
 def get_weasyprint_url_fetcher():
     """
     Fetcher that only loads the resources embedded in the document (data:
-    URLs). The HTML of an email comes from its sender: following its links
-    would make the server request any address it names, local files and
-    services of the internal network included.
+    URLs). The HTML of an email or of a Markdown file comes from outside:
+    following its links would make the server request any address it names,
+    local files and services of the internal network included.
     """
     import weasyprint
 
@@ -475,6 +478,15 @@ class Python(ConverterBase):
             temporary_file_object.seek(0)
             return temporary_file_object
 
+        # The text of an email is read from the PDF file of its pages.
+        if self.mime_type == CONVERTER_EML_MIME_TYPE:
+            temporary_file_object = NamedTemporaryFile()
+            temporary_file_object.write(
+                self._eml_to_pdf_bytes()
+            )
+            temporary_file_object.seek(0)
+            return temporary_file_object
+
         return super().to_pdf()
 
     def get_pillow_page_count(self):
@@ -737,6 +749,68 @@ class Python(ConverterBase):
         except LookupError:
             return payload.decode('utf-8', errors='replace')
 
+    @classmethod
+    def _get_email_leaf_parts(cls, part):
+        """
+        The parts of a message that are not containers. An attached message
+        is a part of its own: what it holds is not the content of this one.
+        """
+        if part.get_content_maintype() == 'multipart' and part.is_multipart():
+            for child in part.iter_parts():
+                yield from cls._get_email_leaf_parts(part=child)
+        else:
+            yield part
+
+    @staticmethod
+    def _get_email_html_with_images(text, parts):
+        """
+        Images of the message that its HTML names by their Content-ID: as
+        data: URLs, the only ones that the rendering loads. Return the HTML
+        and the parts used.
+        """
+        images = {}
+        for part in parts:
+            content_id = (part.get('Content-ID') or '').strip().strip('<>')
+            if content_id and part.get_content_maintype() == 'image':
+                images[content_id] = part
+
+        used = []
+
+        def replace(match):
+            part = images.get(unquote(match.group(1)))
+            if part is None:
+                return match.group(0)
+            used.append(part)
+            return 'data:{};base64,{}'.format(
+                part.get_content_type(), base64.b64encode(
+                    part.get_payload(decode=True) or b''
+                ).decode()
+            )
+
+        return (
+            REGEX_EMAIL_CID.sub(repl=replace, string=text), used
+        )
+
+    @staticmethod
+    def _get_email_part_label(part):
+        name = part.get_filename()
+        if not name and part.get_content_type() == 'message/rfc822':
+            payload = part.get_payload()
+            if payload:
+                name = payload[0].get('Subject')
+        name = str(name or part.get_content_type())
+
+        if part.is_multipart():
+            size = len(part.as_bytes())
+        else:
+            size = len(part.get_payload(decode=True) or b'')
+
+        for unit in ('o', 'Ko', 'Mo'):
+            if size < 1024 or unit == 'Mo':
+                break
+            size /= 1024
+        return '{} ({:.0f} {})'.format(name, size, unit)
+
     def _eml_to_pdf_bytes(self):
         import email as email_lib
         import email.policy
@@ -750,29 +824,42 @@ class Python(ConverterBase):
         subject = msg.get('Subject', '(no subject)')
         from_addr = msg.get('From', '')
         to_addr = msg.get('To', '')
+        cc_addr = msg.get('Cc', '')
         date = msg.get('Date', '')
 
         # The HTML part is kept as HTML; plain text is escaped, its "<" would
-        # otherwise be read as markup. Attachments are not rendered.
+        # otherwise be read as markup. Attachments are named, not rendered.
+        parts = tuple(self._get_email_leaf_parts(part=msg))
         body = ''
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_disposition() == 'attachment':
-                    continue
-                ct = part.get_content_type()
-                if ct == 'text/html':
-                    body = self._get_email_part_text(part=part)
-                    break
-                if ct == 'text/plain' and not body:
-                    body = '<pre>{}</pre>'.format(
-                        html.escape(self._get_email_part_text(part=part))
-                    )
-        else:
-            text = self._get_email_part_text(part=msg)
-            if msg.get_content_type() == 'text/html':
-                body = text
+        used_parts = []
+        body_part = msg.get_body(preferencelist=('html', 'plain'))
+        if body_part is not None:
+            text = self._get_email_part_text(part=body_part)
+            if body_part.get_content_type() == 'text/html':
+                body, used_parts = self._get_email_html_with_images(
+                    parts=parts, text=text
+                )
             elif text:
                 body = '<pre>{}</pre>'.format(html.escape(text))
+
+        attachments = [
+            self._get_email_part_label(part=part) for part in parts
+            if part is not body_part and not any(
+                part is used_part for used_part in used_parts
+            ) and not (
+                # The other version of the body.
+                part.get_content_type() in ('text/plain', 'text/html') and
+                part.get_content_disposition() != 'attachment' and
+                not part.get_filename()
+            )
+        ]
+
+        def header_line(label, value):
+            return (
+                '<div><span class="label">{}&nbsp;:</span> {}</div>'.format(
+                    label, html.escape(str(value))
+                ) if value else ''
+            )
 
         document_html = (
             '<!DOCTYPE html><html><head>'
@@ -782,14 +869,15 @@ class Python(ConverterBase):
             '.label{{color:#666;font-size:.85em;}} pre{{white-space:pre-wrap;}}</style>'
             '</head><body>'
             '<div class="header">'
-            '<div><span class="label">De&nbsp;:</span> {from_}</div>'
-            '<div><span class="label">À&nbsp;:</span> {to}</div>'
-            '<div><span class="label">Date&nbsp;:</span> {date}</div>'
+            '{from_}{to}{cc}{date}'
             '<div><span class="label">Objet&nbsp;:</span> <strong>{subject}</strong></div>'
+            '{attachments}'
             '</div>{body}</body></html>'
         ).format(
-            from_=html.escape(str(from_addr)), to=html.escape(str(to_addr)),
-            date=html.escape(str(date)), subject=html.escape(str(subject)),
+            from_=header_line('De', from_addr), to=header_line('À', to_addr),
+            cc=header_line('Cc', cc_addr), date=header_line('Date', date),
+            subject=html.escape(str(subject)),
+            attachments=header_line('Pièces jointes', ', '.join(attachments)),
             body=body
         )
 
@@ -822,7 +910,9 @@ class Python(ConverterBase):
             'th{{background:#f5f5f5;}}</style>'
             '</head><body>{}</body></html>'
         ).format(html_body)
-        return weasyprint.HTML(string=html).write_pdf()
+        return weasyprint.HTML(
+            string=html, url_fetcher=get_weasyprint_url_fetcher()
+        ).write_pdf()
 
     def _get_markdown_page_count(self):
         return self.get_pypdf_page_count(

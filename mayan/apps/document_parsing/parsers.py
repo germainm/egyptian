@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 from shutil import copyfileobj
@@ -8,8 +9,11 @@ from django.utils.encoding import force_str
 from django.utils.translation import gettext_lazy as _
 
 from mayan.apps.converter.classes import ConverterBase
-from mayan.apps.converter.literals import CONVERTER_OFFICE_FILE_MIMETYPES
+from mayan.apps.converter.literals import (
+    CONVERTER_EML_MIME_TYPE, CONVERTER_OFFICE_FILE_MIMETYPES
+)
 from mayan.apps.converter.renderers.archive import ARCHIVE_MIME_TYPES
+from mayan.apps.storage.literals import MSG_MIME_TYPES
 from mayan.apps.storage.utils import NamedTemporaryFile, get_file_object_path
 
 from .exceptions import ParserError
@@ -212,6 +216,28 @@ class OfficePopplerParser(PopplerParser):
             )
 
 
+class EmailParser(PopplerParser):
+    """
+    Text of the pages of an email, read from the PDF file that gives their
+    images: headers, names of the attachments, body. The email is rendered
+    once for all its pages.
+    """
+    pdf_content = None
+
+    def execute(self, file_object, page_number):
+        if self.pdf_content is None:
+            converter = ConverterBase.get_converter_class()(
+                file_object=file_object, mime_type=CONVERTER_EML_MIME_TYPE
+            )
+            with converter.to_pdf() as pdf_file_object:
+                self.pdf_content = pdf_file_object.read()
+
+        return super().execute(
+            file_object=io.BytesIO(initial_bytes=self.pdf_content),
+            page_number=page_number
+        )
+
+
 class ArchiveParser(Parser):
     """
     Text of the pages of an archive: its summary and the names, sizes and
@@ -267,6 +293,13 @@ Parser.register(
     parser_classes=(ArchiveParser,)
 )
 Parser.register(
-    mimetypes=CONVERTER_OFFICE_FILE_MIMETYPES,
+    mimetypes=(CONVERTER_EML_MIME_TYPE,),
+    parser_classes=(EmailParser,)
+)
+Parser.register(
+    mimetypes=CONVERTER_OFFICE_FILE_MIMETYPES + tuple(
+        mime_type for mime_type in MSG_MIME_TYPES
+        if mime_type not in CONVERTER_OFFICE_FILE_MIMETYPES
+    ),
     parser_classes=(OfficePopplerParser,)
 )

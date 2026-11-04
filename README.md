@@ -12,6 +12,33 @@ commercial extensions built and used in production.
 
 ---
 
+## What's new — November 4, 2026
+
+- **12-bit JPEG in DICOM files.** The *JPEG Extended* images with samples of 12 bits gave a page
+  of attributes: Pillow and the GDCM plugin of pydicom refuse these samples, and the remaining
+  plugin, `pylibjpeg-libjpeg`, is under the GPLv3, which cannot be combined with the
+  GPL-2.0-only license of this project. They are now read by a decoder of this project, in
+  Python with numpy (`mayan/apps/converter/renderers/jpeg_extended.py`), with no new dependency.
+  Its values were compared with those of libjpeg-turbo 3.1.3: identical on 168 monochrome images
+  of all sizes and qualities and on color images with all their samples; color images with
+  fewer chroma samples have the same luma, their chroma is enlarged by repetition instead of
+  being smoothed. On the test server, a 512 × 512 image takes about 0.15 s and an image of 12.6
+  megapixels about 6 s. Images over 64 million samples or 2 minutes of decoding, and files too
+  short for the size they declare, get the page of attributes with the reason.
+- **The text of emails is extracted.** It only came from the OCR of the page images. It is now
+  read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
+  headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
+  same way. For the emails already stored, use *Submit for parsing*.
+- **More of an email on its pages.** The `Cc` header, the name and size of the attachments, the
+  images that the HTML names by their Content-ID, which were not loaded. An attached message is
+  no longer taken for the body of the email.
+- **Markdown files load no external resource.** WeasyPrint requested the images and style sheets
+  named in the file, at any address it gave. Markdown files now have the same filter as emails:
+  only the images embedded in the file (`data:` URLs) are loaded, the other ones show their
+  alternative text.
+
+---
+
 ## What's new — November 3, 2026
 
 Every file format of the converter was tested with 86 sample files found on the web (test
@@ -85,10 +112,9 @@ of that test:
   radiotherapy plans, which hold no image, get a page of their main attributes with the
   content of the report or the 12 leads of the ECG. Images smaller than 512 pixels (dose
   grids, thumbnails) are enlarged without smoothing. An image that no installed decoder
-  can read (JPEG lossless, JPEG-LS, 12-bit JPEG) gets the same page, with the reason and the
-  missing package: `python-gdcm` (BSD license; JPEG lossless, JPEG-LS, JPEG 2000; now in the
-  production requirements), or `pylibjpeg` with `pylibjpeg-libjpeg` (GPLv3; also 12-bit
-  JPEG).
+  can read gets the same page, with the reason and the missing package: `python-gdcm` (JPEG
+  lossless, JPEG-LS, JPEG 2000; now in the production requirements; GDCM is under a BSD
+  license, this package of it under the Apache-2.0 license).
 - **Raw photos in the colors of the camera.** They were developed with a daylight white
   balance, which gave a color cast (cyan with Sigma, pink with Olympus, green with Pentax);
   they now use the white balance recorded by the camera.
@@ -265,14 +291,15 @@ To regenerate the files of the image after a change to the workers, the queues o
 ## Tests
 
 The renderers of the formats added to the converter and the refinement of the MIME types have
-unit tests (72): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
-encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, audio files,
-emails without remote resources, transparency, and the content-based MIME types. They need no
-database, no network and no sample file: their files are built in memory. Run them from an
-Egyptian installation, with the same environment variables as for `migrate`:
+unit tests (107): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit JPEG,
+audio files, emails and Markdown files without remote resources, the text of the emails,
+transparency, and the content-based MIME types. They need no database and no network: their
+files are built in memory or come with pydicom. Run them from an Egyptian installation, with
+the same environment variables as for `migrate`:
 
 ```bash
-/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.mime_types
+/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types
 ```
 
 The tests that need a tool or a library that is not installed (FFmpeg, libarchive-c,

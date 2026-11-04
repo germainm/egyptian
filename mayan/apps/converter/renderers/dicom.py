@@ -8,6 +8,10 @@ Pages of a DICOM file.
 - Objects without image (structured reports, ECG, radiotherapy plans) and
   images that no installed decoder can read: pages of the main attributes,
   with the content of the structured report and the leads of the ECG.
+
+JPEG with samples of 12 bits is read by the decoder of this project
+(jpeg_extended.py): pylibjpeg-libjpeg, the only plugin of pydicom that reads it,
+is under the GPLv3, which this GPL-2.0-only project cannot be combined with.
 """
 from collections.abc import Sequence
 import logging
@@ -19,6 +23,7 @@ from . import (
     PAGE_ACCENT, PAGE_INK, PAGE_INK_MUTED, PAGE_MARGIN, PAGE_RULE,
     clean_text, draw_fields, get_font, new_page, wrap_text
 )
+from .jpeg_extended import UID_JPEG_EXTENDED, register_decoder
 
 logger = logging.getLogger(name=__name__)
 
@@ -87,20 +92,12 @@ def _transfer_syntax(dataset):
 
 
 def _decoder_hints():
-    """The decoder packages that are not installed, and what they add."""
+    """The decoder package that is not installed, and what it adds."""
     from importlib.util import find_spec
 
-    hints = []
     if find_spec('gdcm') is None:
-        hints.append('python-gdcm (JPEG lossless, JPEG-LS, JPEG 2000)')
-    if find_spec('pylibjpeg') is None or find_spec('libjpeg') is None:
-        hints.append(
-            'pylibjpeg with pylibjpeg-libjpeg (JPEG lossless, JPEG-LS, '
-            '12-bit JPEG)'
-        )
-    if not hints:
-        return 'none of the installed decoders reads this file'
-    return 'install ' + ' or '.join(hints)
+        return 'install python-gdcm (JPEG lossless, JPEG-LS, JPEG 2000)'
+    return 'none of the installed decoders reads this file'
 
 
 def _decoder_problem(dataset):
@@ -110,6 +107,7 @@ def _decoder_problem(dataset):
     transfer_syntax = _transfer_syntax(dataset)
     if not transfer_syntax.is_compressed:
         return None
+    register_decoder()
     try:
         decoder = get_decoder(transfer_syntax)
     except NotImplementedError:
@@ -121,12 +119,29 @@ def _decoder_problem(dataset):
     return None
 
 
+def _decoding_plugin(dataset):
+    """
+    The plugin to use for the file; all the plugins by default. Pillow and
+    GDCM refuse the JPEG samples of 12 bits: asking them first would only
+    log their refusals.
+    """
+    if (
+        _transfer_syntax(dataset) == UID_JPEG_EXTENDED and
+        _first(dataset.get('BitsStored', 8)) != 8
+    ):
+        return register_decoder()
+    return ''
+
+
 def _decode_frame(file_object, dataset, index):
     from pydicom.pixels import pixel_array
 
     file_object.seek(0)
     try:
-        return pixel_array(file_object, index=index)
+        return pixel_array(
+            file_object, decoding_plugin=_decoding_plugin(dataset=dataset),
+            index=index
+        )
     except (AttributeError, NotImplementedError, ValueError):
         # Deflated datasets and files that the frame reader does not
         # handle: decode the whole pixel data of the dataset.
@@ -480,8 +495,8 @@ def _plan(file_object):
 def get_dicom_page_count(file_object):
     dataset, page_count, layout = _plan(file_object=file_object)
     if layout is None and _transfer_syntax(dataset).is_compressed:
-        # An available decoder can still fail on the file (12-bit JPEG with
-        # Pillow): a single page then explains why.
+        # An available decoder can still fail on the file: a single page
+        # then explains why.
         try:
             _decode_frame(file_object=file_object, dataset=dataset, index=0)
         except Exception:

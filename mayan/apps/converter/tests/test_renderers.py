@@ -1,9 +1,12 @@
 """
 Pages drawn by the converter for the formats that have none of their own:
 GPS tracks, DICOM objects, audio files; emails rendered without remote
-resources; transparency laid over white.
+resources, with the images named by their Content-ID and the names of their
+attachments; Markdown files without remote resources; transparency laid over
+white. The JPEG samples of 12 bits of DICOM objects: test_jpeg_extended.py.
 """
 import base64
+from email.message import EmailMessage
 import http.server
 import importlib.util
 import io
@@ -18,6 +21,7 @@ import wave
 from unittest import mock
 
 from PIL import Image
+import pypdf
 
 from django.test import SimpleTestCase
 
@@ -44,6 +48,7 @@ GPX = b'''<?xml version="1.0" encoding="UTF-8"?>
 GPXPY = importlib.util.find_spec('gpxpy') is not None
 WEASYPRINT = importlib.util.find_spec('weasyprint') is not None
 PYDICOM = importlib.util.find_spec('pydicom') is not None
+MARKDOWN = importlib.util.find_spec('markdown') is not None
 FFMPEG = bool(shutil.which('ffmpeg') and shutil.which('ffprobe'))
 
 
@@ -168,6 +173,8 @@ class DICOMTestCase(SimpleTestCase):
     def test_decoder_hints(self):
         hint = dicom._decoder_hints()
         self.assertTrue(hint.startswith('install') or hint.startswith('none of'))
+        # GPLv3, not compatible with the license of this project.
+        self.assertNotIn('pylibjpeg', hint)
 
 
 @unittest.skipUnless(FFMPEG, 'ffmpeg and ffprobe not installed')
@@ -189,6 +196,19 @@ class AudioTestCase(SimpleTestCase):
                 self.assertEqual(converter.get_page_count(), 1)
                 converter.seek_page(page_number=0)
                 self.assertEqual(converter.image.size, (1600, 1200))
+
+
+def png_bytes(color=(0, 160, 0)):
+    buffer = io.BytesIO()
+    Image.new('RGB', (40, 40), color).save(buffer, 'PNG')
+    return buffer.getvalue()
+
+
+def count_green(image):
+    return sum(
+        1 for pixel in image.getdata()
+        if pixel[1] > 120 and pixel[0] < 80 and pixel[2] < 80
+    )
 
 
 class RecordingHandler(http.server.BaseHTTPRequestHandler):
@@ -249,6 +269,135 @@ class EmailTestCase(SimpleTestCase):
         converter = Python(file_object=io.BytesIO(email), mime_type='message/rfc822')
         converter.seek_page(page_number=pages - 1)
         self.assertIsNotNone(converter.image)
+
+
+    def _render_email(self, email):
+        converter = Python(file_object=io.BytesIO(email), mime_type='message/rfc822')
+        converter.get_page_count()
+        converter.seek_page(page_number=0)
+        return converter.image.convert('RGB')
+
+    def _pdf_text(self, email):
+        converter = Python(file_object=io.BytesIO(email), mime_type='message/rfc822')
+        with converter.to_pdf() as file_object:
+            reader = pypdf.PdfReader(file_object)
+            return ' '.join(page.extract_text() for page in reader.pages)
+
+    def test_image_named_by_its_content_id(self):
+        message = EmailMessage()
+        message['From'] = 'a@example.com'
+        message['Subject'] = 'Image'
+        message.set_content('Texte')
+        message.add_alternative(
+            '<p>Corps</p><img src="cid:image1@example.com" width="200">',
+            subtype='html'
+        )
+        message.get_payload()[1].add_related(
+            png_bytes(), 'image', 'png', cid='<image1@example.com>',
+            filename='image1.png'
+        )
+        email = message.as_bytes()
+        self.assertGreater(count_green(self._render_email(email)), 1000)
+        self.assertNotIn('image1.png', self._pdf_text(email))
+
+    def test_attachments_named_cc_and_body_of_the_message(self):
+        attached = EmailMessage()
+        attached['Subject'] = 'Message joint'
+        attached.add_alternative('<p>Corps du message joint</p>', subtype='html')
+
+        message = EmailMessage()
+        message['From'] = 'a@example.com'
+        message['To'] = 'b@example.com'
+        message['Cc'] = 'c@example.com'
+        message['Subject'] = 'Pieces'
+        message.set_content('Corps du message')
+        message.add_attachment(
+            b'x' * 3000, maintype='application', subtype='pdf',
+            filename='rapport.pdf'
+        )
+        message.add_attachment(attached)
+        text = self._pdf_text(message.as_bytes())
+        self.assertIn('c@example.com', text)
+        self.assertIn('Corps du message', text)
+        self.assertIn('rapport.pdf (3 Ko)', text)
+        self.assertIn('Message joint', text)
+        # The attached message was taken for the body.
+        self.assertNotIn('Corps du message joint', text)
+
+    def test_alternative_text_not_named_as_attachment(self):
+        message = EmailMessage()
+        message['Subject'] = 'Sujet'
+        message.set_content('Version texte')
+        message.add_alternative('<p>Version HTML</p>', subtype='html')
+        text = self._pdf_text(message.as_bytes())
+        self.assertIn('Version HTML', text)
+        self.assertNotIn('Version texte', text)
+        self.assertNotIn('Pièces jointes', text)
+
+    def test_unknown_content_id_stays_blocked(self):
+        email = (
+            'From: a@example.com\r\nSubject: Essai\r\nMIME-Version: 1.0\r\n'
+            'Content-Type: text/html; charset=utf-8\r\n\r\n'
+            '<p>Corps</p><img src="cid:absent@example.com">'
+        ).encode()
+        self.assertIn('Corps', self._pdf_text(email))
+
+    def test_attachment_alone(self):
+        email = (
+            'From: a@example.com\r\nSubject: Essai\r\nMIME-Version: 1.0\r\n'
+            'Content-Type: application/pdf; name=seul.pdf\r\n'
+            'Content-Disposition: attachment; filename=seul.pdf\r\n\r\nxxx'
+        ).encode()
+        self.assertIn('seul.pdf', self._pdf_text(email))
+
+
+@unittest.skipUnless(WEASYPRINT and MARKDOWN, 'WeasyPrint or Markdown not installed')
+class MarkdownTestCase(SimpleTestCase):
+    def test_remote_and_local_resources_not_loaded(self):
+        server = http.server.HTTPServer(('127.0.0.1', 0), RecordingHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        port = server.server_address[1]
+        address = 'http://127.0.0.1:{}'.format(port)
+        with tempfile.NamedTemporaryFile(suffix='.png') as local_file:
+            local_file.write(png_bytes(color=(200, 0, 0)))
+            local_file.flush()
+            text = (
+                '# Titre\n\nCorps du fichier.\n\n'
+                '![distante]({address}/p.png)\n\n'
+                '<link rel="stylesheet" href="{address}/s.css">\n\n'
+                '<style>@import "{address}/i.css";'
+                '@font-face {{font-family: x; src: url({address}/f.woff)}}'
+                'body {{background: url({address}/b.png)}}</style>\n\n'
+                '<link rel="attachment" href="{address}/a.txt">\n\n'
+                '<img src="{address}/h.png"><img src="file://{local}" width="200">'
+                '<img src="data:image/png;base64,{data}" width="200">\n'
+            ).format(
+                address=address, local=local_file.name,
+                data=base64.b64encode(png_bytes()).decode()
+            ).encode()
+            try:
+                RecordingHandler.requests = []
+                converter = Python(
+                    file_object=io.BytesIO(text), mime_type='text/markdown'
+                )
+                self.assertGreaterEqual(converter.get_page_count(), 1)
+                converter.seek_page(page_number=0)
+                image = converter.image.convert('RGB')
+            finally:
+                server.shutdown()
+
+        self.assertEqual(RecordingHandler.requests, [])
+        self.assertGreater(count_green(image), 1000)
+        red = sum(
+            1 for pixel in image.getdata()
+            if pixel[0] > 150 and pixel[1] < 60 and pixel[2] < 60
+        )
+        self.assertEqual(red, 0)
+
+    def test_page_count_of_a_long_file(self):
+        text = '\n\n'.join('Paragraphe {}'.format(index) for index in range(300))
+        converter = Python(file_object=io.BytesIO(text.encode()), mime_type='text/markdown')
+        self.assertGreater(converter.get_page_count(), 1)
 
 
 class TransparencyTestCase(SimpleTestCase):
