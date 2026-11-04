@@ -68,6 +68,41 @@ class EgyptianIdentityTestCase(TestCase):
         self.assertContains(response, "Egyptian is a fork based on Mayan EDMS")
         self.assertContains(response, "Mayan EDMS Trademark Policy")
 
+    def test_index_template_documentation_link(self):
+        # Section on creating an index template, in the language of the user,
+        # on the pages used to create and edit index templates.
+        from mayan.apps.document_indexing.links import (
+            link_index_template_documentation
+        )
+        from mayan.apps.document_indexing.models.index_template_models import (
+            IndexTemplate
+        )
+        from mayan.apps.events.classes import EventType
+
+        wiki = "https://wiki.mypalace.ca/{}/egyptian/apps/documents/document-indexing#{}"
+        english = wiki.format("en", "creating-an-index-step-by-step")
+        french = wiki.format("fr", "cr%C3%A9er-un-index-guide-pas-%C3%A0-pas")
+        self.assertEqual(link_index_template_documentation.url, english)
+        with translation.override("fr"):
+            self.assertEqual(link_index_template_documentation.url, french)
+
+        # The event types are cached: back in the database of the test.
+        EventType.refresh()
+        index_template = IndexTemplate.objects.create(label="Test", slug="test")
+        root_node = index_template.index_template_root_node
+        self.client.force_login(user=self.user)
+        for path in (
+            "/indexing/templates/", "/indexing/templates/create/",
+            "/indexing/templates/{}/edit/".format(index_template.pk),
+            "/indexing/templates/{}/nodes/".format(index_template.pk),
+            "/indexing/templates/nodes/{}/children/create/".format(root_node.pk)
+        ):
+            self.assertContains(self.client.get(path), english, msg_prefix=path)
+
+        self.user.locale_profile.language = "fr"
+        self.user.locale_profile.save()
+        self.assertContains(self.client.get("/indexing/templates/"), french)
+
     def test_documentation_links(self):
         # Wiki of Egyptian in the language of the user and page of the
         # Egyptian applications (documentation, forum and store page).

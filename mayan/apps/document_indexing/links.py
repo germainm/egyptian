@@ -1,5 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.common.icons import icon_documentation
+from mayan.apps.common.links import LinkLanguage
 from mayan.apps.navigation.links import Link
 from mayan.apps.navigation.utils import factory_condition_queryset_access
 
@@ -12,6 +14,7 @@ from .icons import (
     icon_index_template_node_create, icon_index_template_node_delete,
     icon_index_template_node_edit, icon_index_template_node_tree_view
 )
+from .literals import URL_WIKI_INDEX_TEMPLATE_CREATE
 from .permissions import (
     permission_index_instance_view, permission_index_template_create,
     permission_index_template_delete, permission_index_template_edit,
@@ -37,6 +40,10 @@ link_document_type_index_templates = Link(
 )
 
 
+link_index_template_documentation = LinkLanguage(
+    icon=icon_documentation, tags='new_window',
+    text=_(message='Documentation'), url=URL_WIKI_INDEX_TEMPLATE_CREATE
+)
 link_index_instance_menu = Link(
     condition=factory_condition_queryset_access(
         app_label='document_indexing', model_name='IndexTemplate',

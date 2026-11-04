@@ -472,6 +472,10 @@ def get_language_url(url, **kwargs):
     """
     URL of a page published in English and in French (wiki of Egyptian):
     {language} is the language of the user, English for the other languages.
+    The URL can also be a dictionary with the URL of each language, for an
+    anchor of the page: its name differs from one language to the other.
     """
     language = 'fr' if (get_language() or '').startswith('fr') else 'en'
+    if isinstance(url, dict):
+        url = url[language]
     return url.format(language=language, **kwargs)

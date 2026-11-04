@@ -35,7 +35,8 @@ from .links import (
     link_index_instance_menu, link_index_instance_rebuild,
     link_index_instances_rebuild, link_index_instances_reset,
     link_index_template_create, link_index_template_delete,
-    link_index_template_document_types, link_index_template_edit,
+    link_index_template_document_types, link_index_template_documentation,
+    link_index_template_edit,
     link_index_template_event_triggers, link_index_template_list,
     link_index_template_node_create, link_index_template_node_delete,
     link_index_template_node_edit, link_index_template_node_tree_view,
@@ -299,7 +300,7 @@ class DocumentIndexingApp(MayanAppConfig):
             )
         )
         menu_related.bind_links(
-            links=(link_document_type_list,),
+            links=(link_document_type_list, link_index_template_documentation),
             sources=(
                 IndexTemplate, 'indexing:index_template_list',
                 'indexing:index_template_create'
