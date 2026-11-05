@@ -72,10 +72,11 @@ commercial extensions built and used in production.
   `facture (2).pdf`.
 - **Text of office files: one conversion per file.** LibreOffice converted the whole file for each
   page: 4.5 s for a document of 4 pages, now 1.2 s, for the same text.
-- **All of this on a running instance.** 24 files were uploaded and processed by its workers, among
-  them the mammogram at quality 90, a real radiograph, and 11 `.msg` and `.eml` files, and a `.msg`
-  and an `.eml` file were split into documents: the images, the pages, the text, the OCR and
-  the metadata are right, and no error was logged.
+- **Checked on a running instance.** 24 files were uploaded and processed by its workers: DICOM
+  images, among them the mammogram at quality 90 and a real radiograph, 11 `.msg` files and 2
+  `.eml` files. A `.msg` and an `.eml` file were also split into documents. The images of the first
+  pages and the text are right, the OCR ran, and no error was logged. The conversion of office
+  files was only measured on the test server.
 - **The text of emails is extracted.** It only came from the OCR of the page images. It is now
   read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
   headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
