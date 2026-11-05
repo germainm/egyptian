@@ -327,7 +327,7 @@ Browse all apps and purchase access: **[egyptian-apps.mypalace.ca](https://egypt
 
 ## Docker image
 
-No image of Egyptian is published. `docker compose` builds it from this repository at the first
+No image of Egyptian is published: `docker compose` builds it from this repository at the first
 start, without the extensions. It keeps the paths and the `MAYAN_*` variables of the Mayan EDMS
 image: the Mayan EDMS Docker Compose file and `install-custom-apps.sh` work with it.
 
@@ -337,18 +337,68 @@ cd egyptian/docker
 docker compose up --detach
 ```
 
-On a GitHub runner with 4 CPUs, this builds and starts the image `egyptian:s4.12`
-(`MAYAN_DOCKER_IMAGE_NAME`, `MAYAN_DOCKER_IMAGE_TAG`) in 7 minutes. Set your own passwords in
-`docker/.env` before real use. To use an image from your own registry instead, also set
-`MAYAN_DOCKER_IMAGE_PULL_POLICY=missing`. The image `mypalace/egyptian`, which earlier versions of
-the Compose file pulled, is no longer published.
+Before the first start, edit `docker/.env`:
+
+- Set your own passwords before real use.
+- On a machine with fewer than 6 CPUs, set `MAYAN_DOCKER_CPU_LIMIT` to its number of CPUs, for
+  example `MAYAN_DOCKER_CPU_LIMIT=4.0`. Otherwise Docker refuses to start the application:
+  `Range of CPUs is from 0.01 to 4.00`.
 
 The image has the tools of all the file formats added to the converter: FFmpeg (videos, audio
 files), djvulibre (DjVu), Calibre (EPUB), libarchive (archives), WeasyPrint (EML, Markdown)
 librsvg (SVG) and the Python libraries of the RAW photo, DXF, STL, DICOM (with pyjpegls and
 pylibjpeg-openjpeg), HEIF/HEIC
-and archive formats. The GitHub Actions workflow `Docker image`, run by hand, builds it this way,
-starts it and turns one file of 11 formats into pages.
+and archive formats. The GitHub Actions workflow `Docker image`, run by hand, builds it with
+Docker Compose, starts it and turns one file of 11 formats into pages. It takes 7 minutes to build
+and start on a GitHub runner with 4 CPUs.
+
+### Building the image by hand
+
+From the root of the repository:
+
+```bash
+DOCKER_BUILDKIT=1 docker build --tag egyptian:s4.12 --file docker/Dockerfile .
+cd docker
+docker compose up --detach
+```
+
+Docker Compose uses this image and does not build it again. The Dockerfile needs BuildKit: without
+`DOCKER_BUILDKIT=1`, Docker 20.10, the version in Debian 12, stops with
+`the --mount option requires BuildKit`.
+
+The build took 16 minutes on a virtual machine with 4 vCPUs and 16 GB of memory, with Docker
+20.10.24 and Docker Compose 2.32.4. With its cache and the images of the other services, it used
+about 6 GB of disk.
+
+To give the image another name, build it with that name:
+
+```bash
+DOCKER_BUILDKIT=1 docker build --tag my-egyptian:1.0 --file docker/Dockerfile .
+```
+
+and set the name in `docker/.env`:
+
+```bash
+MAYAN_DOCKER_IMAGE_NAME=my-egyptian
+MAYAN_DOCKER_IMAGE_TAG=1.0
+```
+
+To use an image from your own registry, set its name the same way and add
+`MAYAN_DOCKER_IMAGE_PULL_POLICY=missing`. Without this line, Docker Compose does not pull the image:
+it builds one from the repository under that name.
+
+To update, from the `docker` directory:
+
+```bash
+git stash
+git pull
+git stash pop
+docker compose build
+docker compose up --detach
+```
+
+`git stash` keeps your changes to `docker/.env` aside during the update. `docker compose build` did
+not need `DOCKER_BUILDKIT=1` with these versions.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.
