@@ -12,289 +12,101 @@ commercial extensions built and used in production.
 
 ---
 
-## What's new — November 4, 2026
+## Improvements over Mayan EDMS
 
-- **12-bit JPEG in DICOM files.** The *JPEG Extended* images with samples of 12 bits gave a page
-  of attributes: Pillow and the GDCM plugin of pydicom refuse these samples, and the remaining
-  plugin, `pylibjpeg-libjpeg`, is under the GPLv3, which cannot be combined with the
-  GPL-2.0-only license of this project. They are now read by a decoder of this project, in
-  Python with numpy (`mayan/apps/converter/renderers/jpeg_extended.py`), with no new dependency.
-  Its values were compared with those of libjpeg-turbo 3.1.3: identical on 168 monochrome images
-  of all sizes and qualities, on 8,400 color images of 8 and 12 bits with all the chroma
-  samplings, from 1 to 301 pixels wide, the components with fewer samples being enlarged by the
-  same filter, and on the 43 JPEG images of the test data of pydicom and pylibjpeg. Large images
-  of one component are read with numpy, as lossless JPEG below: on the test server, a mammogram of
-  14 megapixels takes 1.8 s at quality 90 (6.3 s with a Python loop) and 4.2 s at quality 100
-  (8.1 s). The loop remains for the other images and for the streams too dense for the readers,
-  such as pure noise at the highest quality, 12% slower than the loop alone; both give the same
-  result on 842 files, 360 of them damaged. Images over 64 million samples or 2 minutes of
-  decoding, and files too short for the size they declare, get the page of attributes with the
-  reason.
-- **No more `python-gdcm`.** This package is under the Apache-2.0 license and bundles OpenSSL
-  1.1.1k. JPEG-LS is now read by `pyjpegls` (MIT, with CharLS under a BSD license), JPEG 2000 by
-  `pylibjpeg-openjpeg` (MIT, with OpenJPEG under a BSD license) with Pillow after it, and
-  lossless JPEG by a second decoder of this project
-  (`mayan/apps/converter/renderers/jpeg_lossless.py`), for all the predictors, from 2 to 16 bits.
-  On the real files of the test data of pydicom, the values are those of GDCM: 17 JPEG-LS files,
-  30 JPEG 2000 files, 15 8-bit JPEG files; those of GDCM or libjpeg for 13 lossless JPEG files.
-  The pages of 193 sample DICOM files are the same as before, except for 8 files that now have
-  their image instead of a page of attributes, among them two in High-Throughput JPEG 2000 and
-  one in JPEG-LS that GDCM did not read. The lossless decoder reads the Huffman codes with numpy:
-  thousands of readers start along the stream, where they resynchronize by themselves, and a
-  part of the stream only counts if the reader of the previous part ended exactly on its first
-  bit. On the test server, a mammogram of 14 megapixels takes 0.9 s to decode (7.4 s with a
-  Python loop), and 1.3 to 1.7 s for its whole page (1.6 s with GDCM). The loop remains for what
-  the readers refuse: damaged data, streams that do not resynchronize, scans with several Huffman
-  tables. Both give the same result on 2,453 files, 360 of them damaged, and the values are those
-  of libjpeg-turbo in 1,902 comparisons. Do not install `pylibjpeg-libjpeg` (GPLv3), an optional
-  extra of `pylibjpeg`.
-- **No more `extract-msg`.** This package and `pcodedmp`, which it brought, are under the GPLv3,
-  which cannot be combined with the license of this project. Outlook `.msg` files are
-  now read by a reader of this project (`mayan/apps/storage/outlook.py`), written from the public
-  specification of the format, [MS-OXMSG], on `olefile` (BSD). 13 packages leave the installation.
-  On the 41 sample files of Apache POI, the text and the attachments are those of `extract-msg`,
-  except that the Russian and Chinese text of 8-bit files is now readable, an attached message is
-  an `.eml` file instead of an object without a name, and two damaged files that it refused are
-  read. The sender has an address when the file holds one, recipients taken from the Internet
-  headers keep their separators, and an address missing no longer gives `<None>`. One test file
-  has a subject in the wrong encoding: it announces no code page but the one of its HTML body.
-- **The pages of Outlook files are those of an email.** They only held the text of the message,
-  through LibreOffice. They now show the sender, the recipients, the date, the subject and the
-  names of the attachments, then the body, in HTML with its images when the file has one. The 41
-  sample files of Apache POI take 6.6 s together; one of them, with thousands of recipients, gets
-  26 pages to list them. Messages already stored keep the pages they have.
-- **The HTML that Outlook writes stays on the page of the headers.** It puts the message in a named
-  page, which started a new page: the headers were alone on the first one. This also applies to
-  the `.eml` files that come from Outlook.
-- **SVG drawings rendered by `rsvg-convert`.** It replaces `CairoSVG` (LGPL-3.0 or later): this
-  command line program of librsvg (LGPL-2.1 or later, package `librsvg2-bin`) is started for each
-  drawing. On the 1,762 test drawings of resvg, 905 are close to their reference image instead of
-  656, and 3 are not rendered instead of 67. On 294 real logos and icons, none fails; the difference
-  between the two is 0.12% on average, and in the largest ones, seen side by side, its image is
-  that of Chrome where `CairoSVG` was wrong on three logos. A few bytes can ask for a huge drawing: 1.5 GB and
-  60 seconds at the most. A drawing of 32,000 by 32,000 pixels is now refused at once, instead of
-  taking 42 s and 3.9 GB before being refused. Signatures are read from `data:` URLs only:
-  `CairoSVG` received their field as an address.
-  Checked on a running instance: 7 drawings, among them those three logos and a `.svgz` file, and
-  a signature have the right image, a remote image is not loaded, and the drawing of 32,000 pixels
-  and a signature that names a file get an error instead of an image.
-- **Attachments of the same name.** When an email or an Outlook message is split into documents,
-  two attachments of the same name gave the first one twice, and an attachment named
-  `message.txt` gave the text of an Outlook message. They are now `facture.pdf`,
-  `facture (2).pdf`.
-- **Text of office files: one conversion per file.** LibreOffice converted the whole file for each
-  page: 4.5 s for a document of 4 pages, now 1.2 s, for the same text.
-- **Checked on a running instance.** 24 files were uploaded and processed by its workers: DICOM
-  images, among them the mammogram at quality 90 and a real radiograph, 11 `.msg` files and 2
-  `.eml` files. A `.msg` and an `.eml` file were also split into documents. The images of the first
-  pages and the text are right, the OCR ran, and no error was logged. The conversion of office
-  files was only measured on the test server.
-- **The text of emails is extracted.** It only came from the OCR of the page images. It is now
-  read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
-  headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
-  same way. For the emails already stored, use *Submit for parsing*.
-- **More of an email on its pages.** The `Cc` header, the name and size of the attachments, the
-  images that the HTML names by their Content-ID, which were not loaded. An attached message is
-  no longer taken for the body of the email.
-- **Markdown files load no external resource.** WeasyPrint requested the images and style sheets
-  named in the file, at any address it gave. Markdown files now have the same filter as emails:
-  only the images embedded in the file (`data:` URLs) are loaded, the other ones show their
-  alternative text.
+What Egyptian adds to Mayan EDMS 4.12.2 or fixes in it. All of it is free and in this repository.
+The list only keeps what still differs: fixes that Mayan EDMS has made since then are not listed.
+The dated history of these changes, with the measurements behind them, is in
+[CHANGELOG.md](CHANGELOG.md).
 
----
+### File formats
 
-## What's new — November 3, 2026
+- **Archives and compressed files:** ZIP and JAR files and, with libarchive, TAR, 7z, RAR, ISO, CAB,
+  LHA, DEB, RPM, CPIO, XAR, WARC, gzip, bzip2, xz and zstd files get pages with a summary and the list
+  of their entries, whose names go to the search. Nothing is extracted, and a decompression bomb gets
+  a page that says where the listing stopped.
+- **Audio files:** MP3, FLAC, M4A/AAC, Ogg Vorbis and Opus, WAV, AIFF and WMA files get a page with
+  their tags, cover, waveform, duration, encoding and bit rate (FFmpeg).
+- **DICOM files:** images through the modality LUT and the window of the file, one page per frame;
+  structured reports and ECG; 12-bit and lossless JPEG read by decoders of this project.
+- **Emails:** EML and Outlook `.msg` files on all their pages (WeasyPrint), with their headers, the
+  names of their attachments and their embedded images. Their text is extracted at upload.
+- **GPS tracks:** a GPX file gets a map, with its name, date, distance, duration and elevation gain.
+  The map background comes from the tile server of the Itinéraires app when it is installed, else from
+  OpenStreetMap. Set the `map_tile_url` entry of `CONVERTER_GRAPHICS_BACKEND_ARGUMENTS` to an empty
+  value to draw the tracks with no request to the outside.
+- **Raw photos:** CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF and X3F files developed at full
+  resolution, with the white balance of the camera.
+- **Drawings and models:** SVG and SVGZ (`rsvg-convert`, package `librsvg2-bin`), DXF and STL files,
+  WMF and EMF drawings (LibreOffice).
+- **Other files:** HEIF/HEIC images, videos (first frame, FFmpeg), DjVu (djvulibre, bundled files),
+  EPUB (Calibre), Markdown (WeasyPrint), CSV, XML and Python scripts (LibreOffice), Photoshop files
+  with layers (merged image).
+- **Transparent images** are laid over a white background instead of turning black.
+- **Types recognized from the content** when `file` gives a generic one: Office Open XML and
+  OpenDocument archives, DICOM files with a TIFF header, raw photos built on TIFF, EMF drawings,
+  Panasonic raw photos, emails.
 
-Every file format of the converter was tested with 86 sample files found on the web (test
-corpora of Apache Tika, Pillow and pydicom, raw.pixls.us, video samples). These fixes come out
-of that test:
+### Large imports and processing
 
-- **Transparent images are no longer black.** PNG files with transparency, SVG drawings, icons:
-  the page image is a JPEG, and the transparent pixels lost their alpha channel on the way. They
-  are now laid over a white background, and the barcode reader finds the codes they hold.
-- **Formats recognized from their content when `file` gives a generic type:** DOCX, XLSX and
-  PPTX files whose archive does not start with `[Content_Types].xml`, OpenDocument formulas
-  (`application/zip`); DICOM files preceded by a TIFF header and raw photos built on TIFF —
-  DNG, NEF, ARW, PEF (`image/tiff`); EMF drawings and Panasonic RW2 photos
-  (`application/octet-stream`); emails that start with headers unknown to `file`, as saved by
-  Thunderbird or Outlook.com (`text/plain`).
-- **Raw photos at full resolution.** NEF and DNG files showed the 160 × 120 preview stored in
-  their header, ARW, PEF, RW2 and X3F files had no page at all: all are now developed by rawpy.
-- **More formats rendered by LibreOffice:** WMF and EMF drawings, CSV files, XML files (GPX
-  tracks included) and Python scripts named `text/x-script.python` by `file` 5.41 and later.
-  XML files are shown as their source: read as plain text, they cannot make LibreOffice load
-  external resources. HTML files are not added: LibreOffice loads the
-  images and style sheets they link to, so the server would request any address that an
-  uploaded file names.
-- **Photoshop files with layers** are rendered as their merged image, on one page.
-- **GPS tracks on a map.** A GPX file was shown as its XML source, on 22 pages for a walk of
-  5 km. Its page is now a map of its tracks, routes and named waypoints, headed by its name,
-  date, distance, duration and elevation gain, which the OCR reads. The distance and the
-  moving time are those of the Itinéraires app (gpxpy), with the total time when the track has
-  stops. The map background comes from the tile server of the map of the Itinéraires app when
-  it is installed, else from OpenStreetMap: only the zoom level and the numbers of the tiles
-  of the area are sent, and the tiles are cached for 7 days. Set the `map_tile_url` entry of
-  `CONVERTER_GRAPHICS_BACKEND_ARGUMENTS` to an empty value to draw the tracks without map
-  background, with no request to the outside.
-- **Audio files get a page.** MP3, FLAC, M4A/AAC, Ogg Vorbis and Opus, WAV, AIFF and WMA files
-  had no page. Their page now shows their tags (title, artist, album, date, track, genre…),
-  their cover when the file holds one, their waveform, and their duration, encoding and bit
-  rate (ffprobe and ffmpeg). The OCR reads them: an audio file is found by its title or
-  artist.
-- **Archives get pages.** ZIP, JAR, TAR (also gzip, bzip2, xz and zstd compressed), 7z, RAR,
-  ISO, CAB, LHA, DEB, RPM, CPIO, XAR and WARC files had no page. Their pages now show the
-  format, the compression, the number of files and folders, the sizes, the dates, the comment
-  of the archive and of its entries, the encryption (entries that need a password, or names
-  that are themselves encrypted), the owners of TAR files, the manifest of JAR files, the
-  header of RPM packages (name, version, summary, license, vendor, build date, signature) and
-  the properties of RAR archives (version, method and dictionary, solid, locked, recovery
-  record, volume, system, comment), then the list of the entries (name, size, date), up to
-  2,000 on the pages. The text of the pages is extracted for the search, with the names of up
-  to 20,000 entries. A single compressed file (`.gz`, `.bz2`, `.xz`, `.zst`) shows its
-  uncompressed size, the start of its text and, for gzip, its original name and date. Nothing
-  is extracted: only the directory of the archive is read, by the zipfile module for ZIP files
-  and by libarchive (Python package `libarchive-c`, now in the production requirements) for
-  the other formats, with only the formats of the file type enabled. RAR archives that
-  libarchive stops reading (RAR 1.5 to 4 solid archives, RAR 1.5) are listed from their
-  headers; an empty archive says so. Reading stops after 30 seconds, 4 GB decompressed or
-  20,000 entries: a decompression bomb gets a page that says where the listing stopped.
-  Chinese, Japanese and Korean names use an installed CJK font (Noto Sans CJK, WenQuanYi Zen
-  Hei or IPA Gothic).
-- **SVGZ drawings.** A compressed SVG drawing (`.svgz`, which `file` reports as
-  `application/gzip`) is recognized from its content and shown as a drawing; it is
-  decompressed within 64 MB.
-- **exiftool metadata of RAR 5 archives and RPM packages.** exiftool 12.57 (Debian 12) cannot
-  read RAR 5 archives and RPM packages: it ends with exit code 1 and the error "File format
-  error". An error was logged on the document file and no metadata was kept. The tags it still
-  gives (file name, size and permissions, ExifTool version) and its error message are now kept,
-  as for the formats it does not know ("Unknown file type").
-- **DICOM files shown as the file asks.** The pixel values were stretched between their
-  minimum and their maximum. They now go through the modality LUT and the window (or VOI
-  LUT) of the file, top level or functional groups of the enhanced multi-frame images;
-  palette colors and MONOCHROME1 images are shown right. A multi-frame file has one page per
-  frame (an ultrasound loop of 30 frames gives 30 pages). Structured reports, ECG and
-  radiotherapy plans, which hold no image, get a page of their main attributes with the
-  content of the report or the 12 leads of the ECG. Images smaller than 512 pixels (dose
-  grids, thumbnails) are enlarged without smoothing. An image that no installed decoder
-  can read gets the same page, with the reason and the missing package.
-- **Raw photos in the colors of the camera.** They were developed with a daylight white
-  balance, which gave a color cast (cyan with Sigma, pink with Olympus, green with Pentax);
-  they now use the white balance recorded by the camera.
-- **Files that LibreOffice cannot convert no longer break the upload.** When LibreOffice writes
-  no PDF file, fails or times out, the error is logged on the document file and the document
-  gets its version and its file metadata, like any other format the converter cannot read.
-  OpenDocument formulas are in this case: LibreOffice 7.4 does not load them without its
-  interface. Before, the upload stopped and left a document without version.
-- **Emails on all their pages.** An email was cut to its first page; its attachments are no
-  longer shown as base64 text, its plain text is escaped, and the rendering loads no external
-  resource (only the images embedded in the message).
+- PDF files stored as plain files are read in place to render their pages (pdftoppm) and extract
+  their text (pdftotext), instead of being copied to the temporary directory for each page.
+- Oversized PDF pages, such as captures of whole web pages, are rendered at the resolution that fits
+  the pixel limit of Pillow instead of failing.
+- Office documents and EPUB books are OCRed to the last page: the readers of a cached file wait for
+  its lock (up to 30 s), and the retries of the OCR task on lock errors are spread out and more
+  numerous. The task also retries on `FileNotFoundError`.
+- The text of an office file takes one conversion, not one per page, and an EPUB book is converted
+  once.
+- A file that LibreOffice cannot convert no longer breaks the upload: the error is logged and the
+  document gets its version.
+- LibreOffice gets the extension of RTF files, and the intermediate PDF file is generated with the
+  stored MIME type of the document file.
+- NUL characters, which PostgreSQL rejects, are removed from file metadata, and the exiftool tags of
+  RAR 5 archives and RPM packages are kept instead of logging an error.
+- When an email or an Outlook message is split into documents, attachments of the same name stay
+  distinct.
 
----
+### Security and privacy
 
-## What's new — October 30, 2026
+- **Encrypted storage:** AES-256-GCM (authenticated encryption) instead of AES-256-CBC, a random salt
+  (32 bytes) and nonce (12 bytes) per file, PBKDF2 at 600,000 iterations instead of 100,000, and
+  `cryptography` (PyCA) instead of `pycryptodome`.
+- **OIDC:** cross-origin SSO logout, the missing parameters (token expiry, logout endpoint, id token
+  storage), and a `ModelBackend` fallback when the provider is down.
+- **Sentry:** no personal data (user, IP address, cookies) unless `send_default_pii` is enabled.
+- **Emails, Markdown and XML files load nothing from elsewhere:** the first two only load the images
+  they embed, and XML files are read as plain text.
+- **SVG drawings** are rendered within 1.5 GB and 60 seconds, without loading remote images, and
+  signatures are read from `data:` URLs only.
 
-Fixes for large imports, tested in production on October 29 and 30 with more than 380
-documents and 18,000 pages (PDF files, office documents, EPUB books):
+### Search
 
-- **No more copy of the whole PDF file for every page.** Mayan EDMS 4.12.2 copies the entire
-  PDF file to the temporary directory each time it renders a page (pdftoppm) or extracts its
-  text (pdftotext): with 7 workers on a 223 MB file, 1.6 GB of copies at once, enough to fill
-  the disk during an import. Egyptian now reads the stored file in place. The files of the
-  encrypted and compressed storages are still copied, since their file on disk does not hold
-  the content as read.
-- **Oversized pages are rendered instead of failing.** Very tall pages, such as captures of
-  whole web pages (1,626 × 8,138 points), stopped with a decompression bomb error. They are now
-  rendered at the resolution that fits the pixel limit of Pillow.
-- **Office documents and EPUB books are OCRed to the last page.** All their pages are rendered
-  from the same intermediate file: each page now waits for its lock (up to 30 seconds) instead
-  of failing at once — on the test bench, 68 of 70 attempts failed with 7 workers before the
-  fix — and the OCR retries are spread over 5 to 60 seconds, up to 20 times. An EPUB book is
-  converted once, not once per page.
-- **RTF files and file metadata.** LibreOffice gets the extension of RTF files, which it did
-  not always recognize without one, and the NUL characters that PostgreSQL rejects are removed
-  from file metadata (PDF files made by old versions of Acrobat).
+- Elasticsearch: partial search on text fields uses `match`, unless the value holds `*` or `?`, with a
+  shared Point-in-Time for multi-scope queries and the page size capped to `SEARCH_RESULTS_LIMIT`.
+- Deleted objects are tolerated by the index and deindex tasks, and the deletion tasks wait for the
+  transaction to be committed, so that a deleted object does not come back in the index.
+- Documents deleted from the trash leave the search.
 
-Also new: the **System** menu of Egyptian opens the [documentation wiki](https://wiki.mypalace.ca/en/home)
-and a page of the Egyptian applications, installed or not, with the documentation, the forum
-and the store page of each one.
+### Interface
 
----
+- The **System** menu opens the [documentation wiki](https://wiki.mypalace.ca/en/home) and a page of
+  the Egyptian applications, installed or not, with the documentation, the forum and the store page of
+  each one.
+- The index templates link to the section of the wiki on creating an index.
+- The list of the workers shows their memory limit in the right unit.
 
-## Free bug fixes included in this fork
+### Docker
 
-All fixes below are available to anyone who runs this fork, at no cost. The list only keeps
-what still differs from Mayan EDMS 4.12.2: fixes that Mayan EDMS has made since then are not
-listed.
+- `docker compose` builds the image from this repository, with the tools of all these formats: see
+  [Docker image](#docker-image).
+- The health check of the Compose file works with `MAYAN_ALLOWED_HOSTS` and
+  `MAYAN_GUNICORN_BIND_CONTAINER_IP_ONLY`.
 
-### Security and core fixes
+### Dependencies
 
-#### OIDC
-
-- Add cross-origin SSO logout support (the logout URL is escaped in the page script)
-- Add missing OIDC parameters (token expiry, logout endpoint, id token storage)
-- Add ModelBackend fallback for OIDC-down scenarios
-
-#### Encrypted storage
-
-- Migrate AES-256-CBC to AES-256-GCM (authenticated encryption)
-- Replace fixed salt with per-file random salt (32 bytes)
-- Add per-file random nonce (12 bytes)
-- Increase PBKDF2 iterations: 100k to 600k (OWASP 2024)
-- Switch from pycryptodome to cryptography (PyCA)
-
-#### Elasticsearch search
-
-- Fix partial search on text fields (wildcard to match)
-- Add shared Point-in-Time for multi-scope queries
-- Cap page size to SEARCH_RESULTS_LIMIT
-- Tolerate deleted objects in index/deindex tasks
-
-#### Core
-
-- Retry the OCR task on FileNotFoundError
-- Let the readers of a cached file wait for its lock (up to 30 s) instead of failing at once:
-  all the pages of an office document are rendered from the same intermediate file
-- Spread the retries of the OCR task on lock errors, and allow more of them
-- Give LibreOffice the extension of RTF files, which it did not always recognize without one
-- Remove NUL characters from file metadata, which PostgreSQL rejects
-- Read PDF files stored as plain files in place to render their pages (pdftoppm) and to
-  extract their text (pdftotext), instead of copying the whole file to the temporary
-  directory for each page
-- Render oversized PDF pages (captures of whole web pages) at the resolution that fits the
-  pixel limit of Pillow, instead of failing with a decompression bomb error
-- Sentry: do not send personal data (user, IP address, cookies) unless `send_default_pii` is
-  enabled explicitly
-- Lay images with transparency over a white background before saving the page image as JPEG,
-  instead of letting the transparent pixels turn black
-- Refine the generic MIME types returned by `file` (`application/zip`, `image/tiff`,
-  `application/octet-stream`, `text/plain`) from the content: Office Open XML and OpenDocument
-  archives, DICOM files with a TIFF header, raw photos built on TIFF, EMF drawings, Panasonic
-  raw photos, emails
-- Generate the intermediate PDF file with the stored MIME type of the document file instead of
-  detecting it again
-- Render Photoshop files with layers as their merged image, on one page, instead of failing
-  on frame 0
-- Render the XML files and the Python scripts (`text/xml`, `text/x-script.python`) as plain
-  text, and the CSV, WMF and EMF files, with LibreOffice
-- Log the error and complete the upload when LibreOffice writes no PDF file, fails or times
-  out, instead of leaving a document without version
-- Develop raw photos with the white balance of the camera instead of a daylight balance
-- Show DICOM images through their modality LUT and window instead of stretching their values,
-  one page per frame
-- Give archives pages (summary and list of the entries) instead of a page count error, and
-  extract their text for the search
-- Show SVGZ drawings, decompressed within a limit
-- Keep the exiftool tags of RAR 5 archives and RPM packages, which exiftool 12.57 cannot read,
-  instead of logging an error
-
-### More file formats
-
-The converter also renders SVG (`rsvg-convert`, package `librsvg2-bin`), RAW photo (CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF, X3F),
-DXF, STL and DICOM files (images, structured reports, ECG) and HEIF/HEIC images, GPX tracks
-(map), WMF and EMF drawings and CSV files (LibreOffice), ZIP and JAR archives, and, when their
-tools are installed, other archives and compressed files (libarchive), videos (first frame,
-FFmpeg), audio files (tags, cover and waveform, FFmpeg), DjVu (djvulibre, bundled files), EPUB
-(Calibre), EML and Markdown (WeasyPrint).
+- `extract-msg` and `CairoSVG` are replaced by a reader of Outlook files written for this project on
+  `olefile`, and by `rsvg-convert`.
 
 ---
 
