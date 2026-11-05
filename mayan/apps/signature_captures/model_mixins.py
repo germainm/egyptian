@@ -2,15 +2,14 @@ import hashlib
 import io
 import logging
 
-import cairosvg
 from furl import furl
-from PIL import Image
 
 from django.shortcuts import reverse
 from django.utils.encoding import force_bytes
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
+from mayan.apps.converter.renderers.svg import render_svg_data_url
 from mayan.apps.file_caching.models import Cache, CachePartitionFile
 from mayan.apps.templating.template_backends import Template
 
@@ -96,8 +95,4 @@ class SignatureCaptureBusinessLogicMixin:
         return hashlib.sha256(string=string).hexdigest()
 
     def get_image(self):
-        stream = io.BytesIO()
-        cairosvg.svg2png(url=self.svg, write_to=stream)
-        image = Image.open(stream)
-
-        return image
+        return render_svg_data_url(url=self.svg)

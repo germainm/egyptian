@@ -58,7 +58,6 @@ def find_packages(directory):
 
 
 install_requires = """
-CairoSVG==2.9.0
 Markdown==3.10.2
 Pillow==12.3.0
 PyYAML==6.0.3
@@ -66,6 +65,7 @@ Whoosh==2.7.4
 boto3==1.40.24
 celery==5.6.3
 dateparser==1.4.0
+defusedxml==0.7.1
 django==5.2.17
 django-activity-stream==2.0.0
 django-auth-ldap==5.3.0

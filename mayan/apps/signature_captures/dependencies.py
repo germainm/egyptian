@@ -18,7 +18,3 @@ JavaScriptDependency(
     ], version_string='=4.2.0'
 )
 
-PythonDependency(
-    environments=(environment_production,), module=__name__, name='CairoSVG',
-    version_string='==2.9.0'
-)

@@ -84,6 +84,7 @@ apt-get update \
     ffmpeg \
     libarchive13t64 \
     libharfbuzz-subset0 \
+    librsvg2-bin \
     libpango-1.0-0 \
     libpangoft2-1.0-0
 

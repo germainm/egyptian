@@ -214,16 +214,17 @@ class Python(ConverterBase):
         super().convert(*args, **kwargs)
 
         if self.mime_type == CONVERTER_SVG_MIME_TYPE:
-            import cairosvg
+            from ..renderers.svg import render_svg
+
             self.file_object.seek(0)
             data = self.file_object.read()
             if data[:2] == b'\x1f\x8b':
-                # SVGZ: decompressed here, within a limit; CairoSVG would
+                # SVGZ: decompressed here, within a limit; rsvg-convert would
                 # decompress all of it (decompression bomb).
                 data = gunzip_svg(data=data)
-            png_bytes = cairosvg.svg2png(bytestring=data)
+            image = render_svg(data=data)
             self.file_object.seek(0)
-            return Image.open(fp=io.BytesIO(png_bytes))
+            return image
 
         if self.mime_type in CONVERTER_VIDEO_MIME_TYPES:
             return self._convert_video()

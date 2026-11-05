@@ -103,6 +103,7 @@ DEFAULT_DJVUSED_PATH = '/usr/bin/djvused'
 DEFAULT_EBOOK_CONVERT_PATH = '/usr/bin/ebook-convert'
 DEFAULT_FFMPEG_PATH = '/usr/bin/ffmpeg'
 DEFAULT_FFPROBE_PATH = '/usr/bin/ffprobe'
+DEFAULT_RSVG_CONVERT_PATH = '/usr/bin/rsvg-convert'
 
 CONVERTER_OFFICE_FILE_MIMETYPES = (
     'application/msword',

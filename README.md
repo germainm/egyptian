@@ -66,6 +66,15 @@ commercial extensions built and used in production.
 - **The HTML that Outlook writes stays on the page of the headers.** It puts the message in a named
   page, which started a new page: the headers were alone on the first one. This also applies to
   the `.eml` files that come from Outlook.
+- **SVG drawings rendered by `rsvg-convert`.** It replaces `CairoSVG` (LGPL-3.0 or later): this
+  command line program of librsvg (LGPL-2.1 or later, package `librsvg2-bin`) is started for each
+  drawing. On the 1,762 test drawings of resvg, 905 are close to their reference image instead of
+  656, and 3 are not rendered instead of 67. On 294 real logos and icons, none fails; the difference
+  between the two is 0.12% on average, and in the largest ones, seen side by side, its image is
+  that of Chrome where `CairoSVG` was wrong. A few bytes can ask for a huge drawing: 1.5 GB and
+  60 seconds at the most. A drawing of 32,000 by 32,000 pixels is now refused at once, instead of
+  taking 42 s and 3.9 GB before being refused. Signatures are read from `data:` URLs only:
+  `CairoSVG` received their field as an address.
 - **Attachments of the same name.** When an email or an Outlook message is split into documents,
   two attachments of the same name gave the first one twice, and an attachment named
   `message.txt` gave the text of an Outlook message. They are now `facture.pdf`,
@@ -277,7 +286,7 @@ listed.
 
 ### More file formats
 
-The converter also renders SVG, RAW photo (CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF, X3F),
+The converter also renders SVG (`rsvg-convert`, package `librsvg2-bin`), RAW photo (CR2, CRW, NEF, ARW, DNG, ORF, RAF, RW2, PEF, X3F),
 DXF, STL and DICOM files (images, structured reports, ECG) and HEIF/HEIC images, GPX tracks
 (map), WMF and EMF drawings and CSV files (LibreOffice), ZIP and JAR archives, and, when their
 tools are installed, other archives and compressed files (libarchive), videos (first frame,
@@ -330,7 +339,7 @@ docker compose up --detach
 
 The image has the tools of all the file formats added to the converter: FFmpeg (videos, audio
 files), djvulibre (DjVu), Calibre (EPUB), libarchive (archives), WeasyPrint (EML, Markdown)
-and the Python libraries of the SVG, RAW photo, DXF, STL, DICOM (with pyjpegls and
+librsvg (SVG) and the Python libraries of the RAW photo, DXF, STL, DICOM (with pyjpegls and
 pylibjpeg-openjpeg), HEIF/HEIC
 and archive formats. The image on Docker Hub was last built on October 29, 2026: it does not have
 the changes of November 3 and 4 yet.
@@ -343,19 +352,19 @@ To regenerate the files of the image after a change to the workers, the queues o
 ## Tests
 
 The renderers of the formats added to the converter and the refinement of the MIME types have
-unit tests (199): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+unit tests (216): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
 encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit and
-lossless JPEG, audio files, emails and Markdown files without remote resources, the text of the emails,
+lossless JPEG, audio files, SVG drawings and signatures, emails and Markdown files without remote resources, the text of the emails,
 the Outlook `.msg` files, transparency, and the content-based MIME types. They need no database and no network: their
 files are built in memory or come with pydicom. Run them from an Egyptian installation, with
 the same environment variables as for `migrate`:
 
 ```bash
-/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types mayan.apps.storage
+/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types mayan.apps.signature_captures mayan.apps.storage
 ```
 
 The tests that need a tool or a library that is not installed (FFmpeg, libarchive-c,
-WeasyPrint, pydicom, pyjpegls, pylibjpeg-openjpeg, gpxpy) are skipped. The Egyptian extensions have their own tests in their
+WeasyPrint, rsvg-convert, pydicom, pyjpegls, pylibjpeg-openjpeg, gpxpy) are skipped. The Egyptian extensions have their own tests in their
 repositories.
 
 ---

@@ -8,6 +8,7 @@ from .backends.python import (
     pdftoppm_path
 )
 from .classes import libreoffice_path
+from .renderers.svg import get_rsvg_convert_path
 
 # ── Binaires système ──────────────────────────────────────────────────────────
 
@@ -28,6 +29,13 @@ BinaryDependency(
         message='Utility from the popper-utils package used to extract '
         'pages from PDF files into PPM format images.'
     ), module=__name__, name='pdftoppm', path=pdftoppm_path
+)
+BinaryDependency(
+    environments=(environment_production,), label='rsvg-convert',
+    help_text=_(
+        message='Utility from the librsvg2-bin package used to render SVG '
+        'drawings.'
+    ), module=__name__, name='rsvg-convert', path=get_rsvg_convert_path()
 )
 BinaryDependency(
     environments=(environment_production,), label='FFmpeg', help_text=_(
