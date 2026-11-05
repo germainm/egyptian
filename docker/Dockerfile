@@ -17,7 +17,7 @@ LABEL org.opencontainers.image.description="Egyptian, a fork based on Mayan EDMS
 LABEL org.opencontainers.image.documentation="https://github.com/germainm/egyptian#readme"
 LABEL org.opencontainers.image.licenses="GPL-2.0-only"
 LABEL org.opencontainers.image.source="https://github.com/germainm/egyptian"
-LABEL org.opencontainers.image.url="https://hub.docker.com/r/mypalace/egyptian"
+LABEL org.opencontainers.image.url="https://github.com/germainm/egyptian"
 LABEL org.opencontainers.image.vendor="mypalace.ca"
 LABEL org.opencontainers.image.title="Egyptian"
 

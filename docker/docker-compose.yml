@@ -80,7 +80,12 @@ x-mayan-container:
       required: false
   environment:
     <<: [*mayan-environment]
-  image: ${MAYAN_DOCKER_IMAGE_NAME:-mypalace/egyptian}:${MAYAN_DOCKER_IMAGE_TAG:-s4.12}
+  # No image of Egyptian is published: it is built from this repository.
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: ${MAYAN_DOCKER_IMAGE_NAME:-egyptian}:${MAYAN_DOCKER_IMAGE_TAG:-s4.12}
+  pull_policy: ${MAYAN_DOCKER_IMAGE_PULL_POLICY:-never}
   networks:
     - mayan
   restart: unless-stopped

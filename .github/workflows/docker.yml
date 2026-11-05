@@ -1,21 +1,10 @@
 name: Docker image
 
-# Builds the Egyptian image, starts it with docker/docker-compose.yml and checks
-# it. The tested image is published on Docker Hub (mypalace/egyptian) for a
-# version tag (v*) or when asked by hand (Actions > Docker image > Run workflow).
+# Builds the Egyptian image with docker/docker-compose.yml, as the README says,
+# starts it and checks it. Run by hand (Actions > Docker image > Run workflow).
+# The image is not published.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish on Docker Hub after the test'
-        type: boolean
-        default: false
-
-env:
-  IMAGE: mypalace/egyptian
 
 jobs:
   image:
@@ -29,36 +18,16 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: Version
-        id: version
-        run: |
-          version=$(python3 -c "import re; print(re.search(r\"^__version__ = '([^']+)'\", open('mayan/__init__.py').read(), re.M).group(1))")
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "series=s${version%.*}" >> "$GITHUB_OUTPUT"
-          echo "Version ${version}"
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/Dockerfile
-          load: true
-          tags: ${{ env.IMAGE }}:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
-
-      - name: Start with docker/docker-compose.yml
+      - name: Build and start with docker/docker-compose.yml
         working-directory: docker
         env:
-          MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
-          MAYAN_DOCKER_IMAGE_TAG: test
           # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
           MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
+          start=$(date +%s)
           docker compose up --detach
+          echo "Built and started in $(( ($(date +%s) - start) / 60 )) minutes"
+          docker image ls egyptian
           for i in $(seq 90); do
             if curl --silent --fail --output /tmp/login.html http://127.0.0.1/authentication/login/; then
               echo "Login page after about $((i * 10)) seconds"
@@ -71,8 +40,6 @@ jobs:
       - name: Check
         working-directory: docker
         env:
-          MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
-          MAYAN_DOCKER_IMAGE_TAG: test
           # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
           MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
@@ -80,19 +47,19 @@ jobs:
           test -s /tmp/login.html
           grep -q 'content="Egyptian" name="application-name"' /tmp/login.html
           grep -q 'appearance/images/egyptian-login' /tmp/login.html
-          ! grep -q 'Guided Demo' /tmp/login.html
+          if grep -q 'Guided Demo' /tmp/login.html; then exit 1; fi
           curl --silent --fail --location --output /dev/null http://127.0.0.1/favicon.ico
           docker compose exec -T app supervisorctl status
-          ! docker compose exec -T app supervisorctl status | grep -v RUNNING
+          if docker compose exec -T app supervisorctl status | grep -v RUNNING; then exit 1; fi
           docker compose exec -T app /opt/mayan-edms/bin/python -c "import ezdxf, matplotlib, numpy, pillow_heif, pydicom, rawpy, stl"
-          # No extension in the public image.
-          ! docker compose exec -T app sh -c 'ls /opt/mayan-edms/lib/python3*/site-packages/mayan/apps/approvals/*.py'
+          docker compose exec -T app rsvg-convert --version
+          if docker compose exec -T app /opt/mayan-edms/bin/python -c "import cairosvg"; then exit 1; fi
+          # No extension in the image.
+          if docker compose exec -T app sh -c 'ls /opt/mayan-edms/lib/python3*/site-packages/mayan/apps/approvals/*.py'; then exit 1; fi
 
       - name: Process documents
         working-directory: docker
         env:
-          MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
-          MAYAN_DOCKER_IMAGE_TAG: test
           MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
           base=http://127.0.0.1/api/v4
@@ -207,25 +174,8 @@ jobs:
         if: always()
         working-directory: docker
         env:
-          MAYAN_DOCKER_IMAGE_NAME: ${{ env.IMAGE }}
-          MAYAN_DOCKER_IMAGE_TAG: test
           # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
           MAYAN_DOCKER_CPU_LIMIT: '4.0'
         run: |
           docker compose logs app | tail -120
           docker compose down --volumes
-
-      - name: Log in to Docker Hub
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Publish the tested image
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish
-        run: |
-          for tag in "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.series }}" latest; do
-            docker tag "${IMAGE}:test" "${IMAGE}:${tag}"
-            docker push "${IMAGE}:${tag}"
-          done
