@@ -22,6 +22,7 @@ import wave
 from unittest import mock
 
 from PIL import Image
+from pypdf import PdfReader
 import pypdf
 
 from django.test import SimpleTestCase
@@ -469,6 +470,29 @@ class OutlookMessageTestCase(SimpleTestCase):
             self.assertIn(expected, text)
         # A blind copy is not in the headers of a message.
         self.assertNotIn('eve@example.com', text)
+
+    def test_html_of_outlook_on_the_page_of_the_headers(self):
+        html = (
+            b'<html><head><style>@page WordSection1 {size: 8.5in 11in;} '
+            b'div.WordSection1 {page: WordSection1;}</style></head><body>'
+            b'<div class=WordSection1><p>Corps du message HTML</p></div>'
+            b'</body></html>'
+        )
+        converter = Python(
+            file_object=make_message(**{'__substg1.0_10130102': html}),
+            mime_type='application/vnd.ms-outlook'
+        )
+        with converter.to_pdf() as pdf_file_object:
+            reader = PdfReader(pdf_file_object.name)
+            text = subprocess.run(
+                ('pdftotext', '-f', '1', '-l', '1', pdf_file_object.name, '-'),
+                capture_output=True, check=True
+            ).stdout.decode()
+        self.assertEqual(len(reader.pages), 1)
+        self.assertIn('alice@example.com', text)
+        self.assertIn('Corps du message HTML', text)
+        # A4, not the size that the message asks for.
+        self.assertAlmostEqual(float(reader.pages[0].mediabox.width), 595.3, delta=1)
 
     def test_images_named_by_the_html_body(self):
         buffer = io.BytesIO()

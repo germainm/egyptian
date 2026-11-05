@@ -333,7 +333,7 @@ To regenerate the files of the image after a change to the workers, the queues o
 ## Tests
 
 The renderers of the formats added to the converter and the refinement of the MIME types have
-unit tests (198): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
+unit tests (199): archives and compressed files (ZIP, JAR, TAR, gzip, RAR headers, RPM headers,
 encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit and
 lossless JPEG, audio files, emails and Markdown files without remote resources, the text of the emails,
 the Outlook `.msg` files, transparency, and the content-based MIME types. They need no database and no network: their

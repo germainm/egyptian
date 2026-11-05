@@ -914,9 +914,14 @@ class Python(ConverterBase):
             body=body
         )
 
+        # The HTML that Outlook writes puts the message in a named page, which
+        # starts a new page: the headers would be alone on the first one, and
+        # the others would have the size that the message asks for.
         return weasyprint.HTML(
             string=document_html, url_fetcher=get_weasyprint_url_fetcher()
-        ).write_pdf()
+        ).write_pdf(
+            stylesheets=(weasyprint.CSS(string='* {page: auto !important;}'),)
+        )
 
     def _convert_eml(self):
         page_number = getattr(self, 'page_number', 0)
