@@ -412,11 +412,11 @@ unit tests (216): archives and compressed files (ZIP, JAR, TAR, gzip, RAR header
 encryption, decompression bombs, pages and search text), GPS tracks, DICOM images, 12-bit and
 lossless JPEG, audio files, SVG drawings and signatures, emails and Markdown files without remote resources, the text of the emails,
 the Outlook `.msg` files, transparency, and the content-based MIME types. They need no database and no network: their
-files are built in memory or come with pydicom. Run them from an Egyptian installation, with
-the same environment variables as for `migrate`:
+files are built in memory or come with pydicom. Run them from a clone of this repository, with
+the Python of an Egyptian installation. The Docker image does not contain them.
 
 ```bash
-/opt/mayan-edms/bin/mayan-edms.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types mayan.apps.signature_captures mayan.apps.storage
+MAYAN_MEDIA_ROOT=$(mktemp -d) python3 manage.py test mayan.apps.converter mayan.apps.document_parsing mayan.apps.mime_types mayan.apps.signature_captures mayan.apps.storage
 ```
 
 The tests that need a tool or a library that is not installed (FFmpeg, libarchive-c,

@@ -338,8 +338,6 @@ STORAGES['staticfiles'] = {
     'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 }
 
-TEST_RUNNER = 'mayan.apps.testing.runner.MayanTestRunner'
-
 LOGIN_REQUIRED_EXEMPT_URLS = ()
 
 SESSION_REFRESH_EXEMPT_URLS = ()
