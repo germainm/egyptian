@@ -327,25 +327,28 @@ Browse all apps and purchase access: **[egyptian-apps.mypalace.ca](https://egypt
 
 ## Docker image
 
-A public image of Egyptian, without the extensions, is published on Docker Hub:
-**[mypalace/egyptian](https://hub.docker.com/r/mypalace/egyptian)**. It is built from this
-repository (`docker/`, GitHub Actions) and keeps the paths and the `MAYAN_*` variables of the
-Mayan EDMS image: the Mayan EDMS Docker Compose file and `install-custom-apps.sh` work with it.
+No image of Egyptian is published. `docker compose` builds it from this repository at the first
+start, without the extensions. It keeps the paths and the `MAYAN_*` variables of the Mayan EDMS
+image: the Mayan EDMS Docker Compose file and `install-custom-apps.sh` work with it.
 
 ```bash
-cd docker
+git clone https://github.com/germainm/egyptian.git
+cd egyptian/docker
 docker compose up --detach
 ```
 
-`docker/docker-compose.yml` uses `mypalace/egyptian:s4.12` (`MAYAN_DOCKER_IMAGE_NAME`,
-`MAYAN_DOCKER_IMAGE_TAG`). Set your own passwords in `docker/.env` before real use.
+On a GitHub runner with 4 CPUs, this builds and starts the image `egyptian:s4.12`
+(`MAYAN_DOCKER_IMAGE_NAME`, `MAYAN_DOCKER_IMAGE_TAG`) in 7 minutes. Set your own passwords in
+`docker/.env` before real use. To use an image from your own registry instead, also set
+`MAYAN_DOCKER_IMAGE_PULL_POLICY=missing`. The image `mypalace/egyptian`, which earlier versions of
+the Compose file pulled, is no longer published.
 
 The image has the tools of all the file formats added to the converter: FFmpeg (videos, audio
 files), djvulibre (DjVu), Calibre (EPUB), libarchive (archives), WeasyPrint (EML, Markdown)
 librsvg (SVG) and the Python libraries of the RAW photo, DXF, STL, DICOM (with pyjpegls and
 pylibjpeg-openjpeg), HEIF/HEIC
-and archive formats. The image on Docker Hub was last built on October 29, 2026: it does not have
-the changes of November 3 and 4 yet.
+and archive formats. The GitHub Actions workflow `Docker image`, run by hand, builds it this way,
+starts it and turns one file of 11 formats into pages.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.
