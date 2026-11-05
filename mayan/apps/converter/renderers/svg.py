@@ -16,8 +16,9 @@ from urllib.parse import unquote_to_bytes
 from ..literals import DEFAULT_RSVG_CONVERT_PATH
 from ..settings import setting_graphics_backend_arguments
 
-# A drawing above about 300 megapixels is refused, more than the images that
-# Pillow accepts by default. Reading a file takes less than 100 MB.
+# Four bytes per pixel: a drawing above about 390 megapixels is refused at once.
+# Pillow refuses the image above 179 by default, once it is drawn. A small drawing
+# fits in 64 MB.
 MEMORY_MAXIMUM = 1536 * 1024 * 1024
 TIME_MAXIMUM = 60
 
