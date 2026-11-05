@@ -363,7 +363,10 @@ class Worker:
         )
 
     def get_maximum_memory_per_child(self):
-        return filesizeformat(bytes_=self.maximum_memory_per_child)
+        # Celery counts this limit in KiB, the format expects bytes.
+        return filesizeformat(
+            bytes_=(self.maximum_memory_per_child or 0) * 1024
+        )
 
     get_maximum_memory_per_child.help_text = _(
         message='Maximum amount of resident memory a worker can execute '
