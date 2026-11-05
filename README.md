@@ -27,8 +27,9 @@ commercial extensions built and used in production.
   14 megapixels takes 1.8 s at quality 90 (6.3 s with a Python loop) and 4.2 s at quality 100
   (8.1 s). The loop remains for the other images and for the streams too dense for the readers,
   such as pure noise at the highest quality, 12% slower than the loop alone; both give the same
-  result on 842 files, 360 of them damaged. Images over 64 million samples or 2 minutes of decoding, and files too
-  short for the size they declare, get the page of attributes with the reason.
+  result on 842 files, 360 of them damaged. Images over 64 million samples or 2 minutes of
+  decoding, and files too short for the size they declare, get the page of attributes with the
+  reason.
 - **No more `python-gdcm`.** This package is under the Apache-2.0 license and bundles OpenSSL
   1.1.1k. JPEG-LS is now read by `pyjpegls` (MIT, with CharLS under a BSD license), JPEG 2000 by
   `pylibjpeg-openjpeg` (MIT, with OpenJPEG under a BSD license) with Pillow after it, and
@@ -62,12 +63,19 @@ commercial extensions built and used in production.
   names of the attachments, then the body, in HTML with its images when the file has one. The 41
   sample files of Apache POI take 6.6 s together; one of them, with thousands of recipients, gets
   26 pages to list them. Messages already stored keep the pages they have.
+- **The HTML that Outlook writes stays on the page of the headers.** It puts the message in a named
+  page, which started a new page: the headers were alone on the first one. This also applies to
+  the `.eml` files that come from Outlook.
 - **Attachments of the same name.** When an email or an Outlook message is split into documents,
   two attachments of the same name gave the first one twice, and an attachment named
   `message.txt` gave the text of an Outlook message. They are now `facture.pdf`,
   `facture (2).pdf`.
 - **Text of office files: one conversion per file.** LibreOffice converted the whole file for each
   page: 4.5 s for a document of 4 pages, now 1.2 s, for the same text.
+- **All of this on a running instance.** 24 files were uploaded and processed by its workers, among
+  them the mammogram at quality 90, a real radiograph, and 11 `.msg` and `.eml` files, and a `.msg`
+  and an `.eml` file were split into documents: the images, the pages, the text, the OCR and
+  the metadata are right, and no error was logged.
 - **The text of emails is extracted.** It only came from the OCR of the page images. It is now
   read from the PDF file that gives the pages, page by page, as soon as the file is uploaded:
   headers, names of the attachments, body. Outlook `.msg` files get the text of their page the
@@ -323,7 +331,8 @@ The image has the tools of all the file formats added to the converter: FFmpeg (
 files), djvulibre (DjVu), Calibre (EPUB), libarchive (archives), WeasyPrint (EML, Markdown)
 and the Python libraries of the SVG, RAW photo, DXF, STL, DICOM (with pyjpegls and
 pylibjpeg-openjpeg), HEIF/HEIC
-and archive formats.
+and archive formats. The image on Docker Hub was last built on October 29, 2026: it does not have
+the changes of November 3 and 4 yet.
 
 To regenerate the files of the image after a change to the workers, the queues or
 `mayan/literals.py`, see `docker/generer.py`.
