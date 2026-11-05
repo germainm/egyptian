@@ -97,6 +97,16 @@ update_uid_gid() {
         # initial files. Top level only.
         chown {{ DOCKER_USER_USERNAME }}:{{ DOCKER_USER_USERNAME }} "${MAYAN_MEDIA_ROOT}"
 
+        # Django writes the temporary file of a large upload to this
+        # directory, and it must be on the same filesystem as the media root
+        # so that the file is moved into the storage instead of being copied
+        # inside the request. Create it before Mayan starts and give it to the
+        # runtime user. A volume initialized from an image that created the
+        # directory as root is repaired here as well.
+        upload_temporary_directory="${MAYAN_FILE_UPLOAD_TEMP_DIR:-${MAYAN_MEDIA_ROOT}/tmp}"
+        mkdir --parents "${upload_temporary_directory}"
+        chown {{ DOCKER_USER_USERNAME }}:{{ DOCKER_USER_USERNAME }} "${upload_temporary_directory}"
+
         echo "Modifying gid and uid definitions of the user."
         groupmod {{ DOCKER_USER_USERNAME }} --gid "${MAYAN_USER_GID}" --non-unique
         usermod {{ DOCKER_USER_USERNAME }} --uid "${MAYAN_USER_UID}" --non-unique
@@ -124,7 +134,7 @@ CELERY_MAX_TASKS_PER_CHILD_ARGUMENT=--max-tasks-per-child=
 export MAYAN_USER_GID="${MAYAN_USER_GID:-{{ DOCKER_USER_GID }}}"
 export MAYAN_USER_UID="${MAYAN_USER_UID:-{{ DOCKER_USER_UID }}}"
 
-export MAYAN_ALLOWED_HOSTS='["*"]'
+export MAYAN_ALLOWED_HOSTS="${MAYAN_ALLOWED_HOSTS:-['*']}"
 export MAYAN_BIN=/opt/mayan-edms/bin/mayan-edms.py
 export MAYAN_INSTALL_DIR=/opt/mayan-edms
 export MAYAN_PYTHON_BIN_DIR=/opt/mayan-edms/bin/
@@ -138,19 +148,53 @@ export DJANGO_SETTINGS_MODULE="${MAYAN_SETTINGS_MODULE}"
 # Gunicorn
 
 export MAYAN_GUNICORN_BIN="${MAYAN_PYTHON_BIN_DIR}gunicorn"
-# Variables of the Supervisor configuration of Mayan EDMS 4.12.2 (defined in the
-# [supervisord] section outside Docker).
-export MAYAN_GUNICORN_BIND_ADDRESS="${MAYAN_GUNICORN_BIND_ADDRESS:-{{ GUNICORN_BIND_ADDRESS }}}"
-export MAYAN_GUNICORN_LOG_LEVEL="${MAYAN_GUNICORN_LOG_LEVEL:-{{ DEFAULT_LOGGING_LEVEL|lower }}}"
-export MAYAN_BEAT_LOG_LEVEL="${MAYAN_BEAT_LOG_LEVEL:-{{ DEFAULT_LOGGING_LEVEL }}}"
-export MAYAN_BEAT_NICE_LEVEL="${MAYAN_BEAT_NICE_LEVEL:-{{ BEAT_NICE_LEVEL }}}"
-export MAYAN_WORKER_LOG_LEVEL="${MAYAN_WORKER_LOG_LEVEL:-{{ DEFAULT_LOGGING_LEVEL }}}"
 export MAYAN_GUNICORN_REQUESTS_JITTER="${MAYAN_GUNICORN_REQUESTS_JITTER:-{{ GUNICORN_REQUESTS_JITTER }}}"
 export MAYAN_GUNICORN_LIMIT_REQUEST_LINE="${MAYAN_GUNICORN_LIMIT_REQUEST_LINE:-{{ GUNICORN_LIMIT_REQUEST_LINE }}}"
 export MAYAN_GUNICORN_MAX_REQUESTS="${MAYAN_GUNICORN_MAX_REQUESTS:-{{ GUNICORN_MAX_REQUESTS }}}"
 export MAYAN_GUNICORN_WORKER_CLASS="${MAYAN_GUNICORN_WORKER_CLASS:-{{ GUNICORN_WORKER_CLASS }}}"
 export MAYAN_GUNICORN_WORKERS="${MAYAN_GUNICORN_WORKERS:-{{ GUNICORN_WORKERS }}}"
 export MAYAN_GUNICORN_TIMEOUT="${MAYAN_GUNICORN_TIMEOUT:-{{ GUNICORN_TIMEOUT }}}"
+
+# Gunicorn's log level follows the Mayan logging level
+# (`MAYAN_LOGGING_LEVEL`) unless overridden explicitly. Gunicorn expects a
+# lowercase level name, so the resolved value is normalized to lowercase.
+export MAYAN_GUNICORN_LOG_LEVEL="$(echo "${MAYAN_GUNICORN_LOG_LEVEL:-${MAYAN_LOGGING_LEVEL:-{{ DEFAULT_LOGGING_LEVEL }}}}" | tr '[:upper:]' '[:lower:]')"
+
+# The Celery worker log level follows the Mayan logging level
+# (`MAYAN_LOGGING_LEVEL`) unless overridden with `MAYAN_WORKER_LOG_LEVEL`.
+# Celery accepts an uppercase level name, so no case conversion is needed.
+export MAYAN_WORKER_LOG_LEVEL="${MAYAN_WORKER_LOG_LEVEL:-${MAYAN_LOGGING_LEVEL:-{{ DEFAULT_LOGGING_LEVEL }}}}"
+
+# The Celery beat log level follows the worker log level unless overridden
+# with `MAYAN_BEAT_LOG_LEVEL`. Beat is niced one step below the default so
+# that it yields to the class A worker, which serves the interactive
+# requests.
+export MAYAN_BEAT_LOG_LEVEL="${MAYAN_BEAT_LOG_LEVEL:-${MAYAN_WORKER_LOG_LEVEL}}"
+export MAYAN_BEAT_NICE_LEVEL="${MAYAN_BEAT_NICE_LEVEL:-{{ BEAT_NICE_LEVEL }}}"
+
+# Gunicorn bind address hardening.
+#
+# By default Gunicorn listens on all interfaces (`0.0.0.0`). Enabling the
+# `MAYAN_GUNICORN_BIND_CONTAINER_IP_ONLY` toggle restricts Gunicorn to the
+# container's own IP address, so it no longer listens on the loopback or
+# any other attached interface, reducing the exposed attack surface. The
+# toggle is disabled by default; disable it (or leave it unset) if it
+# causes connectivity problems. `MAYAN_GUNICORN_BIND_ADDRESS` can also be
+# set directly to override the bind address entirely.
+MAYAN_GUNICORN_BIND_HOST=0.0.0.0
+
+result="$(any_to_bool ${MAYAN_GUNICORN_BIND_CONTAINER_IP_ONLY})"
+if [ "${result}" ]; then
+    MAYAN_GUNICORN_CONTAINER_IP="$(hostname -i 2>/dev/null | awk '{print $1}')"
+    if [ -n "${MAYAN_GUNICORN_CONTAINER_IP}" ]; then
+        MAYAN_GUNICORN_BIND_HOST="${MAYAN_GUNICORN_CONTAINER_IP}"
+        echo "Restricting Gunicorn to the container IP address ${MAYAN_GUNICORN_CONTAINER_IP}."
+    else
+        echo "Warning: unable to determine the container IP address; Gunicorn will bind to all interfaces."
+    fi
+fi
+
+export MAYAN_GUNICORN_BIND_ADDRESS="${MAYAN_GUNICORN_BIND_ADDRESS:-${MAYAN_GUNICORN_BIND_HOST}:8000}"
 
 if mount | grep --quiet '/dev/shm'; then
     export MAYAN_GUNICORN_TEMPORARY_DIRECTORY="--worker-tmp-dir=/dev/shm"
@@ -164,7 +208,9 @@ export MAYAN_PIP_BIN="${MAYAN_PYTHON_BIN_DIR}pip"
 export MAYAN_STATIC_ROOT="${MAYAN_INSTALL_DIR}/static"
 export MAYAN_SUPERVISOR_AUTORESTART="${MAYAN_SUPERVISOR_AUTORESTART:-{{ SUPERVISOR_AUTORESTART }}}"
 
-# Setup worker environment variables. Used by the all-in-one profile only.
+# Setup worker environment variables. Used by the all-in-one profile to
+# build the command line of each worker, and by `run_worker.sh` for the
+# profiles that run a worker in its own container.
 {% for worker in workers %}
 MAYAN_{{ worker.name|upper }}_CONCURRENCY="${MAYAN_{{ worker.name|upper }}_CONCURRENCY:-{{ worker.concurrency }}}"
 
@@ -225,6 +271,11 @@ run_all)
     /usr/local/bin/run_all.sh
     ;;
 
+run_beat)
+    shift
+    exec runuser --user {{ DOCKER_USER_USERNAME }} -- /usr/local/bin/run_beat.sh "${@}"
+    ;;
+
 run_celery)
     shift
     exec runuser --user {{ DOCKER_USER_USERNAME }} -- /usr/local/bin/run_celery.sh "${@}"
@@ -249,12 +300,6 @@ run_perform_upgrade)
 
 run_initial_setup_or_perform_upgrade)
     initial_setup_or_perform_upgrade
-    ;;
-
-run_tests)
-    initial_setup_or_perform_upgrade
-    shift
-    exec runuser --user {{ DOCKER_USER_USERNAME }} -- /usr/local/bin/run_tests.sh "${@}"
     ;;
 
 run_worker)

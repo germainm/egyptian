@@ -137,7 +137,7 @@ class PostgreSQLServiceCheck(ServiceCheck):
                         'database': database_name,
                         'host': database_parameters.get('HOST'),
                         'password': database_parameters.get('PASSWORD'),
-                        'post': database_parameters.get('PORT'),
+                        'port': database_parameters.get('PORT'),
                         'user': database_parameters.get('USER')
                     }
 

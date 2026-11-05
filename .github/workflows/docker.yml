@@ -170,12 +170,50 @@ jobs:
             exit 1
           fi
 
+      - name: Separate containers
+        working-directory: docker
+        env:
+          MAYAN_DOCKER_CPU_LIMIT: '4.0'
+        run: |
+          set -x
+          docker compose down --volumes
+          export COMPOSE_PROFILES=multi_container,postgresql,rabbitmq,redis
+          docker compose up --detach
+          for i in $(seq 60); do
+            if curl --silent --fail --output /dev/null http://127.0.0.1/authentication/login/; then
+              echo "Login page after about $((i * 10)) seconds"
+              break
+            fi
+            sleep 10
+          done
+          sleep 60
+          docker compose ps --all
+          test "$(docker compose ps --format '{{.State}}' celery_beat)" = running
+          # The periodic tasks are stored when Celery Beat starts.
+          test "$(docker compose exec -T postgresql psql -U mayan -d mayan -At -c 'select count(*) from django_celery_beat_periodictask')" -gt 0
+          # Each worker has its limits, as in the all-in-one container.
+          docker compose exec -T -u mayan frontend /opt/mayan-edms/bin/celery -A mayan inspect stats --json --timeout 15 > /tmp/stats.json
+          python3 -c "
+          import json
+          text = open('/tmp/stats.json').read()
+          stats = json.loads(text[text.index('{'):]).values()
+          values = sorted((s['pool']['max-concurrency'], s['pool']['max-tasks-per-child']) for s in stats)
+          print(values)
+          assert values == [(1, 2000), (2, 2000), (4, 4000), (4, 4000), (4, 20000), (8, 10000)]
+          "
+          # Each queue has one consumer.
+          docker compose exec -T rabbitmq rabbitmqctl -q -p mayan list_queues name consumers > /tmp/queues.txt
+          grep -v -E '^name|pidbox|celeryev|reply' /tmp/queues.txt > /tmp/worker_queues.txt
+          test "$(wc -l < /tmp/worker_queues.txt)" -eq 40
+          if awk '$2 != 1' /tmp/worker_queues.txt | grep .; then exit 1; fi
+
       - name: Logs
         if: always()
         working-directory: docker
         env:
           # GitHub runners have 4 CPUs; the Compose file limits the app to 6 by default.
           MAYAN_DOCKER_CPU_LIMIT: '4.0'
+          COMPOSE_PROFILES: all_in_one,multi_container,postgresql,rabbitmq,redis
         run: |
-          docker compose logs app | tail -120
+          docker compose logs --tail=120
           docker compose down --volumes
