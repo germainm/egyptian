@@ -71,10 +71,13 @@ commercial extensions built and used in production.
   drawing. On the 1,762 test drawings of resvg, 905 are close to their reference image instead of
   656, and 3 are not rendered instead of 67. On 294 real logos and icons, none fails; the difference
   between the two is 0.12% on average, and in the largest ones, seen side by side, its image is
-  that of Chrome where `CairoSVG` was wrong. A few bytes can ask for a huge drawing: 1.5 GB and
+  that of Chrome where `CairoSVG` was wrong on three logos. A few bytes can ask for a huge drawing: 1.5 GB and
   60 seconds at the most. A drawing of 32,000 by 32,000 pixels is now refused at once, instead of
   taking 42 s and 3.9 GB before being refused. Signatures are read from `data:` URLs only:
   `CairoSVG` received their field as an address.
+  Checked on a running instance: 7 drawings, among them those three logos and a `.svgz` file, and
+  a signature have the right image, a remote image is not loaded, and the drawing of 32,000 pixels
+  and a signature that names a file get an error instead of an image.
 - **Attachments of the same name.** When an email or an Outlook message is split into documents,
   two attachments of the same name gave the first one twice, and an attachment named
   `message.txt` gave the text of an Outlook message. They are now `facture.pdf`,
