@@ -49,6 +49,7 @@ jobs:
           grep -q 'appearance/images/egyptian-login' /tmp/login.html
           if grep -q 'Guided Demo' /tmp/login.html; then exit 1; fi
           curl --silent --fail --location --output /dev/null http://127.0.0.1/favicon.ico
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps --quiet app)")" = healthy
           docker compose exec -T app supervisorctl status
           if docker compose exec -T app supervisorctl status | grep -v RUNNING; then exit 1; fi
           docker compose exec -T app /opt/mayan-edms/bin/python -c "import ezdxf, matplotlib, numpy, pillow_heif, pydicom, rawpy, stl"
@@ -188,6 +189,7 @@ jobs:
           done
           sleep 60
           docker compose ps --all
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps --quiet frontend)")" = healthy
           test "$(docker compose ps --format '{{.State}}' celery_beat)" = running
           # The periodic tasks are stored when Celery Beat starts.
           test "$(docker compose exec -T postgresql psql -U mayan -d mayan -At -c 'select count(*) from django_celery_beat_periodictask')" -gt 0

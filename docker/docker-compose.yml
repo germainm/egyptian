@@ -102,10 +102,13 @@ x-mayan-frontend-ports:
     - "${MAYAN_FRONTEND_HTTP_PORT:-80}:8000"
     # []
 
+# Uses the address of the container, because MAYAN_GUNICORN_BIND_CONTAINER_IP_ONLY
+# can restrict Gunicorn to it, and accepts any answer below 500, because Django
+# answers 400 to this host name when MAYAN_ALLOWED_HOSTS is set.
 x-mayan-healthcheck:
   &mayan-healthcheck
   healthcheck:
-    test: ["CMD-SHELL", "/opt/mayan-edms/bin/python -c \"import sys,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5); sys.exit(0 if r.status<400 else 1)\""]
+    test: ["CMD-SHELL", "/opt/mayan-edms/bin/python -c \"import http.client,socket,sys; c=http.client.HTTPConnection(socket.gethostbyname(socket.gethostname()),8000,timeout=5); c.request('GET','/authentication/login/'); sys.exit(0 if c.getresponse().status<500 else 1)\""]
     interval: 30s
     timeout: 5s
     retries: 10
