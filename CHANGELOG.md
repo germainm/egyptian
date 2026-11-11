@@ -16,6 +16,11 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   Quebec: the number, the total, the invoice date and the due date are right on all four. The
   patterns are stored in the workflow action: run `finance_init` again after updating the app.
 
+- **Q&A: answers shown formatted.** The language models answer in Markdown, and the history of a
+  document showed the `**`, the dashes and the numbers as raw text, all on one line. Bold, italic,
+  code, headings, lists and tables are now displayed formatted, also for the answers already saved.
+  The text is escaped first, so an answer cannot inject HTML. Checked on two DeepSeek answers.
+
 ---
 
 ## November 5, 2026
