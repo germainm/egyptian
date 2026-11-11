@@ -5,6 +5,19 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
 
 ---
 
+## November 11, 2026
+
+- **Finance: the total and the supplier are read from the right line.** On invoices with taxes, the
+  stored amount was the subtotal, because "Total" also matched the end of "Sous-total". The supplier
+  could be any text after "de" or "from", even inside a word: "Imprimerie Lavande inc." gave "inc.".
+  The supplier now needs a label ("Fournisseur :", "Supplier:", "De :"…), otherwise the field stays
+  empty. In English, "1,234.56" was cut to "1,23", and "Invoice #:" and "Invoice Number:" were not
+  recognized; "Date d'émission" is now read as the invoice date. Checked on four demo invoices from
+  Quebec: the number, the total, the invoice date and the due date are right on all four. The
+  patterns are stored in the workflow action: run `finance_init` again after updating the app.
+
+---
+
 ## November 5, 2026
 
 - **Separate containers work like the all-in-one container.** With the `multi_container` profile,
