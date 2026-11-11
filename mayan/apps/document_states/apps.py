@@ -417,9 +417,9 @@ class DocumentStatesApp(MayanAppConfig):
             is_sortable=True, source=WorkflowInstance
         )
         # The log entry created by the launch has neither user nor
-        # transition: show "None" translated instead of the raw value.
+        # transition: show a dash instead of the raw value "None".
         SourceColumn(
-            empty_value=_(message='None'),
+            empty_value='—',
             func=lambda context: getattr(
                 context['object'].get_last_log_entry(), 'user',
                 _(message='None')
@@ -427,7 +427,7 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowInstance
         )
         SourceColumn(
-            attribute='get_last_transition', empty_value=_(message='None'),
+            attribute='get_last_transition', empty_value='—',
             include_label=True, label=_(message='Last transition'),
             source=WorkflowInstance
         )
@@ -451,18 +451,18 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowInstanceLogEntry
         )
         SourceColumn(
-            attribute='user', include_label=True, label=_(message='User'),
-            source=WorkflowInstanceLogEntry
+            attribute='user', empty_value='—', include_label=True,
+            label=_(message='User'), source=WorkflowInstanceLogEntry
         )
         SourceColumn(
-            attribute='get_origin_state', include_label=True,
+            attribute='get_origin_state', empty_value='—', include_label=True,
             is_sortable=True, label=_(message='Origin state'),
             sort_field='transition__origin_state',
             source=WorkflowInstanceLogEntry
         )
         SourceColumn(
-            attribute='transition', include_label=True, is_sortable=True,
-            source=WorkflowInstanceLogEntry
+            attribute='transition', empty_value='—', include_label=True,
+            is_sortable=True, source=WorkflowInstanceLogEntry
         )
         SourceColumn(
             attribute='get_destination_state', include_label=True,
