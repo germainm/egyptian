@@ -26,6 +26,9 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   results for:", and many help texts of the settings, tasks, sequences and searches. Each one was
   checked against the existing French terms (classeur, type de document, flux de travail…) and
   keeps its placeholders. The existing translations are unchanged.
+- **Workflows of a document: no more "None".** The log entry created by the launch has neither user
+  nor transition, and the "User" and "Last transition" columns showed the raw value `None`. They now
+  show it translated, like the other empty columns.
 
 ---
 

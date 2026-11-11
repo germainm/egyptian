@@ -416,7 +416,10 @@ class DocumentStatesApp(MayanAppConfig):
             attribute='state_active', include_label=True,
             is_sortable=True, source=WorkflowInstance
         )
+        # The log entry created by the launch has neither user nor
+        # transition: show "None" translated instead of the raw value.
         SourceColumn(
+            empty_value=_(message='None'),
             func=lambda context: getattr(
                 context['object'].get_last_log_entry(), 'user',
                 _(message='None')
@@ -424,8 +427,9 @@ class DocumentStatesApp(MayanAppConfig):
             source=WorkflowInstance
         )
         SourceColumn(
-            attribute='get_last_transition', include_label=True,
-            label=_(message='Last transition'), source=WorkflowInstance
+            attribute='get_last_transition', empty_value=_(message='None'),
+            include_label=True, label=_(message='Last transition'),
+            source=WorkflowInstance
         )
         SourceColumn(
             func=lambda context: getattr(
