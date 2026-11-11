@@ -39,6 +39,11 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   and four of its task names: their French translations had been dropped from the catalog, because
   the extraction of the messages did not see them. They are now in French.
 
+- **Finance: the monthly report counts every state.** The report counted only the invoices pending
+  approval: the approved and the paid ones showed "—" in the Count column. Each row now has its
+  count and its total, and the amounts are formatted for the language of the user, "1 627,82" in
+  French instead of "1627.82".
+
 ---
 
 ## November 5, 2026
