@@ -240,7 +240,8 @@ class MetadataApp(MayanAppConfig):
         )
         SourceColumn(
             attribute='is_required', include_label=True,
-            source=DocumentMetadata, widget=column_widgets.TwoStateWidget
+            label=_(message='Required'), source=DocumentMetadata,
+            widget=column_widgets.TwoStateWidget
         )
         SourceColumn(
             label=_(message='Document link'), order=98,

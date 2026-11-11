@@ -26,10 +26,18 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   results for:", and many help texts of the settings, tasks, sequences and searches. Each one was
   checked against the existing French terms (classeur, type de document, flux de travail…) and
   keeps its placeholders. The existing translations are unchanged.
+
 - **Workflows and approvals: no more "None".** The log entry created by the launch of a workflow has
   neither user, origin state nor transition, and these columns showed the raw value `None`, in the
   workflows of a document and in the detail of a workflow. An approval request without a deadline or
-  made by the system showed it too. These empty values now show "—".
+  made by the system showed it too, like a transition approver without an escalation delay. These
+  empty values now show "—".
+
+- **French: the "Required" column and the approval comments.** The metadata of a document showed a
+  column "Is required" in English. When an approval moved a workflow, the comment of the step,
+  "Approved via approval workflow", stayed in English, like the other comments written by Approvals
+  and four of its task names: their French translations had been dropped from the catalog, because
+  the extraction of the messages did not see them. They are now in French.
 
 ---
 
