@@ -21,6 +21,12 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   code, headings, lists and tables are now displayed formatted, also for the answers already saved.
   The text is escaped first, so an answer cannot inject HTML. Checked on two DeepSeek answers.
 
+- **French: 1,368 missing translations added.** The French catalogs of Mayan EDMS left 1,368 texts
+  in English in 60 apps, such as "Sort by column", "Do not expand", "Active state" or "Search
+  results for:", and many help texts of the settings, tasks, sequences and searches. Each one was
+  checked against the existing French terms (classeur, type de document, flux de travail…) and
+  keeps its placeholders. The existing translations are unchanged.
+
 ---
 
 ## November 5, 2026
