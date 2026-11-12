@@ -41,7 +41,7 @@ class ChoiceForm(Form):
             attrs={
                 'autocomplete': 'off',
                 'class': 'views-select-search',
-                'placeholder': 'Filter list'
+                'placeholder': _(message='Filter list')
             }
         )
     )

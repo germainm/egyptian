@@ -5,6 +5,27 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
 
 ---
 
+## November 12, 2026
+
+- **Approvals: safer and clearer emails.** The comment of the requester and the label of the
+  document were inserted into the HTML emails as they were: a comment could add links or images
+  to the email of the approvers. They are now escaped. The deadline was written in UTC: it is now
+  in the time zone of the recipient, like the language already was. In French, the labels get
+  their space before the colon ("Échéance :"), and the plain-text part of the emails has one line
+  per item instead of a single run-on line. The escalation email named only one of the approvers
+  who had not voted: it now names all of them.
+
+- **Approvals: full names in the lists.** The lists of approval requests, the approvers of a
+  transition and the page of the votes showed usernames ("camille"): they show the full name
+  ("Camille Fortier"). The quorum count shows "—" when the quorum type does not use it.
+
+- **French: texts hidden by the fr_FR catalogs.** Python looks for the French translation in
+  fr_FR before fr, and nine fr_FR entries copied the English text: "<Model attributes>",
+  "<Filters and tags>" (in every template field of the workflow actions), "App", "Build",
+  "Usage" and "Line art" stayed in English although fr had them. They now show the French text.
+  The search box of the permission lists ("Filter list") was not marked for translation: it
+  shows "Filtrer la liste".
+
 ## November 11, 2026
 
 - **Finance: the total and the supplier are read from the right line.** On invoices with taxes, the
