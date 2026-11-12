@@ -39,10 +39,17 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   and four of its task names: their French translations had been dropped from the catalog, because
   the extraction of the messages did not see them. They are now in French.
 
-- **Finance: the monthly report counts every state.** The report counted only the invoices pending
-  approval: the approved and the paid ones showed "—" in the Count column. Each row now has its
-  count and its total, and the amounts are formatted for the language of the user, "1 627,82" in
-  French instead of "1627.82".
+- **Finance: a report of what waits, what is overdue and what was paid this month.** The "Finance
+  monthly report" added up all the invoices ever made under "Period: <month>", counted the pending
+  invoices only and showed raw amounts. It becomes the *Finance report*: the invoices pending
+  approval (with the age of the oldest one), approved and not paid, overdue, due within 7 days, and
+  paid in the current month, each row with its count and its total, amounts formatted for the
+  language ("1 627,82" in French). A click on a count lists the invoices. The report now counts
+  only the documents the user may view, as its README said, and leaves out the trash.
+
+- **French: month names in lowercase.** The French catalog of the documents app wrote the months
+  with a capital letter, and it replaced the Django translation everywhere: dates showed
+  "11 Novembre 2026". They now show "11 novembre 2026".
 
 ---
 
