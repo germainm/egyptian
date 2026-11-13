@@ -5,6 +5,15 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
 
 ---
 
+## November 13, 2026
+
+- **Document Embedding and Document NER: the workers no longer hang.** Both apps loaded their
+  models in a thread as soon as Mayan started. Celery starts Mayan and then forks its worker
+  processes: a process forked while the models were loading hung the first time it used a model,
+  and the worker stopped processing tasks (embeddings, entities, and every other task of that
+  worker). The models are now loaded the first time a process needs them; the parent processes
+  no longer hold them in memory either.
+
 ## November 12, 2026
 
 - **Approvals: safer and clearer emails.** The comment of the requester and the label of the
