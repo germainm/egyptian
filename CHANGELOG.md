@@ -14,6 +14,10 @@ the [README](README.md). The release notes of Mayan EDMS itself are in [HISTORY.
   worker). The models are now loaded the first time a process needs them; the parent processes
   no longer hold them in memory either.
 
+- **Document NER: entity types in the language of the user.** The Entities tab showed the
+  types of entities (Persons, Organizations, Locations...) in English whatever the language of
+  the user; they are now translated (in French: Personnes, Organisations, Lieux...).
+
 ## November 12, 2026
 
 - **Approvals: safer and clearer emails.** The comment of the requester and the label of the
